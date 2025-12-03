@@ -111,7 +111,6 @@ WHERE crm.deleted <> 1
     AND mrd.total IS NOT NULL
     AND mrd.reading_date IS NOT NULL
     AND ma.machinestatus = 1
-    AND YEAR(mrd.reading_date) = 2025
 ORDER BY ma.serialnumber, mrd.reading_date, crme.createdtime;
 """
 
@@ -130,6 +129,7 @@ def load_excel_data(filepath: str) -> Dict:
         customer, model, serial, month_year, a3_mono, a4_mono, a3_color, a4_color, total = row
         if serial and month_year in allowed_months:
             data[str(serial)][month_year] = {
+                'customer': customer,
                 'a3_mono': a3_mono or 0,
                 'a4_mono': a4_mono or 0,
                 'a3_color': a3_color or 0,
@@ -144,12 +144,12 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
     """
     Convert cumulative to incremental with sub-meters - matches Qlik logic
     Takes last reading per date (FirstSortedValue), then calculates monthly movement
-    Filter to specific months only
+    Process ALL historical data but only return 2025 months for reporting
     """
     from collections import OrderedDict
 
-    # Only these months
-    allowed_months = {'Mar-2025', 'Apr-2025', 'May-2025', 'Jun-2025',
+    # Only report these months (but calculate from beginning of time)
+    report_months = {'Mar-2025', 'Apr-2025', 'May-2025', 'Jun-2025',
                      'Jul-2025', 'Aug-2025', 'Sep-2025', 'Nov-2025'}
 
     # Step 1: Group by serial+date, take LAST reading per date (by createdtime)
@@ -193,15 +193,30 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
             # Take latest day in month
             monthly_readings[month_year] = reading
 
-        # Step 4: Calculate incremental movement (only for allowed months)
-        prev_total = 0
-        prev_a3 = 0
-        prev_black = 0
-        prev_large = 0
-        prev_colour = 0
-        prev_extralarge = 0
+        # Step 4: Calculate incremental movement from ALL history, but only store 2025 months
+        # Get list of months to iterate with next month lookup
+        month_list = list(monthly_readings.keys())
 
-        for month_year, reading in monthly_readings.items():
+        for i, month_year in enumerate(month_list):
+            reading = monthly_readings[month_year]
+
+            # Get previous month's reading for baseline
+            if i > 0:
+                prev_reading = monthly_readings[month_list[i-1]]
+                prev_total = prev_reading['total']
+                prev_a3 = prev_reading['a3']
+                prev_black = prev_reading['black']
+                prev_large = prev_reading['large']
+                prev_colour = prev_reading['colour']
+                prev_extralarge = prev_reading['extralarge']
+            else:
+                prev_total = 0
+                prev_a3 = 0
+                prev_black = 0
+                prev_large = 0
+                prev_colour = 0
+                prev_extralarge = 0
+
             cumulative = reading['total']
             incremental = cumulative - prev_total
 
@@ -211,9 +226,20 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
             incr_colour = reading['colour'] - prev_colour
             incr_extralarge = reading['extralarge'] - prev_extralarge
 
-            if incremental >= 0 and month_year in allowed_months:
-                result[serial][month_year] = {
-                    'volume': incremental,
+            # Calculate total from sum of sub-meters
+            incr_total_from_subs = incr_a3 + incr_black + incr_large + incr_colour + incr_extralarge
+
+            # Shift to next month to match Xerox reporting (they report on first day of next month)
+            # Get next month for reporting
+            if i + 1 < len(month_list):
+                report_as_month = month_list[i + 1]
+            else:
+                report_as_month = None
+
+            # Only store if the NEXT month is in our report range
+            if incremental >= 0 and report_as_month and report_as_month in report_months:
+                result[serial][report_as_month] = {
+                    'volume': incr_total_from_subs,  # Use sum of sub-meters
                     'a3': incr_a3,
                     'black': incr_black,
                     'large': incr_large,
@@ -223,12 +249,6 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
                     'company': reading['company'],
                     'cumulative': cumulative
                 }
-            prev_total = cumulative
-            prev_a3 = reading['a3']
-            prev_black = reading['black']
-            prev_large = reading['large']
-            prev_colour = reading['colour']
-            prev_extralarge = reading['extralarge']
 
     return result
 
@@ -280,17 +300,30 @@ def create_excel_report(excel_data: Dict, db_data: Dict, output_path: str):
 
     # Single sheet: Comparison
     ws = wb.create_sheet("Volume Comparison", 0)
+
+    # Styles for total columns
+    total_fill = PatternFill(start_color="FFD966", end_color="FFD966", fill_type="solid")
+    total_header_fill = PatternFill(start_color="F4B084", end_color="F4B084", fill_type="solid")
+    total_header_font = Font(bold=True, color="FFFFFF")
+
     headers = [
-        "Serial", "Model", "Company", "Month",
-        "DB A3", "DB Black", "DB Large", "DB Colour", "DB XL", "DB Total",
+        "Serial", "Model", "BMS Company", "Xerox Customer", "Month",
+        "", # Spacer
+        "BMS A3", "BMS Black", "BMS Large", "BMS Colour", "BMS XL", "BMS Total",
+        "", # Spacer
         "Xerox A3 Mono", "Xerox A4 Mono", "Xerox A3 Color", "Xerox A4 Color", "Xerox Total",
-        "Difference", "DB Balance"
+        "", # Spacer
+        "Difference", "BMS Balance"
     ]
     ws.append(headers)
 
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
+    for idx, cell in enumerate(ws[1], 1):
+        if cell.value in ["BMS Total", "Xerox Total"]:
+            cell.fill = total_header_fill
+            cell.font = total_header_font
+        elif cell.value:
+            cell.fill = header_fill
+            cell.font = header_font
 
     # Month order for sorting
     month_order = {'Mar-2025': 1, 'Apr-2025': 2, 'May-2025': 3, 'Jun-2025': 4,
@@ -302,20 +335,39 @@ def create_excel_report(excel_data: Dict, db_data: Dict, output_path: str):
         all_months = sorted(set(excel_months.keys()) | set(db_months.keys()),
                            key=lambda x: month_order.get(x, 99))
 
+        # Get model and company from any available month for this serial
+        serial_model = 'N/A'
+        serial_company = 'N/A'
+        for month_data in db_months.values():
+            if month_data.get('model'):
+                serial_model = month_data['model']
+            if month_data.get('company'):
+                serial_company = month_data['company']
+            if serial_model != 'N/A' and serial_company != 'N/A':
+                break
+
+        # Get Xerox customer name from any available month for this serial
+        xerox_customer = 'N/A'
+        for month_data in excel_months.values():
+            if month_data.get('customer'):
+                xerox_customer = month_data['customer']
+                break
+
         for month in all_months:
             db_info = db_months.get(month, {})
             xerox_info = excel_months.get(month, {})
 
-            model = db_info.get('model', 'N/A')
-            company = db_info.get('company', 'N/A')
+            model = serial_model
+            company = serial_company
+            customer = xerox_customer
 
-            db_a3 = db_info.get('a3', 0)
-            db_black = db_info.get('black', 0)
-            db_large = db_info.get('large', 0)
-            db_colour = db_info.get('colour', 0)
-            db_xl = db_info.get('extralarge', 0)
-            db_total = db_info.get('volume', 0)
-            db_balance = db_info.get('cumulative', 0)
+            bms_a3 = db_info.get('a3', 0)
+            bms_black = db_info.get('black', 0)
+            bms_large = db_info.get('large', 0)
+            bms_colour = db_info.get('colour', 0)
+            bms_xl = db_info.get('extralarge', 0)
+            bms_total = db_info.get('volume', 0)
+            bms_balance = db_info.get('cumulative', 0)
 
             xerox_a3_mono = xerox_info.get('a3_mono', 0)
             xerox_a4_mono = xerox_info.get('a4_mono', 0)
@@ -323,15 +375,23 @@ def create_excel_report(excel_data: Dict, db_data: Dict, output_path: str):
             xerox_a4_color = xerox_info.get('a4_color', 0)
             xerox_total = xerox_info.get('total', 0)
 
-            difference = db_total - xerox_total
+            difference = bms_total - xerox_total
 
             row = [
-                serial, model, company, month,
-                db_a3, db_black, db_large, db_colour, db_xl, db_total,
+                serial, model, company, customer, month,
+                "", # Spacer
+                bms_a3, bms_black, bms_large, bms_colour, bms_xl, bms_total,
+                "", # Spacer
                 xerox_a3_mono, xerox_a4_mono, xerox_a3_color, xerox_a4_color, xerox_total,
-                difference, db_balance
+                "", # Spacer
+                difference, bms_balance
             ]
             ws.append(row)
+
+            # Highlight total columns
+            row_num = ws.max_row
+            ws[f'L{row_num}'].fill = total_fill  # BMS Total (now column L)
+            ws[f'R{row_num}'].fill = total_fill  # Xerox Total (now column R)
 
     # Auto-size columns
     for column in ws.columns:
