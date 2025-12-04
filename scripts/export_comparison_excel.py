@@ -101,7 +101,8 @@ SELECT
     mrd.black,
     mrd.large,
     mrd.colour,
-    mrd.extralarge
+    mrd.extralarge,
+    mrd.meterreadingid
 FROM bms_machines ma
 LEFT JOIN vtiger_crmentity crm on crm.crmid = ma.machinesid
 LEFT JOIN bms_meterreading mrd on mrd.asset = ma.machinesid
@@ -155,11 +156,11 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
     # Step 1: Group by serial+date, take LAST reading per date (by createdtime)
     by_serial_date = defaultdict(lambda: defaultdict(list))
 
-    for serial, model, status, date, date_time, total, a3, black, large, colour, extralarge, company in raw_data:
+    for serial, model, status, date, date_time, total, a3, black, large, colour, extralarge, meterreading_id, company in raw_data:
         if serial and date and total is not None:
             date_key = date.strftime("%Y-%m-%d")
             by_serial_date[str(serial)][date_key].append((
-                date_time, total, a3 or 0, black or 0, large or 0, colour or 0, extralarge or 0, model, company
+                date_time, total, a3 or 0, black or 0, large or 0, colour or 0, extralarge or 0, model, company, meterreading_id
             ))
 
     # Step 2: Get latest reading per date
@@ -177,7 +178,8 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
                 'colour': latest[5],
                 'extralarge': latest[6],
                 'model': latest[7],
-                'company': latest[8]
+                'company': latest[8],
+                'meterreading_id': latest[9]
             }
 
     # Step 3: Group by month, take last day's reading of month
@@ -247,7 +249,8 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
                     'extralarge': incr_extralarge,
                     'model': reading['model'],
                     'company': reading['company'],
-                    'cumulative': cumulative
+                    'cumulative': cumulative,
+                    'meterreading_id': reading.get('meterreading_id')
                 }
 
     return result
@@ -393,17 +396,104 @@ def create_excel_report(excel_data: Dict, db_data: Dict, output_path: str):
             ws[f'L{row_num}'].fill = total_fill  # BMS Total (now column L)
             ws[f'R{row_num}'].fill = total_fill  # Xerox Total (now column R)
 
-    # Auto-size columns
-    for column in ws.columns:
-        max_length = 0
-        column_letter = get_column_letter(column[0].column)
-        for cell in column:
-            try:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
-        ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    # ========== BMS Source Data Sheet ==========
+    ws_bms = wb.create_sheet("BMS Source Data", 1)
+
+    bms_headers = [
+        "Serial", "Model", "Company", "Month",
+        "Meter Reading ID", "BMS Balance",
+        "BMS A3", "BMS Black", "BMS Large", "BMS Colour", "BMS XL", "BMS Total"
+    ]
+    ws_bms.append(bms_headers)
+
+    for cell in ws_bms[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+
+    # Add BMS data for common serials
+    for serial in sorted(common_serials):
+        db_months = db_data[serial]
+
+        # Get model and company from any available month
+        serial_model = 'N/A'
+        serial_company = 'N/A'
+        for month_data in db_months.values():
+            if month_data.get('model'):
+                serial_model = month_data['model']
+            if month_data.get('company'):
+                serial_company = month_data['company']
+            if serial_model != 'N/A' and serial_company != 'N/A':
+                break
+
+        all_months = sorted(db_months.keys(), key=lambda x: month_order.get(x, 99))
+
+        for month in all_months:
+            db_info = db_months[month]
+
+            row = [
+                serial, serial_model, serial_company, month,
+                db_info.get('meterreading_id', 'N/A'),
+                db_info.get('cumulative', 0),
+                db_info.get('a3', 0),
+                db_info.get('black', 0),
+                db_info.get('large', 0),
+                db_info.get('colour', 0),
+                db_info.get('extralarge', 0),
+                db_info.get('volume', 0)
+            ]
+            ws_bms.append(row)
+
+    # ========== Xerox Source Data Sheet ==========
+    ws_xerox = wb.create_sheet("Xerox Source Data", 2)
+
+    xerox_headers = [
+        "Serial", "Customer", "Month",
+        "Xerox A3 Mono", "Xerox A4 Mono", "Xerox A3 Color", "Xerox A4 Color", "Xerox Total"
+    ]
+    ws_xerox.append(xerox_headers)
+
+    for cell in ws_xerox[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+
+    # Add Xerox data for common serials
+    for serial in sorted(common_serials):
+        excel_months = excel_data[serial]
+
+        # Get customer from any available month
+        xerox_customer = 'N/A'
+        for month_data in excel_months.values():
+            if month_data.get('customer'):
+                xerox_customer = month_data['customer']
+                break
+
+        all_months = sorted(excel_months.keys(), key=lambda x: month_order.get(x, 99))
+
+        for month in all_months:
+            xerox_info = excel_months[month]
+
+            row = [
+                serial, xerox_customer, month,
+                xerox_info.get('a3_mono', 0),
+                xerox_info.get('a4_mono', 0),
+                xerox_info.get('a3_color', 0),
+                xerox_info.get('a4_color', 0),
+                xerox_info.get('total', 0)
+            ]
+            ws_xerox.append(row)
+
+    # Auto-size columns for all sheets
+    for sheet in wb:
+        for column in sheet.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            sheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
 
     wb.save(output_path)
 
