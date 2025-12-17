@@ -87,7 +87,7 @@ export default function LiftPlannerPage() {
     try {
       const [companiesRes, machinesRes] = await Promise.all([
         fetch("/api/companies"),
-        fetch("/api/machines?limit=10000"),
+        fetch("/api/machines?limit=10000&status=ACTIVE"),
       ]);
 
       const companiesData = await companiesRes.json();
@@ -356,7 +356,6 @@ export default function LiftPlannerPage() {
           {filteredStores.map((store) => {
             const storeMachines = machinesByStore.get(store.id) || [];
             const totalBalance = storeMachines.reduce((sum, m) => sum + (m.currentBalance || 0), 0);
-            const activeMachines = storeMachines.filter((m) => m.status === "ACTIVE");
 
             return (
               <Card
@@ -384,7 +383,7 @@ export default function LiftPlannerPage() {
                   {/* Store Header */}
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-medium truncate flex-1">{store.name}</span>
-                    <span className="text-[8px] text-muted-foreground ml-1">{activeMachines.length}</span>
+                    <span className="text-[8px] text-muted-foreground ml-1">{storeMachines.length}</span>
                   </div>
 
                   {/* Store Stats */}

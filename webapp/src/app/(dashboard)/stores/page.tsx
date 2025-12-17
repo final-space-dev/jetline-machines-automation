@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -28,7 +27,6 @@ interface StoreStats {
   bmsSchema: string;
   isActive: boolean;
   machineCount: number;
-  activeMachines: number;
   totalBalance: number;
 }
 
@@ -47,7 +45,7 @@ export default function StoresPage() {
     try {
       const [companiesRes, machinesRes] = await Promise.all([
         fetch("/api/companies"),
-        fetch("/api/machines?limit=10000"),
+        fetch("/api/machines?limit=10000&status=ACTIVE"),
       ]);
 
       const companiesData = await companiesRes.json();
@@ -62,9 +60,6 @@ export default function StoresPage() {
           (sum: number, m: MachineWithRelations) => sum + (m.currentBalance || 0),
           0
         );
-        const activeMachines = storeMachines.filter(
-          (m: MachineWithRelations) => m.status === "ACTIVE"
-        ).length;
 
         return {
           id: company.id,
@@ -73,7 +68,6 @@ export default function StoresPage() {
           bmsSchema: company.bmsSchema,
           isActive: company.isActive,
           machineCount: storeMachines.length,
-          activeMachines,
           totalBalance,
         };
       });
@@ -141,9 +135,7 @@ export default function StoresPage() {
                     { key: "name", header: "Store" },
                     { key: "region", header: "Region" },
                     { key: "machineCount", header: "Machines" },
-                    { key: "activeMachines", header: "Active" },
                     { key: "totalBalance", header: "Balance" },
-                    { key: "isActive", header: "Status" },
                   ],
                   "stores"
                 )
@@ -163,9 +155,7 @@ export default function StoresPage() {
                     { key: "name", header: "Store" },
                     { key: "region", header: "Region" },
                     { key: "machineCount", header: "Machines" },
-                    { key: "activeMachines", header: "Active" },
                     { key: "totalBalance", header: "Balance" },
-                    { key: "isActive", header: "Status" },
                   ],
                   "stores"
                 )
@@ -210,9 +200,7 @@ export default function StoresPage() {
                     <th className="px-3 py-1.5 text-left font-medium">Store</th>
                     <th className="px-3 py-1.5 text-left font-medium">Region</th>
                     <th className="px-3 py-1.5 text-right font-medium">Machines</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Active</th>
                     <th className="px-3 py-1.5 text-right font-medium">Balance</th>
-                    <th className="px-3 py-1.5 text-center font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -225,13 +213,7 @@ export default function StoresPage() {
                       <td className="px-3 py-1.5 font-medium">{store.name}</td>
                       <td className="px-3 py-1.5 text-muted-foreground">{store.region || "-"}</td>
                       <td className="px-3 py-1.5 text-right font-mono">{store.machineCount}</td>
-                      <td className="px-3 py-1.5 text-right font-mono">{store.activeMachines}</td>
                       <td className="px-3 py-1.5 text-right font-mono">{formatNumber(store.totalBalance)}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <Badge variant={store.isActive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
-                          {store.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
