@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
     // Build company filter
     const companyFilter = companyIdFilter ? { companyId: companyIdFilter } : {};
 
+    // Calculate contract expiry thresholds
+    const now = new Date();
+    const sixMonthsFromNow = new Date();
+    sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+
     // Get base statistics in parallel
     const [
       totalMachines,
@@ -31,6 +36,8 @@ export async function GET(request: NextRequest) {
       categoriesCount,
       lastSyncLog,
       recentReadings,
+      expiredContracts,
+      expiringContracts,
     ] = await Promise.all([
       prisma.machine.count({ where: companyFilter }),
       prisma.machine.count({
@@ -62,6 +69,23 @@ export async function GET(request: NextRequest) {
           incrementalTotal: true,
           incrementalColour: true,
           incrementalBlack: true,
+        },
+      }),
+      // Count expired contracts
+      prisma.machine.count({
+        where: {
+          ...companyFilter,
+          rentalEndDate: { lt: now },
+        },
+      }),
+      // Count contracts expiring in next 6 months
+      prisma.machine.count({
+        where: {
+          ...companyFilter,
+          rentalEndDate: {
+            gte: now,
+            lt: sixMonthsFromNow,
+          },
         },
       }),
     ]);
@@ -206,6 +230,8 @@ export async function GET(request: NextRequest) {
           totalVolumeInPeriod > 0
             ? Math.round((totalColorVolume / totalVolumeInPeriod) * 100)
             : 0,
+        expiredContracts,
+        expiringContracts,
       },
       period: {
         days: period,

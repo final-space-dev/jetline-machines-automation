@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, AlertTriangle, Clock } from "lucide-react";
 import { formatNumber, formatDate } from "@/lib/utils";
 
 interface DashboardData {
@@ -24,6 +24,8 @@ interface DashboardData {
     companiesCount: number;
     categoriesCount: number;
     colorPercentage: number;
+    expiredContracts: number;
+    expiringContracts: number;
   };
   period: {
     days: number;
@@ -216,6 +218,45 @@ export default function DashboardPage() {
                 ))}
               </CardContent>
             </Card>
+
+            {/* Contracts Alert */}
+            {((stats?.summary.expiredContracts || 0) > 0 || (stats?.summary.expiringContracts || 0) > 0) && (
+              <Card
+                className="cursor-pointer hover:bg-muted/50 border-yellow-500/50"
+                onClick={() => router.push("/contracts")}
+              >
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    Contracts Alert
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1 px-3 pb-3 text-xs">
+                  {(stats?.summary.expiredContracts || 0) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-red-600 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Expired
+                      </span>
+                      <span className="font-mono font-bold text-red-600">
+                        {stats?.summary.expiredContracts}
+                      </span>
+                    </div>
+                  )}
+                  {(stats?.summary.expiringContracts || 0) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-yellow-600 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Expiring (6mo)
+                      </span>
+                      <span className="font-mono font-bold text-yellow-600">
+                        {stats?.summary.expiringContracts}
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* By Category */}
             <Card>
