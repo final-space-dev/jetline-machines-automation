@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// CORE ENTITIES
+// =============================================================================
+
+// Company/Store - Each Jetline store location
+model Company {
+  id          String    @id @default(cuid())
+  name        String    // Display name (e.g., "Menlyn")
+  bmsSchema   String    @unique @map("bms_schema") // BMS database name (e.g., "menlynbms2")
+  bmsHost     String?   @map("bms_host") // Database hostname
+  region      String?   // Geographic region
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  machines          Machine[]
+  scenarioCompanies ScenarioCompany[]
+
+  @@map("companies")
+}
+
+// Category - Machine classification from BMS (Colour, Black and White, Office Machine, Plan)
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique // e.g., "Colour", "Black and White"
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  machines    Machine[]
+
+  @@map("categories")
+}
+
+// PrinterModel - Specific printer model (extracted from BMS machine_model_name)
+model PrinterModel {
+  id              String    @id @default(cuid())
+  name            String    @unique // e.g., "Xerox VersaLink C7025"
+  makeName        String?   @map("make_name") // e.g., "Xerox"
+  isColor         Boolean   @default(true) @map("is_color")
+  monthlyDutyCycle Int?     @map("monthly_duty_cycle") // Recommended monthly volume
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  machines        Machine[]
+
+  @@map("printer_models")
+}
+
+// =============================================================================
+// MACHINE ENTITY - Core of the system
+// =============================================================================
+
+model Machine {
+  id                    String        @id @default(cuid())
+
+  // Identifiers
+  serialNumber          String        @unique @map("serial_number")
+  bmsMachinesId         Int?          @map("bms_machines_id") // Original machinesid from BMS
+  bmsMachineNo          String?       @map("bms_machine_no") // machinesno from BMS
+
+  // Relationships
+  companyId             String        @map("company_id")
+  categoryId            String?       @map("category_id")
+  modelId               String?       @map("model_id")
+
+  // Machine details from BMS
+  machineName           String?       @map("machine_name") // e.g., "MP1100 L5671200107"
+  makeName              String?       @map("make_name")
+  modelName             String?       @map("model_name")
+
+  // Status
+  status                MachineStatus @default(ACTIVE)
+  bmsStatus             Int?          @map("bms_status") // Raw machinestatus from BMS (0/1)
+
+  // Dates
+  installDate           DateTime?     @map("install_date") // original_installation_date
+  startDate             DateTime?     @map("start_date") // start_date
+
+  // Contract information
+  contractNumber        String?       @map("contract_number")
+  contractType          String?       @map("contract_type") // machine_contract_type
+  rentalStartDate       DateTime?     @map("rental_start_date")
+  rentalEndDate         DateTime?     @map("rental_end_date")
+  rentalMonthsRemaining Int?          @map("rental_months_remaining")
+  rentalAmountExVat     Decimal?      @map("rental_amount_ex_vat") @db.Decimal(22, 2)
+  otherFixedAmountExVat Decimal?      @map("other_fixed_amount_ex_vat") @db.Decimal(22, 2)
+
+  // Operations
+  isLifted              Boolean       @default(false) @map("is_lifted") // lift field from BMS
+
+  // Current state (latest reading summary)
+  currentBalance        Int           @default(0) @map("current_balance")
+  lastReadingDate       DateTime?     @map("last_reading_date")
+
+  // Timestamps
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  lastSyncedAt          DateTime?     @map("last_synced_at")
+
+  // Relations
+  company               Company       @relation(fields: [companyId], references: [id])
+  category              Category?     @relation(fields: [categoryId], references: [id])
+  model                 PrinterModel? @relation(fields: [modelId], references: [id])
+  readings              MeterReading[]
+  scenarioMachines      ScenarioMachine[]
+
+  @@index([companyId])
+  @@index([serialNumber])
+  @@index([categoryId])
+  @@index([modelId])
+  @@map("machines")
+}
+
+enum MachineStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  DECOMMISSIONED
+}
+
+// =============================================================================
+// METER READINGS - Full history from BMS
+// =============================================================================
+
+model MeterReading {
+  id                  String    @id @default(cuid())
+
+  // Source tracking
+  machineId           String    @map("machine_id")
+  bmsMeterReadingId   Int?      @map("bms_meterreading_id") // Original meterreadingid
+  bmsMeterReadingNo   String?   @map("bms_meterreading_no") // meterreading_no
+
+  // Reading details
+  readingDate         DateTime  @map("reading_date") @db.Date
+  readingDateTime     DateTime? @map("reading_datetime") // createdtime from vtiger_crmentity
+
+  // Meter values (cumulative balances from BMS)
+  total               Int       @default(0) // Main balance/total
+  a3                  Int?      // A3 impressions
+  black               Int?      // Black impressions
+  large               Int?      // Large format
+  colour              Int?      // Color impressions
+  extraLarge          Int?      @map("extra_large") // Extra large
+
+  // Calculated incremental values (movement since last reading)
+  incrementalTotal    Int?      @map("incremental_total")
+  incrementalA3       Int?      @map("incremental_a3")
+  incrementalBlack    Int?      @map("incremental_black")
+  incrementalLarge    Int?      @map("incremental_large")
+  incrementalColour   Int?      @map("incremental_colour")
+  incrementalXl       Int?      @map("incremental_xl")
+
+  // Flags from BMS
+  isReported          Boolean   @default(false) @map("is_reported")
+  forBilling          Boolean   @default(false) @map("for_billing")
+  isOpeningReading    Boolean   @default(false) @map("is_opening_reading")
+  isClosingReading    Boolean   @default(false) @map("is_closing_reading")
+
+  // Metadata
+  source              String    @default("BMS") // BMS or XEROX
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  machine             Machine   @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([machineId, readingDate, bmsMeterReadingId])
+  @@index([machineId])
+  @@index([readingDate])
+  @@index([machineId, readingDate])
+  @@map("meter_readings")
+}
+
+// =============================================================================
+// WAR ROOM - Scenario Planning
+// =============================================================================
+
+model Scenario {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  status      ScenarioStatus @default(DRAFT)
+  createdBy   String?        @map("created_by")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  companies   ScenarioCompany[]
+  machines    ScenarioMachine[]
+
+  @@map("scenarios")
+}
+
+enum ScenarioStatus {
+  DRAFT
+  PROPOSED
+  APPROVED
+  IMPLEMENTED
+  ARCHIVED
+}
+
+model ScenarioCompany {
+  id          String    @id @default(cuid())
+  scenarioId  String    @map("scenario_id")
+  companyId   String    @map("company_id")
+
+  scenario    Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  company     Company   @relation(fields: [companyId], references: [id])
+
+  @@unique([scenarioId, companyId])
+  @@map("scenario_companies")
+}
+
+model ScenarioMachine {
+  id              String    @id @default(cuid())
+  scenarioId      String    @map("scenario_id")
+  machineId       String    @map("machine_id")
+  fromCompanyId   String    @map("from_company_id")
+  toCompanyId     String    @map("to_company_id")
+  notes           String?
+
+  scenario        Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  machine         Machine   @relation(fields: [machineId], references: [id])
+
+  @@unique([scenarioId, machineId])
+  @@map("scenario_machines")
+}
+
+// =============================================================================
+// SYNC & AUDIT
+// =============================================================================
+
+model SyncLog {
+  id                String     @id @default(cuid())
+  syncType          String     @map("sync_type") // FULL, INCREMENTAL, COMPANY
+  targetCompany     String?    @map("target_company") // If syncing specific company
+  startedAt         DateTime   @map("started_at")
+  completedAt       DateTime?  @map("completed_at")
+
+  // Stats
+  companiesProcessed Int       @default(0) @map("companies_processed")
+  machinesProcessed  Int       @default(0) @map("machines_processed")
+  readingsProcessed  Int       @default(0) @map("readings_processed")
+
+  // Status
+  status            SyncStatus @default(RUNNING)
+  errors            String?    @db.Text
+
+  @@map("sync_logs")
+}
+
+enum SyncStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// =============================================================================
+// BMS CONNECTION CONFIG
+// =============================================================================
+
+model BmsConnection {
+  id          String    @id @default(cuid())
+  schema      String    @unique // e.g., "menlynbms2"
+  host        String    // hostname
+  port        Int       @default(3306)
+  isActive    Boolean   @default(true) @map("is_active")
+  lastChecked DateTime? @map("last_checked")
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("bms_connections")
+}

@@ -112,6 +112,8 @@ SELECT
     ma.machine_model_name,
     ma.machinestatus,
     mrd.reading_date,
+    ma.machines_category,
+    COALESCE(ma.original_installation_date, ma.start_date) as install_date,
     crme.createdtime as reading_date_time,
     mrd.total as totalamt,
     mrd.a3,
@@ -247,8 +249,8 @@ def calculate_incremental_volumes(raw_data: List[Tuple]) -> Dict:
     # Step 1: Group by serial+date, take LAST reading per date (by createdtime)
     by_serial_date = defaultdict(lambda: defaultdict(list))
 
-    # raw_data structure: (serial, model, status, date, date_time, total, a3, black, large, colour, extralarge, meterreading_id, meterreading_no, company)
-    for serial, model, status, date, date_time, total, a3, black, large, colour, extralarge, meterreading_id, meterreading_no, company in raw_data:
+    # raw_data structure: (serial, model, status, date, category, install_date, date_time, total, a3, black, large, colour, extralarge, meterreading_id, meterreading_no, company)
+    for serial, model, status, date, category, install_date, date_time, total, a3, black, large, colour, extralarge, meterreading_id, meterreading_no, company in raw_data:
         if serial and date and total is not None:
             date_key = date.strftime("%Y-%m-%d")
             by_serial_date[str(serial)][date_key].append((
@@ -505,7 +507,7 @@ def create_excel_report(excel_data: Dict, db_data: Dict, raw_results: List[Tuple
         cell.font = header_font
 
     # Add ALL daily readings from raw_results for common serials only
-    # raw_results structure: (serial, model, status, date, datetime, total, a3, black, large, colour, xl, meterreadingid, meterreading_no, company)
+    # raw_results structure: (serial, model, status, date, category, install_date, datetime, total, a3, black, large, colour, xl, meterreadingid, meterreading_no, company)
     for row in raw_results:
         serial = row[0]
 
@@ -515,15 +517,15 @@ def create_excel_report(excel_data: Dict, db_data: Dict, raw_results: List[Tuple
 
         model = row[1]
         reading_date = row[3]
-        reading_datetime = row[4]
-        total = row[5]
-        a3 = row[6]
-        black = row[7]
-        large = row[8]
-        colour = row[9]
-        xl = row[10]
-        meterreading_no = row[12]  # meterreading_no field
-        company = row[13]
+        reading_datetime = row[6]
+        total = row[7]
+        a3 = row[8]
+        black = row[9]
+        large = row[10]
+        colour = row[11]
+        xl = row[12]
+        meterreading_no = row[14]  # meterreading_no field
+        company = row[15]
 
         bms_row = [
             serial, model, company, str(reading_date), str(reading_datetime),
@@ -590,7 +592,7 @@ def create_excel_report(excel_data: Dict, db_data: Dict, raw_results: List[Tuple
         cell.font = header_font
 
     # Build BMS readings lookup by serial -> date -> readings
-    # raw_results: (serial, model, status, date, datetime, total, a3, black, large, colour, xl, meterreadingid, meterreading_no, company)
+    # raw_results: (serial, model, status, date, category, install_date, datetime, total, a3, black, large, colour, xl, meterreadingid, meterreading_no, company)
     bms_by_serial_date = defaultdict(dict)
     for row in raw_results:
         serial = str(row[0]).strip() if row[0] else None
@@ -600,11 +602,11 @@ def create_excel_report(excel_data: Dict, db_data: Dict, raw_results: List[Tuple
         if reading_date:
             date_key = reading_date.strftime("%Y-%m-%d") if hasattr(reading_date, 'strftime') else str(reading_date)[:10]
             # Store the reading - later ones overwrite earlier (we want latest reading per day)
-            # Use the 'total' field from database (row[5]) - this is the Balance field
+            # Use the 'total' field from database (row[7]) - this is the Balance field
             bms_by_serial_date[serial][date_key] = {
                 'model': row[1],
-                'company': row[13],
-                'balance': row[5] or 0,  # This is the Balance/total field from BMS
+                'company': row[15],
+                'balance': row[7] or 0,  # This is the Balance/total field from BMS
                 'date': reading_date
             }
 
@@ -733,6 +735,7 @@ def create_balance_report(device_meters: Dict, raw_results: List[Tuple], output_
         cell.font = header_font
 
     # Build BMS readings lookup by serial -> date -> readings
+    # raw_results: (serial, model, status, date, category, install_date, datetime, total, a3, black, large, colour, xl, meterreadingid, meterreading_no, company)
     bms_by_serial_date = defaultdict(dict)
     for row in raw_results:
         serial = str(row[0]).strip() if row[0] else None
@@ -743,8 +746,8 @@ def create_balance_report(device_meters: Dict, raw_results: List[Tuple], output_
             date_key = reading_date.strftime("%Y-%m-%d") if hasattr(reading_date, 'strftime') else str(reading_date)[:10]
             bms_by_serial_date[serial][date_key] = {
                 'model': row[1],
-                'company': row[13],
-                'balance': row[5] or 0,
+                'company': row[15],
+                'balance': row[7] or 0,
                 'date': reading_date
             }
 
@@ -831,6 +834,40 @@ def create_balance_report(device_meters: Dict, raw_results: List[Tuple], output_
     print(f"  Serials compared: {ws.max_row - 1}")
 
 
+def export_bms_machine_info(raw_results: List[Tuple]) -> Dict:
+    """Extract unique machine info (category, install_date, company) by serial number
+
+    raw_results structure (updated):
+    (serial, model, status, date, category, install_date, datetime, total, a3, black, large, colour, xl, meterreadingid, meterreading_no, company)
+    """
+    machine_info = {}
+
+    for row in raw_results:
+        serial = str(row[0]).strip() if row[0] else None
+        if not serial:
+            continue
+
+        # Only store first occurrence (or overwrite with newer data)
+        if serial not in machine_info:
+            category = row[4]
+            install_date = row[5]
+            company = row[15]  # company name is appended at the end
+
+            # Convert install_date to string if it's a datetime
+            if install_date:
+                install_date_str = install_date.strftime("%Y-%m-%d") if hasattr(install_date, 'strftime') else str(install_date)[:10]
+            else:
+                install_date_str = None
+
+            machine_info[serial] = {
+                'category': category,
+                'install_date': install_date_str,
+                'bms_company': company
+            }
+
+    return machine_info
+
+
 def main():
     # Use paths relative to script location for portability
     script_dir = Path(__file__).parent
@@ -875,6 +912,15 @@ def main():
     if device_meters:
         print("\nCreating balance comparison report...")
         create_balance_report(device_meters, raw_results, balance_output_path)
+
+    # Export BMS machine info (category, install_date, company) to JSON for performance report
+    print("\nExporting BMS machine info...")
+    bms_machine_info = export_bms_machine_info(raw_results)
+    import json
+    bms_info_path = output_path.parent / "bms_machine_info.json"
+    with open(bms_info_path, 'w') as f:
+        json.dump(bms_machine_info, f)
+    print(f"✓ BMS machine info saved: {bms_info_path} ({len(bms_machine_info)} serials)")
 
 
 if __name__ == "__main__":

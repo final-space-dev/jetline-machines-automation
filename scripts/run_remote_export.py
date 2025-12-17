@@ -30,6 +30,7 @@ REMOTE_DEVICE_METERS = f"{REMOTE_DIR}/Device Current Meters based on last Readin
 REMOTE_ENV = f"{REMOTE_DIR}/.env"
 REMOTE_OUTPUT = f"{REMOTE_DIR}/Volume_Comparison_Report.xlsx"
 REMOTE_BALANCE_OUTPUT = f"{REMOTE_DIR}/Xerox_vs_BMS_Balances.xlsx"
+REMOTE_BMS_INFO = f"{REMOTE_DIR}/bms_machine_info.json"
 
 def run_ssh_command(cmd, check=True):
     """Run command via SSH"""
@@ -133,6 +134,14 @@ def main():
         print(f"✓ Balance report saved: {local_balance_output}")
     except subprocess.CalledProcessError:
         print("⚠ Balance report not found (Device Meters file may be missing)")
+
+    # Copy BMS machine info JSON
+    local_bms_info = PROJECT_ROOT / "bms_machine_info.json"
+    try:
+        copy_from_remote(REMOTE_BMS_INFO, local_bms_info)
+        print(f"✓ BMS machine info saved: {local_bms_info}")
+    except subprocess.CalledProcessError:
+        print("⚠ BMS machine info not found")
 
     # Cleanup remote files
     print("\nCleaning up...")
