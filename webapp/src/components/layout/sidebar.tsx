@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   Menu,
   BarChart3,
+  FileText,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Stores", href: "/stores", icon: Building2 },
   { name: "Machines", href: "/machines", icon: Printer },
   { name: "Models", href: "/models", icon: BarChart3 },
+  { name: "Contracts", href: "/contracts", icon: FileText },
   { name: "Lift Planner", href: "/lift", icon: ArrowUpRight },
 ];
 

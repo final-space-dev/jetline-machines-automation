@@ -153,11 +153,9 @@ export default function SettingsPage() {
                 <thead className="bg-muted/50 border-y">
                   <tr>
                     <th className="px-3 py-1.5 text-left font-medium">Company</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Schema</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Host</th>
                     <th className="px-3 py-1.5 text-right font-medium">Machines</th>
                     <th className="px-3 py-1.5 text-center font-medium">Status</th>
-                    <th className="px-3 py-1.5 text-center font-medium">Test</th>
+                    <th className="px-3 py-1.5 text-center font-medium">Connection</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -166,8 +164,6 @@ export default function SettingsPage() {
                     return (
                       <tr key={company.id}>
                         <td className="px-3 py-1.5 font-medium">{company.name}</td>
-                        <td className="px-3 py-1.5 font-mono text-muted-foreground">{company.bmsSchema}</td>
-                        <td className="px-3 py-1.5 font-mono text-muted-foreground">{company.bmsHost || "default"}</td>
                         <td className="px-3 py-1.5 text-right font-mono">{company._count?.machines || 0}</td>
                         <td className="px-3 py-1.5 text-center">
                           <Badge

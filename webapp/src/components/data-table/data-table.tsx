@@ -21,10 +21,12 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Download,
+  FileSpreadsheet,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +34,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -130,7 +133,7 @@ export function DataTable<TData, TValue>({
     },
   });
 
-  const handleExport = () => {
+  const handleExportCSV = () => {
     const visibleColumns = table.getAllColumns().filter((col) => col.getIsVisible());
     const headers = visibleColumns.map((col) => col.id);
     const rows = table.getFilteredRowModel().rows.map((row) =>
@@ -150,6 +153,25 @@ export function DataTable<TData, TValue>({
     a.download = `${exportFileName}-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportExcel = () => {
+    const visibleColumns = table.getAllColumns().filter((col) => col.getIsVisible());
+    const headers = visibleColumns.map((col) => col.id);
+    const rows = table.getFilteredRowModel().rows.map((row) =>
+      visibleColumns.map((col) => {
+        const value = row.getValue(col.id);
+        if (value === null || value === undefined) return "";
+        if (value instanceof Date) return value;
+        return value;
+      })
+    );
+
+    const wsData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.writeFile(wb, `${exportFileName}-${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const activeFilters = columnFilters.length + (globalFilterValue ? 1 : 0);
@@ -244,10 +266,25 @@ export function DataTable<TData, TValue>({
           </DropdownMenu>
 
           {/* Export */}
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV (.csv)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

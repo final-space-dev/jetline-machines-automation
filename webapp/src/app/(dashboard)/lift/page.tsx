@@ -8,13 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -25,12 +18,14 @@ import {
 import {
   ArrowRight,
   Search,
-  Undo2,
-  Save,
+  Download,
+  FileSpreadsheet,
   Trash2,
-  CheckCircle,
+  X,
+  GripVertical,
 } from "lucide-react";
-import { formatNumber, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { exportToExcel, exportToCSV } from "@/lib/export";
 import type { MachineWithRelations } from "@/types";
 
 interface Store {
@@ -39,24 +34,27 @@ interface Store {
   region: string | null;
 }
 
-interface PendingMove {
+interface PlannedMove {
   id: string;
   machine: MachineWithRelations;
   fromStore: Store;
   toStore: Store;
 }
 
+interface StoreMachines {
+  store: Store;
+  machines: MachineWithRelations[];
+}
+
 export default function LiftPlannerPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [machines, setMachines] = useState<MachineWithRelations[]>([]);
-  const [pendingMoves, setPendingMoves] = useState<PendingMove[]>([]);
-  const [sourceStore, setSourceStore] = useState<string>("");
-  const [destStore, setDestStore] = useState<string>("");
-  const [selectedMachines, setSelectedMachines] = useState<Set<string>>(new Set());
+  const [plannedMoves, setPlannedMoves] = useState<PlannedMove[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [draggedMachine, setDraggedMachine] = useState<MachineWithRelations | null>(null);
+  const [draggedFromStore, setDraggedFromStore] = useState<Store | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -72,11 +70,13 @@ export default function LiftPlannerPage() {
       const companiesData = await companiesRes.json();
       const machinesData = await machinesRes.json();
 
-      setStores(companiesData.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        region: c.region,
-      })));
+      setStores(
+        companiesData.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          region: c.region,
+        }))
+      );
       setMachines(machinesData.data || []);
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -85,91 +85,146 @@ export default function LiftPlannerPage() {
     }
   };
 
-  const sourceMachines = sourceStore
-    ? machines.filter((m) => m.companyId === sourceStore)
-    : [];
+  // Apply planned moves to get current state
+  const getEffectiveMachines = (): Map<string, MachineWithRelations[]> => {
+    const machinesByStore = new Map<string, MachineWithRelations[]>();
 
-  const filteredMachines = searchQuery
-    ? sourceMachines.filter(
-        (m) =>
-          m.serialNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          m.modelName?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : sourceMachines;
-
-  const handleToggleMachine = (machineId: string) => {
-    const newSelected = new Set(selectedMachines);
-    if (newSelected.has(machineId)) {
-      newSelected.delete(machineId);
-    } else {
-      newSelected.add(machineId);
-    }
-    setSelectedMachines(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedMachines.size === filteredMachines.length) {
-      setSelectedMachines(new Set());
-    } else {
-      setSelectedMachines(new Set(filteredMachines.map((m) => m.id)));
-    }
-  };
-
-  const handleAddMoves = () => {
-    if (!sourceStore || !destStore || selectedMachines.size === 0) return;
-
-    const fromStore = stores.find((s) => s.id === sourceStore);
-    const toStore = stores.find((s) => s.id === destStore);
-    if (!fromStore || !toStore) return;
-
-    const newMoves: PendingMove[] = [];
-    selectedMachines.forEach((machineId) => {
-      const machine = machines.find((m) => m.id === machineId);
-      if (machine && !pendingMoves.some((pm) => pm.machine.id === machineId)) {
-        newMoves.push({
-          id: `move-${Date.now()}-${machineId}`,
-          machine,
-          fromStore,
-          toStore,
-        });
-      }
+    // Initialize all stores
+    stores.forEach((store) => {
+      machinesByStore.set(store.id, []);
     });
 
-    setPendingMoves([...pendingMoves, ...newMoves]);
-    setSelectedMachines(new Set());
+    // Start with original assignments
+    machines.forEach((machine) => {
+      // Check if this machine has been moved in the plan
+      const move = plannedMoves.find((m) => m.machine.id === machine.id);
+      const effectiveStoreId = move ? move.toStore.id : machine.companyId;
+
+      const storeMachines = machinesByStore.get(effectiveStoreId) || [];
+      storeMachines.push(machine);
+      machinesByStore.set(effectiveStoreId, storeMachines);
+    });
+
+    return machinesByStore;
   };
 
-  const handleUndoMove = (moveId: string) => {
-    setPendingMoves((prev) => prev.filter((m) => m.id !== moveId));
+  const machinesByStore = getEffectiveMachines();
+
+  // Filter stores based on search
+  const filteredStores = searchQuery
+    ? stores.filter((store) => {
+        const q = searchQuery.toLowerCase();
+        if (store.name.toLowerCase().includes(q)) return true;
+        const storeMachines = machinesByStore.get(store.id) || [];
+        return storeMachines.some(
+          (m) =>
+            m.serialNumber?.toLowerCase().includes(q) ||
+            m.modelName?.toLowerCase().includes(q)
+        );
+      })
+    : stores;
+
+  const handleDragStart = (machine: MachineWithRelations, fromStore: Store) => {
+    setDraggedMachine(machine);
+    setDraggedFromStore(fromStore);
   };
 
-  const handleSaveChanges = async () => {
-    setIsSaving(true);
-    try {
-      // Execute all moves
-      for (const move of pendingMoves) {
-        await fetch(`/api/machines/${move.machine.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ companyId: move.toStore.id }),
-        });
-      }
-      setPendingMoves([]);
-      setShowConfirmDialog(false);
-      // Refresh data
-      await fetchData();
-    } catch (error) {
-      console.error("Failed to save moves:", error);
-    } finally {
-      setIsSaving(false);
+  const handleDragEnd = () => {
+    setDraggedMachine(null);
+    setDraggedFromStore(null);
+  };
+
+  const handleDrop = (toStore: Store) => {
+    if (!draggedMachine || !draggedFromStore) return;
+    if (draggedFromStore.id === toStore.id) return;
+
+    // Check if there's already a move for this machine
+    const existingMoveIndex = plannedMoves.findIndex(
+      (m) => m.machine.id === draggedMachine.id
+    );
+
+    // Get the original store
+    const originalStoreId = draggedMachine.companyId;
+    const originalStore = stores.find((s) => s.id === originalStoreId);
+
+    // If moving back to original store, remove the move
+    if (toStore.id === originalStoreId && existingMoveIndex !== -1) {
+      setPlannedMoves((prev) => prev.filter((_, i) => i !== existingMoveIndex));
+    } else if (existingMoveIndex !== -1) {
+      // Update existing move
+      setPlannedMoves((prev) =>
+        prev.map((m, i) => (i === existingMoveIndex ? { ...m, toStore } : m))
+      );
+    } else if (originalStore) {
+      // Add new move
+      setPlannedMoves((prev) => [
+        ...prev,
+        {
+          id: `move-${Date.now()}-${draggedMachine.id}`,
+          machine: draggedMachine,
+          fromStore: originalStore,
+          toStore,
+        },
+      ]);
     }
+
+    handleDragEnd();
+  };
+
+  const handleRemoveMove = (moveId: string) => {
+    setPlannedMoves((prev) => prev.filter((m) => m.id !== moveId));
+  };
+
+  const handleClearAllMoves = () => {
+    setPlannedMoves([]);
+  };
+
+  const handleExportExcel = () => {
+    if (plannedMoves.length === 0) return;
+    exportToExcel(
+      plannedMoves,
+      [
+        { key: "machine.serialNumber", header: "Serial Number" },
+        { key: "machine.modelName", header: "Model" },
+        { key: "fromStore.name", header: "From Store" },
+        { key: "toStore.name", header: "To Store" },
+      ],
+      "move-plan"
+    );
+    setShowExportDialog(false);
+  };
+
+  const handleExportCSV = () => {
+    if (plannedMoves.length === 0) return;
+    exportToCSV(
+      plannedMoves,
+      [
+        { key: "machine.serialNumber", header: "Serial Number" },
+        { key: "machine.modelName", header: "Model" },
+        { key: "fromStore.name", header: "From Store" },
+        { key: "toStore.name", header: "To Store" },
+      ],
+      "move-plan"
+    );
+    setShowExportDialog(false);
+  };
+
+  // Check if a machine has been moved from its original store
+  const isMachineMoved = (machineId: string): boolean => {
+    return plannedMoves.some((m) => m.machine.id === machineId);
+  };
+
+  // Get the original store for a moved machine
+  const getOriginalStore = (machineId: string): Store | null => {
+    const move = plannedMoves.find((m) => m.machine.id === machineId);
+    return move?.fromStore || null;
   };
 
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-48" />
           <Skeleton className="h-[500px]" />
         </div>
       </AppShell>
@@ -184,237 +239,209 @@ export default function LiftPlannerPage() {
           <div>
             <h1 className="text-xl font-bold tracking-tight">Lift Planner</h1>
             <p className="text-xs text-muted-foreground">
-              Move machines between stores
+              Drag machines between stores to plan moves. Download the plan when ready.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {pendingMoves.length > 0 && (
+            {plannedMoves.length > 0 && (
               <Badge variant="outline" className="gap-1 text-xs">
-                {pendingMoves.length} pending
+                {plannedMoves.length} moves planned
               </Badge>
             )}
             <Button
               variant="outline"
               size="sm"
               className="h-7 text-xs"
-              disabled={pendingMoves.length === 0}
-              onClick={() => setPendingMoves([])}
+              disabled={plannedMoves.length === 0}
+              onClick={handleClearAllMoves}
             >
               <Trash2 className="h-3 w-3 mr-1" />
-              Clear
+              Clear All
             </Button>
             <Button
               size="sm"
               className="h-7 text-xs"
-              disabled={pendingMoves.length === 0}
-              onClick={() => setShowConfirmDialog(true)}
+              disabled={plannedMoves.length === 0}
+              onClick={() => setShowExportDialog(true)}
             >
-              <Save className="h-3 w-3 mr-1" />
-              Save ({pendingMoves.length})
+              <Download className="h-3 w-3 mr-1" />
+              Download Plan
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Source Selection */}
-          <Card>
+        {/* Search */}
+        <div className="relative max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search stores or machines..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+
+        {/* Planned Moves Summary */}
+        {plannedMoves.length > 0 && (
+          <Card className="border-primary/50 bg-primary/5">
             <CardHeader className="pb-2 pt-3 px-3">
-              <CardTitle className="text-sm">Select Machines to Move</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 px-3 pb-3">
-              {/* Store Selectors */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">From Store</label>
-                  <Select value={sourceStore} onValueChange={(v) => { setSourceStore(v); setSelectedMachines(new Set()); }}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select source store" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stores.map((store) => (
-                        <SelectItem key={store.id} value={store.id}>
-                          {store.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">To Store</label>
-                  <Select value={destStore} onValueChange={setDestStore}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select destination" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stores.filter((s) => s.id !== sourceStore).map((store) => (
-                        <SelectItem key={store.id} value={store.id}>
-                          {store.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {sourceStore && (
-                <>
-                  {/* Search */}
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search machines..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8 h-8 text-xs"
-                      />
-                    </div>
-                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleSelectAll}>
-                      {selectedMachines.size === filteredMachines.length ? "Deselect" : "Select All"}
-                    </Button>
-                  </div>
-
-                  {/* Machines Table */}
-                  <div className="border rounded-lg overflow-hidden max-h-72 overflow-y-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/50 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left w-6"></th>
-                          <th className="px-2 py-1.5 text-left font-medium">Serial</th>
-                          <th className="px-2 py-1.5 text-left font-medium">Model</th>
-                          <th className="px-2 py-1.5 text-right font-medium">Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {filteredMachines.map((machine) => (
-                          <tr
-                            key={machine.id}
-                            className={cn(
-                              "cursor-pointer",
-                              selectedMachines.has(machine.id) ? "bg-primary/10" : "hover:bg-muted/50"
-                            )}
-                            onClick={() => handleToggleMachine(machine.id)}
-                          >
-                            <td className="px-2 py-1">
-                              <input
-                                type="checkbox"
-                                checked={selectedMachines.has(machine.id)}
-                                onChange={() => {}}
-                                className="rounded h-3 w-3"
-                              />
-                            </td>
-                            <td className="px-2 py-1 font-mono">{machine.serialNumber}</td>
-                            <td className="px-2 py-1 text-muted-foreground">{machine.modelName || "-"}</td>
-                            <td className="px-2 py-1 text-right font-mono">{formatNumber(machine.currentBalance)}</td>
-                          </tr>
-                        ))}
-                        {filteredMachines.length === 0 && (
-                          <tr>
-                            <td colSpan={4} className="px-2 py-4 text-center text-muted-foreground">
-                              No machines found
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Add Button */}
-                  <Button
-                    className="w-full h-8 text-xs"
-                    disabled={selectedMachines.size === 0 || !destStore}
-                    onClick={handleAddMoves}
-                  >
-                    Add {selectedMachines.size} Machine{selectedMachines.size !== 1 ? "s" : ""} to Move List
-                    <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Pending Moves */}
-          <Card>
-            <CardHeader className="pb-2 pt-3 px-3">
-              <CardTitle className="text-sm">Pending Moves ({pendingMoves.length})</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                Planned Moves ({plannedMoves.length})
+                <span className="text-xs font-normal text-muted-foreground">
+                  (Not saved - download to export)
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              {pendingMoves.length > 0 ? (
-                <div className="border rounded-lg overflow-hidden max-h-72 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50 sticky top-0">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left font-medium">Serial</th>
-                        <th className="px-2 py-1.5 text-left font-medium">From</th>
-                        <th className="px-2 py-1.5 text-center font-medium"></th>
-                        <th className="px-2 py-1.5 text-left font-medium">To</th>
-                        <th className="px-2 py-1.5 text-center font-medium w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {pendingMoves.map((move) => (
-                        <tr key={move.id}>
-                          <td className="px-2 py-1 font-mono">{move.machine.serialNumber}</td>
-                          <td className="px-2 py-1 text-muted-foreground">{move.fromStore.name}</td>
-                          <td className="px-2 py-1 text-center">
-                            <ArrowRight className="h-3 w-3 inline text-muted-foreground" />
-                          </td>
-                          <td className="px-2 py-1 font-medium text-primary">{move.toStore.name}</td>
-                          <td className="px-2 py-1 text-center">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
-                              onClick={() => handleUndoMove(move.id)}
-                            >
-                              <Undo2 className="h-3 w-3" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="border rounded-lg p-4 text-center text-xs text-muted-foreground">
-                  <p>Select machines from a source store and add them to the move list</p>
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {plannedMoves.map((move) => (
+                  <div
+                    key={move.id}
+                    className="flex items-center gap-1 px-2 py-1 bg-background rounded border text-xs"
+                  >
+                    <span className="font-mono">{move.machine.serialNumber}</span>
+                    <span className="text-muted-foreground">{move.fromStore.name}</span>
+                    <ArrowRight className="h-3 w-3 text-primary" />
+                    <span className="font-medium text-primary">{move.toStore.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 ml-1"
+                      onClick={() => handleRemoveMove(move.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Store Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {filteredStores.map((store) => {
+            const storeMachines = machinesByStore.get(store.id) || [];
+            const activeMachines = storeMachines.filter((m) => m.status === "ACTIVE");
+
+            return (
+              <Card
+                key={store.id}
+                className={cn(
+                  "transition-colors",
+                  draggedMachine &&
+                    draggedFromStore?.id !== store.id &&
+                    "border-dashed border-primary/50 bg-primary/5"
+                )}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.add("ring-2", "ring-primary");
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.classList.remove("ring-2", "ring-primary");
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove("ring-2", "ring-primary");
+                  handleDrop(store);
+                }}
+              >
+                <CardHeader className="pb-1 pt-2 px-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-xs font-medium">{store.name}</CardTitle>
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                      {activeMachines.length} active
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-2 pb-2">
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {storeMachines.length === 0 ? (
+                      <p className="text-[10px] text-muted-foreground text-center py-2">
+                        No machines
+                      </p>
+                    ) : (
+                      storeMachines.map((machine) => {
+                        const moved = isMachineMoved(machine.id);
+                        const originalStore = getOriginalStore(machine.id);
+
+                        return (
+                          <div
+                            key={machine.id}
+                            draggable
+                            onDragStart={() => handleDragStart(machine, store)}
+                            onDragEnd={handleDragEnd}
+                            className={cn(
+                              "flex items-center gap-1 px-1.5 py-1 rounded text-[10px] cursor-grab active:cursor-grabbing hover:bg-muted/50",
+                              moved && "bg-primary/10 border border-primary/30"
+                            )}
+                          >
+                            <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-mono truncate">{machine.serialNumber}</div>
+                              <div className="text-muted-foreground truncate">
+                                {machine.modelName || "Unknown"}
+                              </div>
+                            </div>
+                            {moved && originalStore && (
+                              <Badge variant="outline" className="text-[8px] px-1 py-0 flex-shrink-0">
+                                from {originalStore.name}
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
+
+        {filteredStores.length === 0 && (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              No stores match your search
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Confirmation Dialog */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+      {/* Export Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Machine Moves</DialogTitle>
+            <DialogTitle>Download Move Plan</DialogTitle>
             <DialogDescription>
-              You are about to move {pendingMoves.length} machines. This will update their
-              assigned stores in the system.
+              Download your {plannedMoves.length} planned moves as a spreadsheet.
+              This is only a plan - no changes will be made to the system.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {pendingMoves.map((move) => (
+          <div className="space-y-2 max-h-60 overflow-y-auto border rounded p-2">
+            {plannedMoves.map((move) => (
               <div
                 key={move.id}
-                className="flex items-center gap-2 p-2 rounded-lg border text-sm"
+                className="flex items-center gap-2 p-2 rounded bg-muted/50 text-xs"
               >
                 <span className="font-mono">{move.machine.serialNumber}</span>
                 <span className="text-muted-foreground">{move.fromStore.name}</span>
-                <ArrowRight className="h-4 w-4" />
-                <span className="text-primary font-medium">{move.toStore.name}</span>
+                <ArrowRight className="h-3 w-3" />
+                <span className="font-medium text-primary">{move.toStore.name}</span>
               </div>
             ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowExportDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveChanges} disabled={isSaving}>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              {isSaving ? "Saving..." : "Confirm Moves"}
+            <Button variant="outline" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+            <Button onClick={handleExportExcel}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel
             </Button>
           </DialogFooter>
         </DialogContent>

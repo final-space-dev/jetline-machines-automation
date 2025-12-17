@@ -101,16 +101,16 @@ async function syncMachinesFromBMS(
         categoryId = categoryMap.get(row.machines_category) || null;
       }
 
-      // Determine machine status
-      let status: MachineStatus = MachineStatus.ACTIVE;
-      if (row.machinestatus === 0) {
-        status = MachineStatus.INACTIVE;
-      }
-
       // Convert bmsStatus to number (BMS returns it as string "0" or "1")
       const bmsStatusNum = row.machinestatus !== null && row.machinestatus !== undefined
         ? parseInt(String(row.machinestatus), 10)
         : null;
+
+      // Determine machine status - INACTIVE when bmsStatus is 0
+      let status: MachineStatus = MachineStatus.ACTIVE;
+      if (bmsStatusNum === 0) {
+        status = MachineStatus.INACTIVE;
+      }
 
       // Convert rental amounts to numbers (BMS returns them as strings like "0.00")
       const rentalAmount = row.rental_amount_ex_vat !== null && row.rental_amount_ex_vat !== undefined
