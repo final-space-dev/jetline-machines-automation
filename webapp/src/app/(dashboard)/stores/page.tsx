@@ -47,7 +47,7 @@ export default function StoresPage() {
     try {
       const [companiesRes, machinesRes] = await Promise.all([
         fetch("/api/companies"),
-        fetch("/api/machines"),
+        fetch("/api/machines?limit=10000"),
       ]);
 
       const companiesData = await companiesRes.json();

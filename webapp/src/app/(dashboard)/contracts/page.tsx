@@ -39,7 +39,7 @@ export default function ContractsPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch("/api/machines");
+      const res = await fetch("/api/machines?limit=10000");
       const data = await res.json();
       const machinesData = data.data || [];
 
