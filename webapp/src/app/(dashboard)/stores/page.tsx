@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
+import { exportToExcel, exportToCSV } from "@/lib/export";
+import { Download, FileSpreadsheet } from "lucide-react";
 import type { MachineWithRelations } from "@/types";
 
 interface StoreStats {
@@ -126,6 +129,52 @@ export default function StoresPage() {
               {stores.length} stores · {totalMachines} machines · {formatNumber(totalBalance)} total balance
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() =>
+                exportToExcel(
+                  filteredStores,
+                  [
+                    { key: "name", header: "Store" },
+                    { key: "region", header: "Region" },
+                    { key: "machineCount", header: "Machines" },
+                    { key: "activeMachines", header: "Active" },
+                    { key: "totalBalance", header: "Balance" },
+                    { key: "isActive", header: "Status" },
+                  ],
+                  "stores"
+                )
+              }
+            >
+              <FileSpreadsheet className="h-3 w-3 mr-1" />
+              Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() =>
+                exportToCSV(
+                  filteredStores,
+                  [
+                    { key: "name", header: "Store" },
+                    { key: "region", header: "Region" },
+                    { key: "machineCount", header: "Machines" },
+                    { key: "activeMachines", header: "Active" },
+                    { key: "totalBalance", header: "Balance" },
+                    { key: "isActive", header: "Status" },
+                  ],
+                  "stores"
+                )
+              }
+            >
+              <Download className="h-3 w-3 mr-1" />
+              CSV
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -159,7 +208,6 @@ export default function StoresPage() {
                 <thead className="bg-muted/50 border-y">
                   <tr>
                     <th className="px-3 py-1.5 text-left font-medium">Store</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Schema</th>
                     <th className="px-3 py-1.5 text-left font-medium">Region</th>
                     <th className="px-3 py-1.5 text-right font-medium">Machines</th>
                     <th className="px-3 py-1.5 text-right font-medium">Active</th>
@@ -175,7 +223,6 @@ export default function StoresPage() {
                       onClick={() => router.push(`/stores/${store.id}`)}
                     >
                       <td className="px-3 py-1.5 font-medium">{store.name}</td>
-                      <td className="px-3 py-1.5 font-mono text-muted-foreground">{store.bmsSchema}</td>
                       <td className="px-3 py-1.5 text-muted-foreground">{store.region || "-"}</td>
                       <td className="px-3 py-1.5 text-right font-mono">{store.machineCount}</td>
                       <td className="px-3 py-1.5 text-right font-mono">{store.activeMachines}</td>

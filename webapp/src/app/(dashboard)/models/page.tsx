@@ -13,6 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { exportToExcel, exportToCSV } from "@/lib/export";
+import { Download, FileSpreadsheet } from "lucide-react";
 
 interface ModelData {
   modelName: string;
@@ -85,17 +88,50 @@ export default function ModelsPage() {
               {data?.totalModels || 0} models · {data?.totalMachines || 0} active machines
             </p>
           </div>
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-28 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="30">30 days</SelectItem>
-              <SelectItem value="90">90 days</SelectItem>
-              <SelectItem value="180">6 months</SelectItem>
-              <SelectItem value="365">1 year</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() =>
+                exportToExcel(
+                  models.map((m) => ({
+                    model: m.modelName,
+                    make: m.makeName,
+                    machines: m.machineCount,
+                    avgMonthly: m.statistics.averageMonthlyPerMachine,
+                    totalVolume: m.statistics.totalVolume,
+                    minVolume: m.statistics.minVolume,
+                    maxVolume: m.statistics.maxVolume,
+                  })),
+                  [
+                    { key: "model", header: "Model" },
+                    { key: "make", header: "Make" },
+                    { key: "machines", header: "Machines" },
+                    { key: "avgMonthly", header: "Avg Monthly" },
+                    { key: "totalVolume", header: "Total Volume" },
+                    { key: "minVolume", header: "Min" },
+                    { key: "maxVolume", header: "Max" },
+                  ],
+                  "models"
+                )
+              }
+            >
+              <FileSpreadsheet className="h-3 w-3 mr-1" />
+              Excel
+            </Button>
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-28 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">30 days</SelectItem>
+                <SelectItem value="90">90 days</SelectItem>
+                <SelectItem value="180">6 months</SelectItem>
+                <SelectItem value="365">1 year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Models Table */}
