@@ -78,7 +78,6 @@ const globalFilter: FilterFn<any> = (row, _columnId, filterValue) => {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  searchKey?: string;
   searchPlaceholder?: string;
   filterColumns?: { key: string; label: string; options: { value: string; label: string }[] }[];
   exportFileName?: string;
@@ -90,7 +89,6 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
-  searchKey,
   searchPlaceholder = "Search...",
   filterColumns = [],
   exportFileName = "export",

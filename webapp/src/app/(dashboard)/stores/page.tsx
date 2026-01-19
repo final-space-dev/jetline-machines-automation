@@ -52,7 +52,7 @@ export default function StoresPage() {
       const machinesData = await machinesRes.json();
       const machines = machinesData.data || [];
 
-      const storeStats: StoreStats[] = companiesData.map((company: any) => {
+      const storeStats: StoreStats[] = companiesData.map((company: { id: string; name: string; region: string | null; bmsSchema: string; isActive: boolean }) => {
         const storeMachines = machines.filter(
           (m: MachineWithRelations) => m.companyId === company.id
         );

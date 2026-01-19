@@ -1,17 +1,25 @@
-node_modules
-.next
-.turbo
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+.turbo/
+out/
+
+# Environment
 .env
 .env.local
 .env*.local
+
+# Database
 *.sqlite
 *.db
 *.db-journal
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
-pnpm-lock.yaml
 
 # Python
 __pycache__/
@@ -23,10 +31,6 @@ venv/
 ENV/
 env/
 
-# Generated Excel reports
-*.xlsx
-!Volumes\ from\ Xerox.xlsx
-
 # macOS
 .DS_Store
 ~$*
@@ -34,3 +38,11 @@ env/
 # IDE
 .vscode/
 .idea/
+
+# Data files (keep source data, ignore generated)
+data/*.xlsx
+!data/Volumes from Xerox.xlsx
+
+# Temporary
+*.tmp
+*.temp

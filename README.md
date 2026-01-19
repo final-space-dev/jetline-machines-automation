@@ -105,6 +105,7 @@ jetline-machines-automation/
 │   │   └── types/          # TypeScript types
 │   └── package.json
 ├── scripts/                # Python analysis scripts
+├── data/                   # Excel data files & reports
 ├── CONTEXT.md              # Project context
 └── README.md
 ```
@@ -114,7 +115,6 @@ jetline-machines-automation/
 Python scripts for volume comparison with Xerox data:
 
 ```bash
-pip3 install -r requirements.txt
 python3 scripts/export_comparison_excel.py
 ```
 

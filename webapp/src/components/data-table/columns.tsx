@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, ExternalLink, ArrowUpRight, Printer } from "lucide-react";
-import { formatNumber, formatDate, formatCurrency } from "@/lib/utils";
+import { formatNumber, formatDate } from "@/lib/utils";
 import type { MachineWithRelations } from "@/types";
 
 export const machineColumns: ColumnDef<MachineWithRelations>[] = [

@@ -179,6 +179,17 @@ async function main() {
             currentBalance: 250000,
             status: "MAINTENANCE",
           },
+          {
+            serialNumber: "XRX007890",
+            companyId: sandton.id,
+            categoryId: office.id,
+            modelId: versalink.id,
+            modelName: "Xerox VersaLink C7025",
+            makeName: "Xerox",
+            installDate: new Date("2023-09-01"),
+            currentBalance: 15000,
+            status: "ACTIVE",
+          },
         ],
       });
 

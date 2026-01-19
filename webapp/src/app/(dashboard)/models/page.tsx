@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { exportToExcel, exportToCSV } from "@/lib/export";
-import { Download, FileSpreadsheet } from "lucide-react";
+import { exportToExcel } from "@/lib/export";
+import { FileSpreadsheet } from "lucide-react";
 
 interface ModelData {
   modelName: string;

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
-import { formatNumber, formatDate, cn } from "@/lib/utils";
+import { formatNumber, formatDate } from "@/lib/utils";
 import type { MachineWithRelations } from "@/types";
 
 interface StoreDetail {

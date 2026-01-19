@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Download, FileSpreadsheet, Search, AlertTriangle, Clock } from "lucide-react";
-import { formatNumber, formatDate, cn } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 import { exportToExcel, exportToCSV } from "@/lib/export";
 import type { MachineWithRelations } from "@/types";
 

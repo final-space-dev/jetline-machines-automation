@@ -6,6 +6,7 @@ Jetline Machines - Comprehensive Printer Fleet Management System for Jetline sto
 
 - **Main Application**: `/webapp` - Next.js 16 with App Router, Prisma ORM, Recharts
 - **Analysis Scripts**: `/scripts` - Python scripts for volume comparison and reporting
+- **Data Files**: `/data` - Excel source data and generated reports
 - **Port**: 3003
 
 ## Webapp Pages
@@ -51,6 +52,5 @@ npm run db:seed    # Seed initial data
 Analysis scripts for volume comparison with Xerox data:
 
 ```bash
-pip3 install -r requirements.txt
 python3 scripts/export_comparison_excel.py
 ```

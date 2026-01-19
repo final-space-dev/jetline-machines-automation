@@ -94,7 +94,7 @@ export default function LiftPlannerPage() {
       const machinesData = await machinesRes.json();
 
       setStores(
-        companiesData.map((c: any) => ({
+        companiesData.map((c: { id: string; name: string; region: string | null }) => ({
           id: c.id,
           name: c.name,
           region: c.region,

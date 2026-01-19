@@ -11,10 +11,8 @@ interface StoreCardProps {
   region?: string | null;
   machineCount: number;
   activeMachines: number;
-  totalVolume: number;
   monthlyAverage: number;
   colorPercentage: number;
-  lastSync?: string;
   alerts?: number;
   onClick?: () => void;
   isSelected?: boolean;
@@ -25,10 +23,8 @@ export function StoreCard({
   region,
   machineCount,
   activeMachines,
-  totalVolume,
   monthlyAverage,
   colorPercentage,
-  lastSync,
   alerts = 0,
   onClick,
   isSelected = false,

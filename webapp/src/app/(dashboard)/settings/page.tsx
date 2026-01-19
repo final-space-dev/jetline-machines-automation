@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
@@ -76,7 +75,7 @@ export default function SettingsPage() {
         });
         return next;
       });
-    } catch (error) {
+    } catch {
       setConnectionTests((prev) => {
         const next = new Map(prev);
         next.set(company.id, {

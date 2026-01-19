@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
 import { BarChart3, Printer, Shuffle, Settings, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/types";

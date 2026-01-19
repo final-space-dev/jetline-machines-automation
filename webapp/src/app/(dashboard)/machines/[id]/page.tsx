@@ -58,7 +58,7 @@ export default function MachineDetailPage() {
 
       setMachine(machineData);
       setMonthlyReadings(readingsData.monthly || []);
-      setStores(companiesData.map((c: any) => ({ id: c.id, name: c.name })));
+      setStores(companiesData.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
       setSelectedStore(machineData.companyId);
     } catch (error) {
       console.error("Failed to fetch machine data:", error);
