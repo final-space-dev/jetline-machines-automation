@@ -1,129 +1,123 @@
-# Jetline Machines Automation
+# Jetline Machines - Fleet Management System
 
-Automated system for comparing meter reading volumes from Jetline's database systems with Xerox-provided volume data.
-
-## Overview
-
-This project compares machine meter readings across multiple company database schemas with volumes provided by Xerox. It implements Qlik Sense transformation logic to calculate incremental volumes and provides detailed Excel reports with sub-meter breakdowns.
+Comprehensive printer fleet management system for Jetline stores. Track, monitor, and optimize printer deployments across all locations with real-time data visualization and scenario planning.
 
 ## Features
 
-- Queries 63+ company MySQL database schemas
-- Implements Qlik logic: `FirstSortedValue(DISTINCT totalamt,-reading_date_time)`
-- Calculates incremental monthly volumes from cumulative meter readings
-- Compares DB volumes with Xerox-provided volumes
-- Generates detailed Excel reports with sub-meter breakdowns (A3, Black, Large, Colour, XL)
-- Tracks machine models and company entities
+### Dashboard
+- **KPI Overview**: Total machines, active status, balance remaining, utilization rates
+- **Volume Trends**: Monthly print volume analysis with interactive charts
+- **Category Distribution**: Visual breakdown of machines by type
+- **Performance Tracking**: Identify top and under-performing machines
+- **Contract Alerts**: Expiring contracts with days remaining
+
+### Machine Management
+- Full machine inventory with search and filters
+- Sort by serial, model, company, balance, install date, or status
+- Export data to Excel
+- Real-time status badges (Active, Inactive, Maintenance, Decommissioned)
+
+### Store Analytics
+- Store-level fleet breakdown
+- Machine counts and balance summaries
+- Export store data to Excel
+
+### Model Analytics
+- Model-wise distribution and counts
+- Performance metrics by model type
+
+### Lift Planner (Scenario Planning)
+- **Drag-and-Drop Interface**: Visually plan machine relocations
+- **Multi-Store Comparison**: Side-by-side view of different stores
+- **Scenario Saving**: Save and load "what-if" configurations
+- **Move Tracking**: Track all proposed moves with from/to details
+
+### Data Sync
+- Automated BMS database synchronization
+- Sync history and status tracking
+
+## Tech Stack
+
+- **Framework**: Next.js 16 with App Router
+- **Styling**: Tailwind CSS 4
+- **Database**: PostgreSQL with Prisma ORM
+- **Charts**: Recharts
+- **Drag & Drop**: @dnd-kit
+- **UI Components**: shadcn/ui (Radix)
+- **Icons**: Lucide React
+
+## Quick Start
+
+```bash
+cd webapp
+npm install
+npm run dev
+```
+
+Open [http://localhost:3003](http://localhost:3003)
 
 ## Setup
 
 ### Prerequisites
 
-- Node.js 18+ (for Next.js app)
-- Python 3.8+ (for analysis scripts)
-- MySQL database access
+- Node.js 18+
+- PostgreSQL 14+
 
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd jetline-machines-automation
-```
+1. Navigate to the webapp:
+   ```bash
+   cd webapp
+   ```
 
-2. Install Node.js dependencies:
-```bash
-npm install
-```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-3. Install Python dependencies:
-```bash
-pip3 install -r requirements.txt
-```
+3. Configure environment:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your database credentials
+   ```
 
-4. Create `.env` file from example:
-```bash
-cp .env.example .env
-```
+4. Setup database:
+   ```bash
+   npm run db:push
+   npm run db:seed
+   ```
 
-5. Configure environment variables in `.env`:
-```
-DB_USER=your_db_user
-DB_PASSWORD=your_db_password
-```
-
-## Usage
-
-### Run Volume Comparison
-
-Compare all serials across databases with Xerox data:
-
-```bash
-python3 scripts/export_comparison_excel.py
-```
-
-Generates: `Volume_Comparison_Report.xlsx`
-
-### Analyze Specific Serial
-
-Detailed analysis of a single serial number:
-
-```bash
-python3 scripts/analyze_3135455511.py
-```
-
-Generates: `Serial_3135455511_Analysis.xlsx`
-
-### Next.js Application
-
-Run the development server:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000)
+5. Start development server:
+   ```bash
+   npm run dev
+   ```
 
 ## Project Structure
 
 ```
-.
-├── app/                    # Next.js app directory
-├── lib/                    # Shared libraries
-│   ├── companies.ts        # Company/schema configurations
-│   └── query.ts            # Database query utilities
+jetline-machines-automation/
+├── webapp/                 # Main Next.js application
+│   ├── prisma/             # Database schema & seeds
+│   ├── src/
+│   │   ├── app/            # App Router pages & API routes
+│   │   ├── components/     # React components
+│   │   ├── lib/            # Utilities & Prisma client
+│   │   └── types/          # TypeScript types
+│   └── package.json
 ├── scripts/                # Python analysis scripts
-│   ├── export_comparison_excel.py
-│   ├── analyze_3135455511.py
-│   └── analyze_with_subtotals.py
-├── tests/                  # Test files
-└── Volumes from Xerox.xlsx # Source data from Xerox
+├── CONTEXT.md              # Project context
+└── README.md
 ```
 
-## Report Columns
+## Analysis Scripts
 
-### Volume Comparison Report
+Python scripts for volume comparison with Xerox data:
 
-- **Serial**: Machine serial number
-- **Model**: Machine model from DB
-- **Company**: Entity/company name
-- **Month**: Month-Year
-- **DB A3, DB Black, DB Large, DB Colour, DB XL**: Individual meter movements from DB
-- **DB Total**: Total DB movement (calculated incrementally)
-- **Xerox A3 Mono, A4 Mono, A3 Color, A4 Color**: Xerox sub-meters
-- **Xerox Total**: Total Xerox movement
-- **Difference**: DB Total - Xerox Total
-- **DB Balance**: Cumulative meter balance
-
-## Qlik Logic Implementation
-
-The system replicates Qlik Sense transformations:
-
-1. **Last Reading Per Day**: Takes last reading by `createdtime` DESC
-2. **Monthly Aggregation**: Takes last day's reading per month
-3. **Incremental Calculation**: Current month - previous month
-4. **Filtering**: Only includes active machines (`machinestatus = 1`)
+```bash
+pip3 install -r requirements.txt
+python3 scripts/export_comparison_excel.py
+```
 
 ## License
 
-Proprietary - Jetline Network Support Centre
+Proprietary - Jetline Internal Use Only
