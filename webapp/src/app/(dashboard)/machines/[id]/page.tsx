@@ -6,7 +6,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoading } from "@/components/ui/page-loading";
+import { NotFoundState } from "@/components/ui/empty-state";
 import {
   Select,
   SelectContent,
@@ -15,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
-import { formatNumber, formatDate, cn } from "@/lib/utils";
+import { formatNumber, formatDate, cn, getStatusVariant } from "@/lib/utils";
 import type { MachineWithRelations } from "@/types";
 
 interface MonthlyReading {
@@ -84,10 +85,7 @@ export default function MachineDetailPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-[600px]" />
-        </div>
+        <PageLoading variant="detail" />
       </AppShell>
     );
   }
@@ -95,25 +93,15 @@ export default function MachineDetailPage() {
   if (!machine) {
     return (
       <AppShell>
-        <div className="flex flex-col items-center justify-center h-96">
-          <p className="text-muted-foreground">Machine not found</p>
-          <Button onClick={() => router.push("/machines")} className="mt-4">
+        <NotFoundState type="machine" />
+        <div className="flex justify-center mt-4">
+          <Button onClick={() => router.push("/machines")}>
             Back to Machines
           </Button>
         </div>
       </AppShell>
     );
   }
-
-  const statusVariant = (status: string) => {
-    const map: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      ACTIVE: "default",
-      INACTIVE: "secondary",
-      MAINTENANCE: "outline",
-      DECOMMISSIONED: "destructive",
-    };
-    return map[status] || "outline";
-  };
 
   return (
     <AppShell>
@@ -129,7 +117,7 @@ export default function MachineDetailPage() {
                 <h1 className="text-lg font-bold">
                   {machine.modelName || "Unknown Model"} - {machine.company?.name}
                 </h1>
-                <Badge variant={statusVariant(machine.status)} className="text-[10px] px-1.5 py-0">{machine.status}</Badge>
+                <Badge variant={getStatusVariant(machine.status as "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "DECOMMISSIONED")} className="text-[10px] px-1.5 py-0">{machine.status}</Badge>
               </div>
               <p className="text-xs text-muted-foreground font-mono">
                 {machine.serialNumber}

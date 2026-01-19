@@ -5,7 +5,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageLoading } from "@/components/ui/page-loading";
 import { RefreshCw, CheckCircle, XCircle, Clock } from "lucide-react";
 import { formatNumber, formatDate } from "@/lib/utils";
 
@@ -72,10 +73,7 @@ export default function SyncPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-4">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-[400px]" />
-        </div>
+        <PageLoading variant="cards" />
       </AppShell>
     );
   }
@@ -83,19 +81,15 @@ export default function SyncPage() {
   return (
     <AppShell>
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Sync</h1>
-            <p className="text-xs text-muted-foreground">
-              BMS database synchronization
-            </p>
-          </div>
-          <Button size="sm" onClick={handleSync} disabled={isSyncing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
+        <PageHeader
+          title="Sync"
+          description="BMS database synchronization"
+        >
+          <Button size="sm" className="h-7 text-xs" onClick={handleSync} disabled={isSyncing}>
+            <RefreshCw className={`h-3 w-3 mr-1 ${isSyncing ? "animate-spin" : ""}`} />
             {isSyncing ? "Syncing..." : "Run Full Sync"}
           </Button>
-        </div>
+        </PageHeader>
 
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Totals */}

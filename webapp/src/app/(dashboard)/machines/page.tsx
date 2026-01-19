@@ -6,7 +6,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DataTable } from "@/components/data-table/data-table";
 import { machineColumns } from "@/components/data-table/columns";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageLoading } from "@/components/ui/page-loading";
 import { formatNumber } from "@/lib/utils";
 import type { MachineWithRelations } from "@/types";
 
@@ -91,15 +92,7 @@ function MachinesPageContent() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <div className="grid gap-4 md:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24" />
-            ))}
-          </div>
-          <Skeleton className="h-96" />
-        </div>
+        <PageLoading variant="table" />
       </AppShell>
     );
   }
@@ -107,16 +100,10 @@ function MachinesPageContent() {
   return (
     <AppShell>
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Machines</h1>
-            <p className="text-xs text-muted-foreground">
-              {totalMachines} total · {activeMachines} active · {uniqueStores} stores
-              {storeFilter && " · Filtered"}
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Machines"
+          description={`${totalMachines} total · ${activeMachines} active · ${uniqueStores} stores${storeFilter ? " · Filtered" : ""}`}
+        />
 
         {/* Summary Stats (inline) */}
         <div className="flex gap-4 text-xs">
@@ -147,12 +134,12 @@ function MachinesPageContent() {
               searchPlaceholder="Search serial, model, store..."
               filterColumns={[
                 {
-                  key: "company.name",
+                  key: "companyName",
                   label: "Store",
                   options: filterOptions.companies,
                 },
                 {
-                  key: "category.name",
+                  key: "categoryName",
                   label: "Category",
                   options: filterOptions.categories,
                 },
@@ -176,15 +163,7 @@ function MachinesPageContent() {
 function MachinesPageLoading() {
   return (
     <AppShell>
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid gap-4 md:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <Skeleton className="h-96" />
-      </div>
+      <PageLoading variant="table" />
     </AppShell>
   );
 }

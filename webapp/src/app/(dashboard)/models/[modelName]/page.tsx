@@ -5,7 +5,8 @@ import { useRouter, useParams } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoading } from "@/components/ui/page-loading";
+import { NotFoundState } from "@/components/ui/empty-state";
 import {
   Select,
   SelectContent,
@@ -77,10 +78,7 @@ export default function ModelDetailPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-[600px]" />
-        </div>
+        <PageLoading variant="detail" />
       </AppShell>
     );
   }
@@ -88,9 +86,9 @@ export default function ModelDetailPage() {
   if (!modelData) {
     return (
       <AppShell>
-        <div className="flex flex-col items-center justify-center h-96">
-          <p className="text-muted-foreground">Model not found</p>
-          <Button onClick={() => router.push("/models")} className="mt-4">
+        <NotFoundState type="model" />
+        <div className="flex justify-center mt-4">
+          <Button onClick={() => router.push("/models")}>
             Back to Models
           </Button>
         </div>

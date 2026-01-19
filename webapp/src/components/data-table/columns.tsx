@@ -36,15 +36,17 @@ export const machineColumns: ColumnDef<MachineWithRelations>[] = [
     ),
   },
   {
-    accessorKey: "company.name",
+    id: "companyName",
+    accessorFn: (row) => row.company?.name,
     header: "Store",
-    cell: ({ row }) => row.original.company.name,
+    cell: ({ row }) => row.original.company?.name || "-",
     filterFn: (row, id, value) => {
-      return row.original.company.name === value;
+      return row.original.company?.name === value;
     },
   },
   {
-    accessorKey: "category.name",
+    id: "categoryName",
+    accessorFn: (row) => row.category?.name,
     header: "Category",
     cell: ({ row }) => {
       const category = row.original.category?.name;

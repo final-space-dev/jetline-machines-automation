@@ -6,9 +6,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoading } from "@/components/ui/page-loading";
+import { NotFoundState } from "@/components/ui/empty-state";
 import { ArrowLeft } from "lucide-react";
-import { formatNumber, formatDate } from "@/lib/utils";
+import { formatNumber, formatDate, getStatusVariant } from "@/lib/utils";
 import type { MachineWithRelations } from "@/types";
 
 interface StoreDetail {
@@ -64,10 +65,7 @@ export default function StoreDetailPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-[500px]" />
-        </div>
+        <PageLoading variant="detail" />
       </AppShell>
     );
   }
@@ -75,25 +73,15 @@ export default function StoreDetailPage() {
   if (!store) {
     return (
       <AppShell>
-        <div className="flex flex-col items-center justify-center h-96">
-          <p className="text-muted-foreground">Store not found</p>
-          <Button onClick={() => router.push("/stores")} className="mt-4">
+        <NotFoundState type="store" />
+        <div className="flex justify-center mt-4">
+          <Button onClick={() => router.push("/stores")}>
             Back to Stores
           </Button>
         </div>
       </AppShell>
     );
   }
-
-  const statusVariant = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      ACTIVE: "default",
-      INACTIVE: "secondary",
-      MAINTENANCE: "outline",
-      DECOMMISSIONED: "destructive",
-    };
-    return variants[status] || "outline";
-  };
 
   const activeMachines = store.machines.filter((m) => m.status === "ACTIVE").length;
   const totalBalance = store.machines.reduce((sum, m) => sum + (m.currentBalance || 0), 0);
@@ -186,7 +174,7 @@ export default function StoreDetailPage() {
                           <td className="px-3 py-1.5 text-right font-mono">{formatNumber(machine.currentBalance)}</td>
                           <td className="px-3 py-1.5 text-muted-foreground">{formatDate(machine.lastReadingDate)}</td>
                           <td className="px-3 py-1.5 text-center">
-                            <Badge variant={statusVariant(machine.status)} className="text-[10px] px-1.5 py-0">
+                            <Badge variant={getStatusVariant(machine.status as "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "DECOMMISSIONED")} className="text-[10px] px-1.5 py-0">
                               {machine.status}
                             </Badge>
                           </td>

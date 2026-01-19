@@ -6,8 +6,9 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageLoading } from "@/components/ui/page-loading";
 import {
   Select,
   SelectContent,
@@ -179,10 +180,7 @@ export default function ContractsPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-4">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-[400px]" />
-        </div>
+        <PageLoading variant="cards" />
       </AppShell>
     );
   }
@@ -190,25 +188,19 @@ export default function ContractsPage() {
   return (
     <AppShell>
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Contracts</h1>
-            <p className="text-xs text-muted-foreground">
-              Manage machine contracts, renewals, and equipment age
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportExcel}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Contracts"
+          description="Manage machine contracts, renewals, and equipment age"
+        >
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleExportExcel}>
+            <FileSpreadsheet className="h-3 w-3 mr-1" />
+            Excel
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleExportCSV}>
+            <Download className="h-3 w-3 mr-1" />
+            CSV
+          </Button>
+        </PageHeader>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

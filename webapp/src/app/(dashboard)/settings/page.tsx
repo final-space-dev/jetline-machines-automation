@@ -5,7 +5,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageLoading } from "@/components/ui/page-loading";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 
@@ -91,10 +92,7 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="space-y-4">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-[400px]" />
-        </div>
+        <PageLoading variant="table" />
       </AppShell>
     );
   }
@@ -104,13 +102,10 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="space-y-4">
-        {/* Header */}
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Settings</h1>
-          <p className="text-xs text-muted-foreground">
-            BMS connection configuration
-          </p>
-        </div>
+        <PageHeader
+          title="Settings"
+          description="BMS connection configuration"
+        />
 
         {/* Summary */}
         <Card>
