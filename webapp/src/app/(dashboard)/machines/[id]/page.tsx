@@ -9,15 +9,32 @@ import { Badge } from "@/components/ui/badge";
 import { PageLoading } from "@/components/ui/page-loading";
 import { NotFoundState } from "@/components/ui/empty-state";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Target,
+  AlertTriangle,
+  Lightbulb,
+  Calendar,
+} from "lucide-react";
 import { formatNumber, formatDate, cn, getStatusVariant } from "@/lib/utils";
-import type { MachineWithRelations } from "@/types";
+import { utilizationConfig, type UtilizationStatus } from "@/components/ui/utilization-badge";
+import type { MachineWithRelations, MachineUtilization } from "@/types";
 
 interface MonthlyReading {
   month: string;
@@ -35,6 +52,7 @@ export default function MachineDetailPage() {
   const machineId = params.id as string;
 
   const [machine, setMachine] = useState<MachineWithRelations | null>(null);
+  const [utilization, setUtilization] = useState<MachineUtilization | null>(null);
   const [monthlyReadings, setMonthlyReadings] = useState<MonthlyReading[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
@@ -47,19 +65,30 @@ export default function MachineDetailPage() {
 
   const fetchData = async () => {
     try {
-      const [machineRes, readingsRes, companiesRes] = await Promise.all([
+      const [machineRes, readingsRes, utilizationRes, companiesRes] = await Promise.all([
         fetch(`/api/machines/${machineId}`),
         fetch(`/api/machines/${machineId}/readings?months=${period}`),
+        fetch(`/api/machines/utilization`),
         fetch("/api/companies"),
       ]);
 
       const machineData = await machineRes.json();
       const readingsData = await readingsRes.json();
+      const utilizationData = await utilizationRes.json();
       const companiesData = await companiesRes.json();
 
-      setMachine(machineData);
-      setMonthlyReadings(readingsData.monthly || []);
-      setStores(companiesData.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+      // Handle API error responses
+      const companiesArray = Array.isArray(companiesData) ? companiesData : [];
+
+      // Find this machine's utilization data
+      const machineUtilization = utilizationData?.machines?.find(
+        (u: MachineUtilization) => u.machineId === machineId
+      ) || null;
+
+      setMachine(machineData?.id ? machineData : null);
+      setUtilization(machineUtilization);
+      setMonthlyReadings(Array.isArray(readingsData?.monthly) ? readingsData.monthly : []);
+      setStores(companiesArray.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
       setSelectedStore(machineData.companyId);
     } catch (error) {
       console.error("Failed to fetch machine data:", error);
@@ -103,6 +132,9 @@ export default function MachineDetailPage() {
     );
   }
 
+  const utilizationStatus = utilization?.utilizationStatus as UtilizationStatus | undefined;
+  const config = utilizationStatus ? utilizationConfig[utilizationStatus] : null;
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -113,11 +145,33 @@ export default function MachineDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg font-bold">
                   {machine.modelName || "Unknown Model"} - {machine.company?.name}
                 </h1>
                 <Badge variant={getStatusVariant(machine.status as "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "DECOMMISSIONED")} className="text-[10px] px-1.5 py-0">{machine.status}</Badge>
+                {utilization && config && (
+                  <Badge
+                    variant="outline"
+                    className={cn("text-[10px] px-1.5 py-0", config.badgeBg)}
+                  >
+                    {utilization.utilizationPercent}% Utilization
+                  </Badge>
+                )}
+                {utilization && utilization.liftScore >= 70 && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[10px] px-1.5 py-0",
+                      utilization.liftScore >= 80
+                        ? "bg-red-100 text-red-700 border-red-300"
+                        : "bg-amber-100 text-amber-700 border-amber-300"
+                    )}
+                  >
+                    <Target className="h-2.5 w-2.5 mr-0.5" />
+                    Lift Score: {utilization.liftScore}
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground font-mono">
                 {machine.serialNumber}
@@ -129,6 +183,115 @@ export default function MachineDetailPage() {
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Left Column - Machine Information */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Utilization & Insights Card (NEW) */}
+            {utilization && config && (
+              <Card className={cn(
+                "border-l-4",
+                utilization.utilizationStatus === "critical" && "border-l-red-500",
+                utilization.utilizationStatus === "low" && "border-l-amber-500",
+                utilization.utilizationStatus === "optimal" && "border-l-emerald-500",
+                utilization.utilizationStatus === "high" && "border-l-blue-500",
+                utilization.utilizationStatus === "overworked" && "border-l-purple-500"
+              )}>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      Performance & Insights
+                      {utilization.trendDirection === "up" && (
+                        <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                      )}
+                      {utilization.trendDirection === "down" && (
+                        <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                      )}
+                      {utilization.trendDirection === "stable" && (
+                        <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </CardTitle>
+                    <Badge variant="outline" className={cn("text-xs", config.badgeBg)}>
+                      {config.label}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 space-y-4">
+                  {/* Utilization Bar */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">Utilization</span>
+                      <span className={cn("text-sm font-bold", config.color)}>
+                        {utilization.utilizationPercent}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all", config.bgColor)}
+                        style={{ width: `${Math.min(utilization.utilizationPercent, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+                      <span>0%</span>
+                      <span>Duty: {formatNumber(utilization.dutyCycle)}/mo</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+
+                  {/* Key Metrics Grid */}
+                  <div className="grid grid-cols-3 gap-3 text-xs">
+                    <div className="bg-muted/50 rounded-lg p-2 text-center">
+                      <p className="text-muted-foreground text-[10px]">Avg Monthly</p>
+                      <p className="font-mono font-bold">{formatNumber(utilization.avgMonthlyVolume)}</p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-2 text-center">
+                      <p className="text-muted-foreground text-[10px]">Trend</p>
+                      <p className={cn(
+                        "font-mono font-bold",
+                        utilization.volumeTrend > 0 ? "text-emerald-600" : utilization.volumeTrend < 0 ? "text-red-600" : ""
+                      )}>
+                        {utilization.volumeTrend > 0 ? "+" : ""}{utilization.volumeTrend}%
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-2 text-center">
+                      <p className="text-muted-foreground text-[10px]">Lift Score</p>
+                      <p className={cn(
+                        "font-mono font-bold",
+                        utilization.liftScore >= 80 ? "text-red-600" : utilization.liftScore >= 60 ? "text-amber-600" : ""
+                      )}>
+                        {utilization.liftScore}/100
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Insights */}
+                  {utilization.insights.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium flex items-center gap-1.5">
+                        <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+                        Insights
+                      </p>
+                      <ul className="space-y-1">
+                        {utilization.insights.map((insight, idx) => (
+                          <li
+                            key={idx}
+                            className={cn(
+                              "text-xs px-2 py-1 rounded-md",
+                              insight.includes("Critical") || insight.includes("declining") || insight.includes("ends in")
+                                ? "bg-red-50 text-red-700"
+                                : insight.includes("Low") || insight.includes("Consider")
+                                  ? "bg-amber-50 text-amber-700"
+                                  : insight.includes("growing") || insight.includes("high demand")
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            • {insight}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Machine Information */}
             <Card>
               <CardHeader className="pb-2 pt-3 px-3">
@@ -303,8 +466,95 @@ export default function MachineDetailPage() {
                     </div>
                   </>
                 )}
+                {utilization && (
+                  <>
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Duty Cycle</span>
+                        <span className="font-mono">{formatNumber(utilization.dutyCycle)}/mo</span>
+                      </div>
+                    </div>
+                    {utilization.contractMonthsRemaining !== null && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Contract Remaining</span>
+                        <span className={cn(
+                          "font-medium",
+                          utilization.contractMonthsRemaining <= 3 ? "text-red-600" : utilization.contractMonthsRemaining <= 6 ? "text-amber-600" : ""
+                        )}>
+                          {utilization.contractMonthsRemaining} months
+                        </span>
+                      </div>
+                    )}
+                    {utilization.daysSinceLastReading !== null && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Days Since Reading</span>
+                        <span className={cn(
+                          utilization.daysSinceLastReading > 60 ? "text-amber-600 font-medium" : ""
+                        )}>
+                          {utilization.daysSinceLastReading} days
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
+
+            {/* Contract Status Card */}
+            {utilization && utilization.contractMonthsRemaining !== null && utilization.contractMonthsRemaining <= 6 && (
+              <Card className={cn(
+                "border-l-4",
+                utilization.contractMonthsRemaining <= 3 ? "border-l-red-500" : "border-l-amber-500"
+              )}>
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-2">
+                    <Calendar className={cn(
+                      "h-4 w-4 mt-0.5",
+                      utilization.contractMonthsRemaining <= 3 ? "text-red-500" : "text-amber-500"
+                    )} />
+                    <div>
+                      <p className={cn(
+                        "text-xs font-medium",
+                        utilization.contractMonthsRemaining <= 3 ? "text-red-700" : "text-amber-700"
+                      )}>
+                        Contract {utilization.contractMonthsRemaining <= 3 ? "Expiring Soon" : "Ending"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {utilization.contractMonthsRemaining} months remaining
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Lift Recommendation Card */}
+            {utilization && utilization.liftScore >= 70 && (
+              <Card className={cn(
+                "border-l-4",
+                utilization.liftScore >= 80 ? "border-l-red-500" : "border-l-amber-500"
+              )}>
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-2">
+                    <Target className={cn(
+                      "h-4 w-4 mt-0.5",
+                      utilization.liftScore >= 80 ? "text-red-500" : "text-amber-500"
+                    )} />
+                    <div>
+                      <p className={cn(
+                        "text-xs font-medium",
+                        utilization.liftScore >= 80 ? "text-red-700" : "text-amber-700"
+                      )}>
+                        {utilization.liftScore >= 80 ? "Strong Lift Candidate" : "Consider Relocation"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Lift Score: {utilization.liftScore}/100
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Move Machine */}
             <Card>

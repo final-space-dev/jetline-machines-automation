@@ -10,20 +10,38 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoading } from "@/components/ui/page-loading";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, Search, AlertTriangle, Clock } from "lucide-react";
-import { formatDate, cn } from "@/lib/utils";
+import {
+  Download,
+  FileSpreadsheet,
+  Search,
+  AlertTriangle,
+  Clock,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from "lucide-react";
+import { formatDate, formatNumber, cn } from "@/lib/utils";
 import { exportToExcel, exportToCSV } from "@/lib/export";
-import type { MachineWithRelations } from "@/types";
+import { utilizationConfig, type UtilizationStatus } from "@/components/ui/utilization-badge";
+import type { MachineWithRelations, MachineUtilization } from "@/types";
 
 interface ContractData extends MachineWithRelations {
   machineAge: number; // months
   contractRemaining: number | null; // months
+  utilization?: MachineUtilization;
 }
 
 export default function ContractsPage() {
@@ -33,6 +51,7 @@ export default function ContractsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<string>("expiring");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterUtilization, setFilterUtilization] = useState<string>("all");
 
   useEffect(() => {
     fetchData();
@@ -40,9 +59,21 @@ export default function ContractsPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch("/api/machines?limit=10000&status=ACTIVE");
-      const data = await res.json();
-      const machinesData = data.data || [];
+      const [machinesRes, utilizationRes] = await Promise.all([
+        fetch("/api/machines?limit=10000&status=ACTIVE"),
+        fetch("/api/machines/utilization"),
+      ]);
+
+      const data = await machinesRes.json();
+      const utilizationData = await utilizationRes.json();
+
+      // Handle API error responses
+      const machinesData = Array.isArray(data?.data) ? data.data : [];
+      const utilizationArray: MachineUtilization[] = utilizationData?.machines || [];
+
+      // Create a map of machine utilization by machineId
+      const utilizationMap = new Map<string, MachineUtilization>();
+      utilizationArray.forEach((u) => utilizationMap.set(u.machineId, u));
 
       const now = new Date();
       const processed: ContractData[] = machinesData.map((m: MachineWithRelations) => {
@@ -65,6 +96,7 @@ export default function ContractsPage() {
           ...m,
           machineAge,
           contractRemaining,
+          utilization: utilizationMap.get(m.id),
         };
       });
 
@@ -89,16 +121,24 @@ export default function ContractsPage() {
       }
 
       if (filterStatus === "expiring") {
-        return m.contractRemaining !== null && m.contractRemaining <= 6 && m.contractRemaining > 0;
+        if (!(m.contractRemaining !== null && m.contractRemaining <= 6 && m.contractRemaining > 0)) return false;
+      } else if (filterStatus === "expired") {
+        if (!(m.contractRemaining !== null && m.contractRemaining <= 0)) return false;
+      } else if (filterStatus === "no-contract") {
+        if (m.contractRemaining !== null) return false;
+      } else if (filterStatus === "active-contract") {
+        if (!(m.contractRemaining !== null && m.contractRemaining > 6)) return false;
       }
-      if (filterStatus === "expired") {
-        return m.contractRemaining !== null && m.contractRemaining <= 0;
-      }
-      if (filterStatus === "no-contract") {
-        return m.contractRemaining === null;
-      }
-      if (filterStatus === "active-contract") {
-        return m.contractRemaining !== null && m.contractRemaining > 6;
+
+      // Utilization filter
+      if (filterUtilization !== "all" && m.utilization) {
+        if (filterUtilization === "lift-candidates") {
+          if (m.utilization.liftScore < 70) return false;
+        } else if (m.utilization.utilizationStatus !== filterUtilization) {
+          return false;
+        }
+      } else if (filterUtilization !== "all" && !m.utilization) {
+        return false;
       }
 
       return true;
@@ -111,6 +151,10 @@ export default function ContractsPage() {
           if (a.contractRemaining === null) return 1;
           if (b.contractRemaining === null) return 1;
           return a.contractRemaining - b.contractRemaining;
+        case "lift-score":
+          return (b.utilization?.liftScore || 0) - (a.utilization?.liftScore || 0);
+        case "utilization":
+          return (a.utilization?.utilizationPercent || 0) - (b.utilization?.utilizationPercent || 0);
         case "oldest":
           return b.machineAge - a.machineAge;
         case "newest":
@@ -133,9 +177,8 @@ export default function ContractsPage() {
     (m) => m.contractRemaining !== null && m.contractRemaining <= 0
   ).length;
   const noContract = machines.filter((m) => m.contractRemaining === null).length;
-  const avgMachineAge = machines.length > 0
-    ? Math.round(machines.reduce((sum, m) => sum + m.machineAge, 0) / machines.length)
-    : 0;
+  const liftCandidates = machines.filter((m) => m.utilization && m.utilization.liftScore >= 70).length;
+  const criticalUtilization = machines.filter((m) => m.utilization?.utilizationStatus === "critical").length;
 
   const handleExportExcel = () => {
     exportToExcel(
@@ -151,6 +194,9 @@ export default function ContractsPage() {
         { key: "rentalStartDate", header: "Contract Start" },
         { key: "rentalEndDate", header: "Contract End" },
         { key: "contractRemaining", header: "Months Remaining" },
+        { key: "utilization.utilizationPercent", header: "Utilization %" },
+        { key: "utilization.avgMonthlyVolume", header: "Avg Monthly Vol" },
+        { key: "utilization.liftScore", header: "Lift Score" },
         { key: "status", header: "Status" },
       ],
       "contracts"
@@ -171,6 +217,9 @@ export default function ContractsPage() {
         { key: "rentalStartDate", header: "Contract Start" },
         { key: "rentalEndDate", header: "Contract End" },
         { key: "contractRemaining", header: "Months Remaining" },
+        { key: "utilization.utilizationPercent", header: "Utilization %" },
+        { key: "utilization.avgMonthlyVolume", header: "Avg Monthly Vol" },
+        { key: "utilization.liftScore", header: "Lift Score" },
         { key: "status", header: "Status" },
       ],
       "contracts"
@@ -190,7 +239,7 @@ export default function ContractsPage() {
       <div className="space-y-4">
         <PageHeader
           title="Contracts"
-          description="Manage machine contracts, renewals, and equipment age"
+          description="Manage machine contracts, renewals, and utilization"
         >
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleExportExcel}>
             <FileSpreadsheet className="h-3 w-3 mr-1" />
@@ -203,7 +252,7 @@ export default function ContractsPage() {
         </PageHeader>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <Card className="cursor-pointer hover:bg-muted/50" onClick={() => setFilterStatus("all")}>
             <CardContent className="p-3">
               <p className="text-xs text-muted-foreground">Total Machines</p>
@@ -240,22 +289,46 @@ export default function ContractsPage() {
               <p className="text-xl font-bold font-mono text-yellow-600">{expiringIn6Months}</p>
             </CardContent>
           </Card>
-          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => setFilterStatus("no-contract")}>
+          <Card
+            className={cn(
+              "cursor-pointer hover:bg-muted/50",
+              criticalUtilization > 0 && "border-red-500/50"
+            )}
+            onClick={() => setFilterUtilization("critical")}
+          >
             <CardContent className="p-3">
-              <p className="text-xs text-muted-foreground">No Contract Data</p>
-              <p className="text-xl font-bold font-mono text-muted-foreground">{noContract}</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <TrendingDown className="h-3 w-3 text-red-600" />
+                Critical Util
+              </p>
+              <p className="text-xl font-bold font-mono text-red-600">{criticalUtilization}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={cn(
+              "cursor-pointer hover:bg-muted/50",
+              liftCandidates > 0 && "border-orange-500/50 bg-orange-50/50"
+            )}
+            onClick={() => setFilterUtilization("lift-candidates")}
+          >
             <CardContent className="p-3">
-              <p className="text-xs text-muted-foreground">Avg Machine Age</p>
-              <p className="text-xl font-bold font-mono">{avgMachineAge} mo</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Target className="h-3 w-3 text-orange-600" />
+                Lift Candidates
+              </p>
+              <p className="text-xl font-bold font-mono text-orange-600">{liftCandidates}</p>
+            </CardContent>
+          </Card>
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => setFilterStatus("no-contract")}>
+            <CardContent className="p-3">
+              <p className="text-xs text-muted-foreground">No Contract</p>
+              <p className="text-xl font-bold font-mono text-muted-foreground">{noContract}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -265,9 +338,9 @@ export default function ContractsPage() {
               className="pl-8 h-8 text-xs"
             />
           </div>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setFilterUtilization("all"); }}>
             <SelectTrigger className="w-[150px] h-8 text-xs">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder="Contract Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Contracts</SelectItem>
@@ -277,12 +350,28 @@ export default function ContractsPage() {
               <SelectItem value="no-contract">No Contract</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={filterUtilization} onValueChange={(v) => { setFilterUtilization(v); }}>
+            <SelectTrigger className="w-[150px] h-8 text-xs">
+              <SelectValue placeholder="Utilization" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Utilization</SelectItem>
+              <SelectItem value="critical">Critical (&lt;20%)</SelectItem>
+              <SelectItem value="low">Low (20-40%)</SelectItem>
+              <SelectItem value="optimal">Optimal (40-80%)</SelectItem>
+              <SelectItem value="high">High (80-100%)</SelectItem>
+              <SelectItem value="overworked">Overworked (&gt;100%)</SelectItem>
+              <SelectItem value="lift-candidates">Lift Candidates</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-[140px] h-8 text-xs">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="expiring">Expiring Soon</SelectItem>
+              <SelectItem value="lift-score">Lift Score</SelectItem>
+              <SelectItem value="utilization">Lowest Util</SelectItem>
               <SelectItem value="oldest">Oldest First</SelectItem>
               <SelectItem value="newest">Newest First</SelectItem>
               <SelectItem value="store">By Store</SelectItem>
@@ -306,8 +395,8 @@ export default function ContractsPage() {
                     <th className="px-3 py-1.5 text-left font-medium">Serial</th>
                     <th className="px-3 py-1.5 text-left font-medium">Model</th>
                     <th className="px-3 py-1.5 text-left font-medium">Store</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Contract #</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Age (mo)</th>
+                    <th className="px-3 py-1.5 text-center font-medium">Utilization</th>
+                    <th className="px-3 py-1.5 text-center font-medium">Lift</th>
                     <th className="px-3 py-1.5 text-left font-medium">Contract End</th>
                     <th className="px-3 py-1.5 text-right font-medium">Remaining</th>
                     <th className="px-3 py-1.5 text-center font-medium">Status</th>
@@ -317,6 +406,9 @@ export default function ContractsPage() {
                   {filteredMachines.map((machine) => {
                     const isExpired = machine.contractRemaining !== null && machine.contractRemaining <= 0;
                     const isExpiring = machine.contractRemaining !== null && machine.contractRemaining <= 6 && machine.contractRemaining > 0;
+                    const util = machine.utilization;
+                    const utilStatus = util?.utilizationStatus as UtilizationStatus | undefined;
+                    const config = utilStatus ? utilizationConfig[utilStatus] : null;
 
                     return (
                       <tr
@@ -329,12 +421,72 @@ export default function ContractsPage() {
                         onClick={() => router.push(`/machines/${machine.id}`)}
                       >
                         <td className="px-3 py-1.5 font-mono">{machine.serialNumber}</td>
-                        <td className="px-3 py-1.5">{machine.modelName || "-"}</td>
+                        <td className="px-3 py-1.5 truncate max-w-[120px]">{machine.modelName || "-"}</td>
                         <td className="px-3 py-1.5">{machine.company?.name || "-"}</td>
-                        <td className="px-3 py-1.5 font-mono text-muted-foreground">
-                          {machine.contractNumber || "-"}
+                        <td className="px-3 py-1.5">
+                          {util && config ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <div className="w-12">
+                                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                          className={cn("h-full rounded-full", config.bgColor)}
+                                          style={{ width: `${Math.min(util.utilizationPercent, 100)}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                    <span className={cn("text-[10px] font-medium w-8", config.color)}>
+                                      {util.utilizationPercent}%
+                                    </span>
+                                    {util.trendDirection === "up" && <TrendingUp className="h-2.5 w-2.5 text-emerald-500" />}
+                                    {util.trendDirection === "down" && <TrendingDown className="h-2.5 w-2.5 text-red-500" />}
+                                    {util.trendDirection === "stable" && <Minus className="h-2.5 w-2.5 text-muted-foreground" />}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-medium">{config.label}: {util.utilizationPercent}%</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Avg: {formatNumber(util.avgMonthlyVolume)}/mo · Duty: {formatNumber(util.dutyCycle)}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
-                        <td className="px-3 py-1.5 text-right font-mono">{machine.machineAge}</td>
+                        <td className="px-3 py-1.5 text-center">
+                          {util && util.liftScore >= 60 ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "text-[9px] px-1 py-0",
+                                      util.liftScore >= 80
+                                        ? "bg-red-100 text-red-700 border-red-300"
+                                        : "bg-amber-100 text-amber-700 border-amber-300"
+                                    )}
+                                  >
+                                    <Target className="h-2 w-2 mr-0.5" />
+                                    {util.liftScore}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-medium">Lift Score: {util.liftScore}/100</p>
+                                  {util.insights.slice(0, 2).map((i, idx) => (
+                                    <p key={idx} className="text-xs text-muted-foreground">• {i}</p>
+                                  ))}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-1.5 text-muted-foreground">
                           {formatDate(machine.rentalEndDate)}
                         </td>
@@ -349,8 +501,8 @@ export default function ContractsPage() {
                               )}
                             >
                               {machine.contractRemaining <= 0
-                                ? `${Math.abs(machine.contractRemaining)} overdue`
-                                : `${machine.contractRemaining} mo`}
+                                ? `${Math.abs(machine.contractRemaining)} over`
+                                : `${machine.contractRemaining}mo`}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>

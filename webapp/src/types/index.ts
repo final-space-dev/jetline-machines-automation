@@ -179,6 +179,35 @@ export interface ScenarioWithMoves {
   moves: ScenarioMove[];
 }
 
+export interface MachineUtilization {
+  machineId: string;
+  serialNumber: string;
+  modelName: string | null;
+  categoryName: string | null;
+  companyId: string;
+  companyName: string;
+  currentBalance: number;
+  avgMonthlyVolume: number;
+  dutyCycle: number;
+  utilizationPercent: number;
+  utilizationStatus: "critical" | "low" | "optimal" | "high" | "overworked";
+  volumeTrend: number;
+  trendDirection: "up" | "down" | "stable";
+  contractEndDate: string | null;
+  contractMonthsRemaining: number | null;
+  rentalAmount: number | null;
+  contractType: string | null;
+  daysSinceLastReading: number | null;
+  machineAgeMonths: number | null;
+  isLifted: boolean;
+  liftScore: number;
+  insights: string[];
+}
+
+export interface MachineWithUtilization extends MachineWithRelations {
+  utilization?: MachineUtilization;
+}
+
 export interface SyncStatus {
   history: {
     id: string;
