@@ -200,12 +200,35 @@ export interface MachineUtilization {
   daysSinceLastReading: number | null;
   machineAgeMonths: number | null;
   isLifted: boolean;
+  // Revenue (calculated from volume × rates)
+  monthlyRevenue: number;
+  monoRevenue: number;
+  colourRevenue: number;
+  hasRates: boolean;
+  // Lift scoring
   liftScore: number;
   insights: string[];
 }
 
 export interface MachineWithUtilization extends MachineWithRelations {
   utilization?: MachineUtilization;
+  currentRate?: MachineRate;
+}
+
+export interface MachineRate {
+  id: string;
+  machineId: string;
+  bmsMachinesId: number | null;
+  category: string;
+  ratesFrom: Date | string;
+  meters: number | null;
+  a4Mono: number | null;
+  a3Mono: number | null;
+  a4Colour: number | null;
+  a3Colour: number | null;
+  colourExtraLarge: number | null;
+  dateSaved: Date | string | null;
+  savedBy: string | null;
 }
 
 export interface SyncStatus {

@@ -8,6 +8,7 @@ export type {
   BMSConnectionConfig,
   BMSMachineRow,
   BMSMeterReadingRow,
+  BMSMachineRateRow,
   CompanyBMSConfig,
   SyncResult,
   FullSyncSummary,
@@ -33,6 +34,8 @@ export {
   fetchCategories,
   fetchModels,
   fetchMachinesWithLatestReading,
+  fetchAllMachineRates,
+  fetchRateCount,
 } from "./queries";
 
 // Sync operations

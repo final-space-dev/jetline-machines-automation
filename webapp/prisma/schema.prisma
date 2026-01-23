@@ -111,6 +111,7 @@ model Machine {
   category              Category?     @relation(fields: [categoryId], references: [id])
   model                 PrinterModel? @relation(fields: [modelId], references: [id])
   readings              MeterReading[]
+  rates                 MachineRate[]
   scenarioMachines      ScenarioMachine[]
 
   @@index([companyId])
@@ -277,4 +278,46 @@ model BmsConnection {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@map("bms_connections")
+}
+
+// =============================================================================
+// MACHINE RATES - Pricing from BMS
+// =============================================================================
+
+model MachineRate {
+  id              String    @id @default(cuid())
+
+  // Machine reference
+  machineId       String    @map("machine_id")
+  bmsMachinesId   Int?      @map("bms_machines_id") // Original machinesid from BMS
+
+  // Rate category from BMS
+  category        String    // e.g., "Colour", "Black and White"
+
+  // Effective date - rates are historical, newer supersedes older
+  ratesFrom       DateTime  @map("rates_from") @db.Date
+
+  // Rate values (cents per impression)
+  meters          Decimal?  @db.Decimal(22, 6) // Meter rate
+  a4Mono          Decimal?  @map("a4_mono") @db.Decimal(22, 6)
+  a3Mono          Decimal?  @map("a3_mono") @db.Decimal(22, 6)
+  a4Colour        Decimal?  @map("a4_colour") @db.Decimal(22, 6)
+  a3Colour        Decimal?  @map("a3_colour") @db.Decimal(22, 6)
+  colourExtraLarge Decimal? @map("colour_extra_large") @db.Decimal(22, 6)
+
+  // Audit fields from BMS
+  dateSaved       DateTime? @map("date_saved")
+  savedBy         String?   @map("saved_by")
+
+  // Timestamps
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  machine         Machine   @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([machineId, ratesFrom])
+  @@index([machineId])
+  @@index([ratesFrom])
+  @@index([machineId, ratesFrom])
+  @@map("machine_rates")
 }

@@ -8,12 +8,13 @@ import {
   BMSConnectionConfig,
   BMSMachineRow,
   BMSMeterReadingRow,
+  BMSMachineRateRow,
   SyncResult,
   FullSyncSummary,
   CompanyBMSConfig,
 } from "./types";
 import { createBMSConfig, closeBMSConnection } from "./connection";
-import { fetchAllMachines, fetchAllMeterReadings } from "./queries";
+import { fetchAllMachines, fetchAllMeterReadings, fetchAllMachineRates } from "./queries";
 
 const prisma = new PrismaClient();
 
@@ -313,6 +314,84 @@ async function syncReadingsFromBMS(
 }
 
 /**
+ * Sync machine rates from BMS to local PostgreSQL
+ */
+async function syncRatesFromBMS(
+  bmsConfig: BMSConnectionConfig,
+  bmsRows: BMSMachineRateRow[]
+): Promise<{ processed: number; errors: string[] }> {
+  const errors: string[] = [];
+  let processed = 0;
+
+  // Build a map of machinesid -> local machine id
+  const machines = await prisma.machine.findMany({
+    where: { bmsMachinesId: { not: null } },
+    select: { id: true, bmsMachinesId: true },
+  });
+  const machineIdMap = new Map<number, string>();
+  machines.forEach((m) => {
+    if (m.bmsMachinesId) machineIdMap.set(m.bmsMachinesId, m.id);
+  });
+
+  for (const row of bmsRows) {
+    try {
+      const machineId = machineIdMap.get(row.machineid);
+      if (!machineId) continue;
+
+      // Parse rate values - BMS may return them as strings
+      const parseRate = (val: number | string | null): number | null => {
+        if (val === null || val === undefined) return null;
+        const parsed = parseFloat(String(val));
+        return isNaN(parsed) ? null : parsed;
+      };
+
+      await prisma.machineRate.upsert({
+        where: {
+          machineId_ratesFrom: {
+            machineId,
+            ratesFrom: new Date(row.rates_from),
+          },
+        },
+        create: {
+          machineId,
+          bmsMachinesId: row.machineid,
+          category: row.category || "Unknown",
+          ratesFrom: new Date(row.rates_from),
+          meters: parseRate(row.meters),
+          a4Mono: parseRate(row.a4_mono),
+          a3Mono: parseRate(row.a3_mono),
+          a4Colour: parseRate(row.a4_colour),
+          a3Colour: parseRate(row.a3_colour),
+          colourExtraLarge: parseRate(row.colour_extra_large),
+          dateSaved: row.date_saved ? new Date(row.date_saved) : null,
+          savedBy: row.saved_by,
+        },
+        update: {
+          bmsMachinesId: row.machineid,
+          category: row.category || "Unknown",
+          meters: parseRate(row.meters),
+          a4Mono: parseRate(row.a4_mono),
+          a3Mono: parseRate(row.a3_mono),
+          a4Colour: parseRate(row.a4_colour),
+          a3Colour: parseRate(row.a3_colour),
+          colourExtraLarge: parseRate(row.colour_extra_large),
+          dateSaved: row.date_saved ? new Date(row.date_saved) : null,
+          savedBy: row.saved_by,
+        },
+      });
+
+      processed++;
+    } catch (error) {
+      errors.push(
+        `Rate ${row.machineid}/${row.rates_from}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  return { processed, errors };
+}
+
+/**
  * Sync a single company's BMS data
  */
 export async function syncCompany(company: CompanyBMSConfig): Promise<SyncResult> {
@@ -320,6 +399,7 @@ export async function syncCompany(company: CompanyBMSConfig): Promise<SyncResult
   const errors: string[] = [];
   let machinesProcessed = 0;
   let readingsProcessed = 0;
+  let ratesProcessed = 0;
 
   const bmsConfig = createBMSConfig(company.bmsSchema, company.bmsHost);
 
@@ -348,8 +428,22 @@ export async function syncCompany(company: CompanyBMSConfig): Promise<SyncResult
     readingsProcessed = readingResult.processed;
     errors.push(...readingResult.errors);
 
+    // Fetch all machine rates
+    try {
+      const bmsRates = await fetchAllMachineRates(bmsConfig);
+      console.log(`[Sync] Found ${bmsRates.length} rates in ${company.bmsSchema}`);
+
+      // Sync rates
+      const rateResult = await syncRatesFromBMS(bmsConfig, bmsRates);
+      ratesProcessed = rateResult.processed;
+      errors.push(...rateResult.errors);
+    } catch (rateError) {
+      // Rate table might not exist in all BMS databases - log but don't fail
+      console.log(`[Sync] Rate sync skipped for ${company.name}: ${rateError instanceof Error ? rateError.message : String(rateError)}`);
+    }
+
     console.log(
-      `[Sync] Completed ${company.name}: ${machinesProcessed} machines, ${readingsProcessed} readings`
+      `[Sync] Completed ${company.name}: ${machinesProcessed} machines, ${readingsProcessed} readings, ${ratesProcessed} rates`
     );
   } catch (error) {
     errors.push(
@@ -367,6 +461,7 @@ export async function syncCompany(company: CompanyBMSConfig): Promise<SyncResult
     bmsSchema: company.bmsSchema,
     machinesProcessed,
     readingsProcessed,
+    ratesProcessed,
     errors,
     duration: Date.now() - startTime,
   };
@@ -416,6 +511,7 @@ export async function runFullSync(): Promise<FullSyncSummary> {
     // Calculate totals
     const totalMachines = companyResults.reduce((sum, r) => sum + r.machinesProcessed, 0);
     const totalReadings = companyResults.reduce((sum, r) => sum + r.readingsProcessed, 0);
+    const totalRates = companyResults.reduce((sum, r) => sum + r.ratesProcessed, 0);
 
     // Update sync log
     await prisma.syncLog.update({
@@ -431,7 +527,7 @@ export async function runFullSync(): Promise<FullSyncSummary> {
     });
 
     console.log(
-      `[Sync] Full sync completed: ${totalMachines} machines, ${totalReadings} readings`
+      `[Sync] Full sync completed: ${totalMachines} machines, ${totalReadings} readings, ${totalRates} rates`
     );
 
     return {
@@ -441,6 +537,7 @@ export async function runFullSync(): Promise<FullSyncSummary> {
       companiesProcessed: companies.length,
       totalMachines,
       totalReadings,
+      totalRates,
       errors,
       companyResults,
     };

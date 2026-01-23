@@ -1,17 +1,17 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { DataTable } from "@/components/data-table/data-table";
-import { machineColumns } from "@/components/data-table/columns";
+import { createMachineColumns, type StoreOption } from "@/components/data-table/columns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoading } from "@/components/ui/page-loading";
 import { formatNumber, cn } from "@/lib/utils";
 import { AlertTriangle, TrendingDown, CheckCircle, Zap, Target } from "lucide-react";
-import type { MachineWithRelations, MachineUtilization, MachineWithUtilization } from "@/types";
+import type { MachineWithRelations, MachineUtilization, MachineWithUtilization, MachineRate } from "@/types";
 
 interface FilterOptions {
   companies: { value: string; label: string }[];
@@ -36,7 +36,9 @@ function MachinesPageContent() {
   const storeFilter = searchParams.get("store");
 
   const [machines, setMachines] = useState<MachineWithUtilization[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
   const [utilizationSummary, setUtilizationSummary] = useState<UtilizationSummary | null>(null);
+  const [liftRefreshKey, setLiftRefreshKey] = useState(0);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     companies: [],
     categories: [],
@@ -63,8 +65,8 @@ function MachinesPageContent() {
   const fetchData = async () => {
     try {
       const machineUrl = storeFilter
-        ? `/api/machines?companyId=${storeFilter}`
-        : "/api/machines";
+        ? `/api/machines?companyId=${storeFilter}&limit=10000&includeRates=true`
+        : "/api/machines?limit=10000&includeRates=true";
       const utilizationUrl = storeFilter
         ? `/api/machines/utilization?companyId=${storeFilter}`
         : "/api/machines/utilization";
@@ -84,21 +86,26 @@ function MachinesPageContent() {
       // Handle API error responses
       const companiesArray = Array.isArray(companiesData) ? companiesData : [];
       const categoriesArray = Array.isArray(categoriesData) ? categoriesData : [];
-      const machinesArray: MachineWithRelations[] = Array.isArray(machinesData?.data) ? machinesData.data : [];
+      const machinesArray: (MachineWithRelations & { rates?: MachineRate[] })[] = Array.isArray(machinesData?.data) ? machinesData.data : [];
       const utilizationArray: MachineUtilization[] = utilizationData?.machines || [];
 
       // Create a map of machine utilization by machineId
       const utilizationMap = new Map<string, MachineUtilization>();
       utilizationArray.forEach((u) => utilizationMap.set(u.machineId, u));
 
-      // Merge utilization data with machines
+      // Merge utilization and rate data with machines
       const machinesWithUtilization: MachineWithUtilization[] = machinesArray.map((machine) => ({
         ...machine,
         utilization: utilizationMap.get(machine.id),
+        currentRate: machine.rates?.[0], // Latest rate (already sorted by ratesFrom desc)
       }));
 
       setMachines(machinesWithUtilization);
       setUtilizationSummary(utilizationData?.summary || null);
+      setStores(companiesArray.map((c: { id: string; name: string }) => ({
+        id: c.id,
+        name: c.name,
+      })));
       setFilterOptions({
         companies: companiesArray.map((c: { id: string; name: string }) => ({
           value: c.name,
@@ -132,6 +139,17 @@ function MachinesPageContent() {
   const handleRowClick = (machine: MachineWithUtilization) => {
     router.push(`/machines/${machine.id}`);
   };
+
+  // Handle lift change - trigger re-render to update UI
+  const handleLiftChange = (machineId: string, toStoreId: string | null) => {
+    setLiftRefreshKey((k) => k + 1);
+  };
+
+  // Create columns with stores for inline lift dropdown
+  const columns = useMemo(
+    () => createMachineColumns(stores, handleLiftChange),
+    [stores, liftRefreshKey]
+  );
 
   // Calculate summary stats
   const totalMachines = machines.length;
@@ -237,8 +255,9 @@ function MachinesPageContent() {
         <Card>
           <CardContent className="p-3">
             <DataTable
-              columns={machineColumns}
+              columns={columns}
               data={machines}
+              tableId="machines"
               searchPlaceholder="Search serial, model, store..."
               filterColumns={[
                 {

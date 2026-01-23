@@ -18,6 +18,8 @@ import {
   FileWarning,
   Zap,
   Building2,
+  DollarSign,
+  Banknote,
 } from "lucide-react";
 import { formatNumber, formatDate } from "@/lib/utils";
 
@@ -133,10 +135,39 @@ interface DashboardData {
   } | null;
 }
 
+interface RateSummary {
+  totalRates: number;
+  machinesWithRates: number;
+  averageRates: {
+    a4Mono: number;
+    a3Mono: number;
+    a4Colour: number;
+    a3Colour: number;
+    meters: number;
+  };
+}
+
+interface UtilizationSummary {
+  total: number;
+  critical: number;
+  low: number;
+  optimal: number;
+  high: number;
+  overworked: number;
+  liftCandidates: number;
+  totalMonthlyRevenue: number;
+  totalMonoRevenue: number;
+  totalColourRevenue: number;
+  machinesWithRates: number;
+  avgRevenuePerMachine: number;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [rateSummary, setRateSummary] = useState<RateSummary | null>(null);
+  const [utilizationSummary, setUtilizationSummary] = useState<UtilizationSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -145,16 +176,27 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const [insightsRes, dashboardRes] = await Promise.all([
+      const [insightsRes, dashboardRes, ratesRes, utilizationRes] = await Promise.all([
         fetch("/api/dashboard/insights?period=90"),
         fetch("/api/dashboard"),
+        fetch("/api/machines/rates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "summary" }),
+        }),
+        fetch("/api/machines/utilization"),
       ]);
 
       const insightsData = await insightsRes.json();
       const dashData = await dashboardRes.json();
+      const ratesData = await ratesRes.json();
+      const utilizationData = await utilizationRes.json();
 
-      setInsights(insightsData);
-      setDashboardData(dashData);
+      // Handle API error responses
+      setInsights(insightsData?.summary ? insightsData : null);
+      setDashboardData(dashData?.stats ? dashData : null);
+      setRateSummary(ratesData?.totalRates ? ratesData : null);
+      setUtilizationSummary(utilizationData?.summary || null);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
@@ -468,6 +510,91 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Monthly Revenue Summary */}
+            {utilizationSummary && utilizationSummary.totalMonthlyRevenue > 0 && (
+              <Card className="border-emerald-200">
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-emerald-600" />
+                    Monthly Revenue
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                  <div className="text-center py-2 bg-emerald-50 rounded-lg">
+                    <p className="text-xl font-bold text-emerald-700 font-mono">
+                      R{utilizationSummary.totalMonthlyRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Volume × Rates = ZAR</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="text-center">
+                      <p className="text-muted-foreground text-[10px]">Mono</p>
+                      <p className="font-mono font-medium text-gray-700">
+                        R{(utilizationSummary.totalMonoRevenue / 1000).toFixed(0)}k
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground text-[10px]">Colour</p>
+                      <p className="font-mono font-medium text-blue-700">
+                        R{(utilizationSummary.totalColourRevenue / 1000).toFixed(0)}k
+                      </p>
+                    </div>
+                  </div>
+                  <div className="border-t pt-2 mt-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Machines with Rates</span>
+                      <span className="font-mono">{formatNumber(utilizationSummary.machinesWithRates)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Avg/Machine</span>
+                      <span className="font-mono text-emerald-600">
+                        R{utilizationSummary.avgRevenuePerMachine.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Rate Summary */}
+            {rateSummary && rateSummary.machinesWithRates > 0 && (
+              <Card>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-emerald-600" />
+                    Rate Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Machines with Rates</span>
+                    <span className="font-mono font-bold">{formatNumber(rateSummary.machinesWithRates)}</span>
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    <p className="text-[10px] text-muted-foreground mb-1.5">Average Rates (cents/page)</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">A4 Mono</span>
+                        <span className="font-mono">{(rateSummary.averageRates.a4Mono * 100).toFixed(2)}c</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">A4 Colour</span>
+                        <span className="font-mono text-blue-600">{(rateSummary.averageRates.a4Colour * 100).toFixed(2)}c</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">A3 Mono</span>
+                        <span className="font-mono">{(rateSummary.averageRates.a3Mono * 100).toFixed(2)}c</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">A3 Colour</span>
+                        <span className="font-mono text-blue-600">{(rateSummary.averageRates.a3Colour * 100).toFixed(2)}c</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Top Performing Stores */}
             <Card>

@@ -75,6 +75,7 @@ export interface SyncResult {
   bmsSchema: string;
   machinesProcessed: number;
   readingsProcessed: number;
+  ratesProcessed: number;
   errors: string[];
   duration: number;
 }
@@ -87,6 +88,22 @@ export interface FullSyncSummary {
   companiesProcessed: number;
   totalMachines: number;
   totalReadings: number;
+  totalRates: number;
   errors: string[];
   companyResults: SyncResult[];
+}
+
+// Raw row from bms_machines_fsma_rates table
+export interface BMSMachineRateRow {
+  machineid: number;
+  category: string | null;
+  rates_from: Date;
+  meters: number | null;
+  a4_mono: number | null;
+  a3_mono: number | null;
+  a4_colour: number | null;
+  a3_colour: number | null;
+  colour_extra_large: number | null;
+  date_saved: Date | null;
+  saved_by: string | null;
 }

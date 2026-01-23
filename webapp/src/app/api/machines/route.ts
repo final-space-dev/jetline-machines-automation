@@ -15,10 +15,11 @@ import { Prisma } from "@prisma/client";
  * - status: Filter by machine status
  * - search: Search serial number or machine name
  * - page: Page number (default 1)
- * - limit: Items per page (default 50)
+ * - limit: Items per page (default 10000 - returns all)
  * - sortBy: Field to sort by
  * - sortOrder: asc or desc
  * - includeReadings: Include meter reading history
+ * - includeRates: Include current rate (latest rate by ratesFrom date)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +36,8 @@ export async function GET(request: NextRequest) {
 
     // Pagination
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(10000, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
+    // Default to 10000 to return all machines - prevents regression bugs from missing limit params
+    const limit = Math.min(10000, Math.max(1, parseInt(searchParams.get("limit") || "10000", 10)));
     const skip = (page - 1) * limit;
 
     // Sorting
@@ -44,6 +46,8 @@ export async function GET(request: NextRequest) {
 
     // Include readings?
     const includeReadings = searchParams.get("includeReadings") === "true";
+    // Include current rate?
+    const includeRates = searchParams.get("includeRates") === "true";
 
     // Build where clause
     const where: Prisma.MachineWhereInput = {};
@@ -98,6 +102,12 @@ export async function GET(request: NextRequest) {
             ? {
                 orderBy: { readingDate: "desc" },
                 take: 12, // Last 12 readings
+              }
+            : false,
+          rates: includeRates
+            ? {
+                orderBy: { ratesFrom: "desc" },
+                take: 1, // Only the current/latest rate
               }
             : false,
         },

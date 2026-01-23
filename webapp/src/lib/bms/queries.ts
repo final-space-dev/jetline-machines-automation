@@ -4,7 +4,7 @@
  */
 
 import { RowDataPacket } from "mysql2/promise";
-import { BMSConnectionConfig, BMSMachineRow, BMSMeterReadingRow } from "./types";
+import { BMSConnectionConfig, BMSMachineRow, BMSMeterReadingRow, BMSMachineRateRow } from "./types";
 import { queryBMS } from "./connection";
 
 /**
@@ -202,4 +202,48 @@ export async function fetchMachinesWithLatestReading(
   return queryBMS<
     (BMSMachineRow & { latest_reading_date?: Date; latest_total?: number }) & RowDataPacket
   >(config, query);
+}
+
+/**
+ * Get all machine rates from a BMS database
+ * Returns full rate history with all rate types
+ */
+export async function fetchAllMachineRates(
+  config: BMSConnectionConfig
+): Promise<BMSMachineRateRow[]> {
+  const query = `
+    SELECT
+      machineid,
+      category,
+      rates_from,
+      meters,
+      a4_mono,
+      a3_mono,
+      a4_colour,
+      a3_colour,
+      colour_extra_large,
+      date_saved,
+      saved_by
+    FROM bms_machines_fsma_rates
+    WHERE machineid IS NOT NULL
+    ORDER BY machineid, rates_from
+  `;
+
+  return queryBMS<BMSMachineRateRow & RowDataPacket>(config, query);
+}
+
+/**
+ * Get rate count from a BMS database
+ */
+export async function fetchRateCount(
+  config: BMSConnectionConfig
+): Promise<number> {
+  const query = `
+    SELECT COUNT(*) as count
+    FROM bms_machines_fsma_rates
+    WHERE machineid IS NOT NULL
+  `;
+
+  const result = await queryBMS<{ count: number } & RowDataPacket>(config, query);
+  return result[0]?.count || 0;
 }
