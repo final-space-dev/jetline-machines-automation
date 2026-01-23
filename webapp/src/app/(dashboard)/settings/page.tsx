@@ -39,7 +39,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/companies");
       const data = await res.json();
-      setCompanies(data);
+      setCompanies(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch companies:", error);
     } finally {

@@ -200,10 +200,10 @@ export interface MachineUtilization {
   daysSinceLastReading: number | null;
   machineAgeMonths: number | null;
   isLifted: boolean;
-  // Revenue (calculated from volume × rates)
-  monthlyRevenue: number;
-  monoRevenue: number;
-  colourRevenue: number;
+  // FSMA Lease Cost (calculated from volume × rates)
+  monthlyCost: number;
+  monoCost: number;
+  colourCost: number;
   hasRates: boolean;
   // Lift scoring
   liftScore: number;

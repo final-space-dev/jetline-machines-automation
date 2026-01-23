@@ -569,35 +569,35 @@ export default function MachineDetailPage() {
               </Card>
             )}
 
-            {/* Monthly Revenue Card */}
-            {utilization && utilization.hasRates && utilization.monthlyRevenue > 0 && (
-              <Card className="border-l-4 border-l-emerald-500">
+            {/* Monthly FSMA Cost Card */}
+            {utilization && utilization.hasRates && utilization.monthlyCost > 0 && (
+              <Card className="border-l-4 border-l-red-500">
                 <CardHeader className="pb-2 pt-3 px-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm flex items-center gap-1.5">
-                      <Banknote className="h-4 w-4 text-emerald-600" />
-                      Monthly Revenue
+                      <Banknote className="h-4 w-4 text-red-600" />
+                      Monthly FSMA Cost
                     </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2 px-3 pb-3 text-xs">
                   <div className="text-center py-2">
-                    <p className="text-2xl font-bold text-emerald-700 font-mono">
-                      R{utilization.monthlyRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <p className="text-2xl font-bold text-red-700 font-mono">
+                      R{utilization.monthlyCost.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">Volume × Rates = ZAR</p>
+                    <p className="text-[10px] text-muted-foreground">Volume × Rates = Cost to FSMA</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t">
                     <div className="bg-gray-50 rounded-lg p-2 text-center">
                       <p className="text-[10px] text-muted-foreground">Mono</p>
                       <p className="font-mono font-medium text-gray-700">
-                        R{utilization.monoRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                        R{utilization.monoCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div className="bg-blue-50 rounded-lg p-2 text-center">
                       <p className="text-[10px] text-muted-foreground">Colour</p>
                       <p className="font-mono font-medium text-blue-700">
-                        R{utilization.colourRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                        R{utilization.colourCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>

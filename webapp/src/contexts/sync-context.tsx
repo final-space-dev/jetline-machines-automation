@@ -98,7 +98,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     try {
       // First, get the list of companies to show progress
       const companiesRes = await fetch("/api/companies");
-      const companies = await companiesRes.json();
+      const companiesData = await companiesRes.json();
+
+      // Handle API error responses
+      const companies = Array.isArray(companiesData) ? companiesData : [];
 
       // Initialize company results
       const initialResults: SyncCompanyResult[] = companies

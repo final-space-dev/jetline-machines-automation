@@ -36,8 +36,8 @@ function formatRate(value: number | null | undefined): string {
   return `${(value * 100).toFixed(2)}c`;
 }
 
-// Helper to format revenue values (ZAR)
-function formatRevenueShort(value: number): string {
+// Helper to format cost values (ZAR)
+function formatCostShort(value: number): string {
   if (value === 0) return "—";
   if (value < 1000) return `R${value.toFixed(0)}`;
   if (value < 1000000) return `R${(value / 1000).toFixed(1)}k`;
@@ -316,12 +316,12 @@ export function createMachineColumns(
     },
   },
   {
-    id: "monthlyRevenue",
-    accessorFn: (row) => row.utilization?.monthlyRevenue ?? 0,
-    header: "Monthly Rev",
+    id: "monthlyCost",
+    accessorFn: (row) => row.utilization?.monthlyCost ?? 0,
+    header: "FSMA Cost",
     cell: ({ row }) => {
       const utilization = row.original.utilization;
-      if (!utilization?.hasRates || utilization.monthlyRevenue === 0) {
+      if (!utilization?.hasRates || utilization.monthlyCost === 0) {
         return <span className="text-muted-foreground text-xs">—</span>;
       }
 
@@ -330,25 +330,25 @@ export function createMachineColumns(
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1">
-                <Banknote className="h-3 w-3 text-emerald-600" />
-                <span className="font-mono text-xs font-medium text-emerald-700">
-                  {formatRevenueShort(utilization.monthlyRevenue)}
+                <Banknote className="h-3 w-3 text-red-600" />
+                <span className="font-mono text-xs font-medium text-red-700">
+                  {formatCostShort(utilization.monthlyCost)}
                 </span>
               </div>
             </TooltipTrigger>
             <TooltipContent>
               <div className="space-y-1">
-                <p className="font-medium">Monthly Revenue (Volume × Rates)</p>
+                <p className="font-medium">Monthly FSMA Lease Cost (Volume × Rates)</p>
                 <div className="text-xs space-y-0.5">
                   <p className="text-gray-600">
-                    Mono: R{utilization.monoRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    Mono: R{utilization.monoCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                   </p>
                   <p className="text-blue-600">
-                    Colour: R{utilization.colourRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    Colour: R{utilization.colourCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                   </p>
                   <hr className="my-1" />
                   <p className="font-medium">
-                    Total: R{utilization.monthlyRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    Total: R{utilization.monthlyCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>

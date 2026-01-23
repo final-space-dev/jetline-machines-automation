@@ -46,7 +46,8 @@ export default function SyncPage() {
     try {
       const res = await fetch("/api/sync?limit=20");
       const json = await res.json();
-      setData(json);
+      // Handle API error responses
+      setData(json?.history ? json : null);
     } catch (error) {
       console.error("Failed to fetch sync data:", error);
     } finally {

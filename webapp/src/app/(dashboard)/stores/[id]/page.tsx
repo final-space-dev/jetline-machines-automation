@@ -71,7 +71,7 @@ export default function StoreDetailPage() {
     try {
       const [companyRes, machinesRes, utilizationRes] = await Promise.all([
         fetch(`/api/companies/${storeId}`),
-        fetch(`/api/machines?companyId=${storeId}`),
+        fetch(`/api/machines?companyId=${storeId}&limit=10000`),
         fetch(`/api/machines/utilization?companyId=${storeId}`),
       ]);
 

@@ -155,11 +155,11 @@ interface UtilizationSummary {
   high: number;
   overworked: number;
   liftCandidates: number;
-  totalMonthlyRevenue: number;
-  totalMonoRevenue: number;
-  totalColourRevenue: number;
+  totalMonthlyCost: number;
+  totalMonoCost: number;
+  totalColourCost: number;
   machinesWithRates: number;
-  avgRevenuePerMachine: number;
+  avgCostPerMachine: number;
 }
 
 export default function DashboardPage() {
@@ -511,33 +511,33 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Monthly Revenue Summary */}
-            {utilizationSummary && utilizationSummary.totalMonthlyRevenue > 0 && (
-              <Card className="border-emerald-200">
+            {/* Monthly FSMA Lease Cost Summary */}
+            {utilizationSummary && utilizationSummary.totalMonthlyCost > 0 && (
+              <Card className="border-red-200">
                 <CardHeader className="pb-2 pt-3 px-3">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <Banknote className="h-4 w-4 text-emerald-600" />
-                    Monthly Revenue
+                    <Banknote className="h-4 w-4 text-red-600" />
+                    Monthly FSMA Cost
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 px-3 pb-3 text-xs">
-                  <div className="text-center py-2 bg-emerald-50 rounded-lg">
-                    <p className="text-xl font-bold text-emerald-700 font-mono">
-                      R{utilizationSummary.totalMonthlyRevenue.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  <div className="text-center py-2 bg-red-50 rounded-lg">
+                    <p className="text-xl font-bold text-red-700 font-mono">
+                      R{utilizationSummary.totalMonthlyCost.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">Volume × Rates = ZAR</p>
+                    <p className="text-[10px] text-muted-foreground">Volume × Rates = Cost to FSMA</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <div className="text-center">
                       <p className="text-muted-foreground text-[10px]">Mono</p>
                       <p className="font-mono font-medium text-gray-700">
-                        R{(utilizationSummary.totalMonoRevenue / 1000).toFixed(0)}k
+                        R{(utilizationSummary.totalMonoCost / 1000).toFixed(0)}k
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-muted-foreground text-[10px]">Colour</p>
                       <p className="font-mono font-medium text-blue-700">
-                        R{(utilizationSummary.totalColourRevenue / 1000).toFixed(0)}k
+                        R{(utilizationSummary.totalColourCost / 1000).toFixed(0)}k
                       </p>
                     </div>
                   </div>
@@ -548,8 +548,8 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Avg/Machine</span>
-                      <span className="font-mono text-emerald-600">
-                        R{utilizationSummary.avgRevenuePerMachine.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                      <span className="font-mono text-red-600">
+                        R{utilizationSummary.avgCostPerMachine.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>

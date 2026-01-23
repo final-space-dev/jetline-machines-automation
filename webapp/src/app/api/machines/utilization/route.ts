@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { calculateRevenueFromIncrementals } from "@/lib/revenue";
+import { calculateCostFromIncrementals } from "@/lib/cost";
 
 // Default duty cycles by category (monthly prints)
 const DUTY_CYCLES: Record<string, number> = {
@@ -41,10 +41,10 @@ interface MachineUtilization {
   machineAgeMonths: number | null;
   isLifted: boolean;
 
-  // Revenue (calculated from volume × rates)
-  monthlyRevenue: number;      // Total monthly revenue in ZAR
-  monoRevenue: number;         // Mono component
-  colourRevenue: number;       // Colour component
+  // FSMA Lease Cost (calculated from volume × rates)
+  monthlyCost: number;         // Total monthly cost in ZAR (what we pay FSMA)
+  monoCost: number;            // Mono component
+  colourCost: number;          // Colour component
   hasRates: boolean;           // Whether this machine has rate data
 
   // Insights
@@ -135,10 +135,10 @@ export async function GET(request: NextRequest) {
           ? Math.round(monthlyVolumes.reduce((a, b) => a + b, 0) / monthlyVolumes.length)
           : 0;
 
-      // Calculate average monthly revenue from volume × rates
-      let monthlyRevenue = 0;
-      let monoRevenue = 0;
-      let colourRevenue = 0;
+      // Calculate average monthly FSMA lease cost from volume × rates
+      let monthlyCost = 0;
+      let monoCost = 0;
+      let colourCost = 0;
       const hasRates = currentRate !== null;
 
       if (hasRates && monthlyIncrementals.size > 0) {
@@ -156,8 +156,8 @@ export async function GET(request: NextRequest) {
         const avgA3 = totalA3 / monthCount;
         const avgXl = totalXl / monthCount;
 
-        // Calculate revenue using rates
-        const revenue = calculateRevenueFromIncrementals(
+        // Calculate cost using rates
+        const cost = calculateCostFromIncrementals(
           avgBlack,
           avgColour,
           avgA3,
@@ -179,9 +179,9 @@ export async function GET(request: NextRequest) {
           },
           isColorMachine
         );
-        monthlyRevenue = revenue.totalRevenue;
-        monoRevenue = revenue.monoRevenue + revenue.a3MonoRevenue;
-        colourRevenue = revenue.colourRevenue + revenue.a3ColourRevenue + revenue.xlRevenue;
+        monthlyCost = cost.totalCost;
+        monoCost = cost.monoCost + cost.a3MonoCost;
+        colourCost = cost.colourCost + cost.a3ColourCost + cost.xlCost;
       }
 
       // Calculate utilization percentage
@@ -300,9 +300,9 @@ export async function GET(request: NextRequest) {
         daysSinceLastReading,
         machineAgeMonths,
         isLifted: machine.isLifted,
-        monthlyRevenue,
-        monoRevenue,
-        colourRevenue,
+        monthlyCost,
+        monoCost,
+        colourCost,
         hasRates,
         liftScore,
         insights,
@@ -312,10 +312,10 @@ export async function GET(request: NextRequest) {
     // Sort by lift score (best candidates first)
     utilizationData.sort((a, b) => b.liftScore - a.liftScore);
 
-    // Calculate revenue totals
-    const totalMonthlyRevenue = utilizationData.reduce((sum, m) => sum + m.monthlyRevenue, 0);
-    const totalMonoRevenue = utilizationData.reduce((sum, m) => sum + m.monoRevenue, 0);
-    const totalColourRevenue = utilizationData.reduce((sum, m) => sum + m.colourRevenue, 0);
+    // Calculate cost totals
+    const totalMonthlyCost = utilizationData.reduce((sum, m) => sum + m.monthlyCost, 0);
+    const totalMonoCost = utilizationData.reduce((sum, m) => sum + m.monoCost, 0);
+    const totalColourCost = utilizationData.reduce((sum, m) => sum + m.colourCost, 0);
     const machinesWithRates = utilizationData.filter((m) => m.hasRates).length;
 
     return NextResponse.json({
@@ -328,12 +328,12 @@ export async function GET(request: NextRequest) {
         high: utilizationData.filter((m) => m.utilizationStatus === "high").length,
         overworked: utilizationData.filter((m) => m.utilizationStatus === "overworked").length,
         liftCandidates: utilizationData.filter((m) => m.liftScore >= 70).length,
-        // Revenue summary
-        totalMonthlyRevenue,
-        totalMonoRevenue,
-        totalColourRevenue,
+        // FSMA Lease Cost summary
+        totalMonthlyCost,
+        totalMonoCost,
+        totalColourCost,
         machinesWithRates,
-        avgRevenuePerMachine: machinesWithRates > 0 ? totalMonthlyRevenue / machinesWithRates : 0,
+        avgCostPerMachine: machinesWithRates > 0 ? totalMonthlyCost / machinesWithRates : 0,
       },
     });
   } catch (error) {
