@@ -105,5 +105,5 @@ export interface BMSMachineRateRow {
   a3_colour: number | null;
   colour_extra_large: number | null;
   date_saved: Date | null;
-  saved_by: string | null;
+  saved_by: number | null;
 }

@@ -307,7 +307,7 @@ model MachineRate {
 
   // Audit fields from BMS
   dateSaved       DateTime? @map("date_saved")
-  savedBy         String?   @map("saved_by")
+  savedBy         Int?      @map("saved_by")
 
   // Timestamps
   createdAt       DateTime  @default(now()) @map("created_at")

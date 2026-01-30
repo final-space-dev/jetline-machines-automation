@@ -228,7 +228,7 @@ export interface MachineRate {
   a3Colour: number | null;
   colourExtraLarge: number | null;
   dateSaved: Date | string | null;
-  savedBy: string | null;
+  savedBy: number | null;
 }
 
 export interface SyncStatus {
