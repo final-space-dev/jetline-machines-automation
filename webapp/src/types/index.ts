@@ -188,6 +188,9 @@ export interface MachineUtilization {
   companyName: string;
   currentBalance: number;
   avgMonthlyVolume: number;
+  volume3m: number;
+  volume6m: number;
+  volume12m: number;
   dutyCycle: number;
   utilizationPercent: number;
   utilizationStatus: "critical" | "low" | "optimal" | "high" | "overworked";

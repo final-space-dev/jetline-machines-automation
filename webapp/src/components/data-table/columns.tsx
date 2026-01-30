@@ -234,6 +234,48 @@ export function createMachineColumns(
     },
   },
   {
+    id: "volume3m",
+    accessorFn: (row) => row.utilization?.volume3m ?? 0,
+    header: "3M Vol",
+    cell: ({ row }) => {
+      const utilization = row.original.utilization;
+      if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <span className="font-mono text-xs">
+          {formatNumber(utilization.volume3m)}
+        </span>
+      );
+    },
+  },
+  {
+    id: "volume6m",
+    accessorFn: (row) => row.utilization?.volume6m ?? 0,
+    header: "6M Vol",
+    cell: ({ row }) => {
+      const utilization = row.original.utilization;
+      if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <span className="font-mono text-xs">
+          {formatNumber(utilization.volume6m)}
+        </span>
+      );
+    },
+  },
+  {
+    id: "volume12m",
+    accessorFn: (row) => row.utilization?.volume12m ?? 0,
+    header: "12M Vol",
+    cell: ({ row }) => {
+      const utilization = row.original.utilization;
+      if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <span className="font-mono text-xs">
+          {formatNumber(utilization.volume12m)}
+        </span>
+      );
+    },
+  },
+  {
     id: "avgMonthlyVolume",
     accessorFn: (row) => row.utilization?.avgMonthlyVolume ?? 0,
     header: "Monthly Avg",

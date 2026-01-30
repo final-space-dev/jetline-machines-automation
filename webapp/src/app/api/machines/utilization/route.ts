@@ -22,6 +22,9 @@ interface MachineUtilization {
 
   // Utilization metrics
   avgMonthlyVolume: number;
+  volume3m: number;
+  volume6m: number;
+  volume12m: number;
   dutyCycle: number;
   utilizationPercent: number;
   utilizationStatus: "critical" | "low" | "optimal" | "high" | "overworked";
@@ -58,6 +61,9 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get("companyId");
     const months = parseInt(searchParams.get("months") || "6", 10);
 
+    // Always fetch at least 12 months to compute volume3m, volume6m, volume12m
+    const fetchMonths = Math.max(months, 12);
+
     // Get all active machines with their readings and current rates
     const machines = await prisma.machine.findMany({
       where: {
@@ -73,7 +79,7 @@ export async function GET(request: NextRequest) {
         readings: {
           where: {
             readingDate: {
-              gte: new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000),
+              gte: new Date(Date.now() - fetchMonths * 30 * 24 * 60 * 60 * 1000),
             },
           },
           orderBy: { readingDate: "asc" },
@@ -128,6 +134,29 @@ export async function GET(request: NextRequest) {
       });
 
       readingsByMonth.forEach((volume) => monthlyVolumes.push(volume));
+
+      // Calculate total volumes for 3m, 6m, 12m windows
+      // readingsByMonth keys are "YYYY-M", compute cutoff month keys
+      const nowDate = new Date();
+      const getMonthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
+      const monthKeysInWindow = (windowMonths: number): Set<string> => {
+        const keys = new Set<string>();
+        for (let i = 0; i < windowMonths; i++) {
+          const d = new Date(nowDate.getFullYear(), nowDate.getMonth() - i, 1);
+          keys.add(getMonthKey(d));
+        }
+        return keys;
+      };
+      const sum3mKeys = monthKeysInWindow(3);
+      const sum6mKeys = monthKeysInWindow(6);
+      const sum12mKeys = monthKeysInWindow(12);
+
+      let volume3m = 0, volume6m = 0, volume12m = 0;
+      readingsByMonth.forEach((volume, key) => {
+        if (sum3mKeys.has(key)) volume3m += volume;
+        if (sum6mKeys.has(key)) volume6m += volume;
+        if (sum12mKeys.has(key)) volume12m += volume;
+      });
 
       // Calculate average monthly volume
       const avgMonthlyVolume =
@@ -288,6 +317,9 @@ export async function GET(request: NextRequest) {
         companyName: machine.company.name,
         currentBalance: machine.currentBalance,
         avgMonthlyVolume,
+        volume3m,
+        volume6m,
+        volume12m,
         dutyCycle,
         utilizationPercent,
         utilizationStatus,
