@@ -285,26 +285,30 @@ export function DataTable<TData, TValue>({
 
   // Column order state - initialize from localStorage or use default column order
   const defaultColumnOrder = React.useMemo(
-    () => columns.map((col) => (col as { accessorKey?: string; id?: string }).accessorKey || (col as { id?: string }).id || ""),
-    [columns]
+    () => {
+      const base = columns.map((col) => (col as { accessorKey?: string; id?: string }).accessorKey || (col as { id?: string }).id || "");
+      return enableRowSelection ? ["select", ...base] : base;
+    },
+    [columns, enableRowSelection]
   );
 
   const [columnOrder, setColumnOrder] = React.useState<ColumnOrderState>(() => {
     const stored = getStoredColumnOrder(tableId);
-    // Filter out any stored columns that no longer exist
     if (stored) {
-      const validStored = stored.filter((id) => defaultColumnOrder.includes(id));
-      // Add any new columns that weren't in storage
-      const newColumns = defaultColumnOrder.filter((id) => !validStored.includes(id));
-      return [...validStored, ...newColumns];
+      // Remove "select" from stored - we pin it first ourselves
+      const cleaned = stored.filter((id) => id !== "select");
+      const validStored = cleaned.filter((id) => defaultColumnOrder.includes(id));
+      const newColumns = defaultColumnOrder.filter((id) => id !== "select" && !validStored.includes(id));
+      const base = [...validStored, ...newColumns];
+      return enableRowSelection ? ["select", ...base] : base;
     }
     return defaultColumnOrder;
   });
 
-  // Save column order to localStorage when it changes
+  // Save column order to localStorage when it changes (exclude "select" from storage)
   React.useEffect(() => {
     if (columnOrder.length > 0) {
-      setStoredColumnOrder(tableId, columnOrder);
+      setStoredColumnOrder(tableId, columnOrder.filter((id) => id !== "select"));
     }
   }, [columnOrder, tableId]);
 
@@ -318,16 +322,17 @@ export function DataTable<TData, TValue>({
     })
   );
 
-  // Handle drag end for column reordering
+  // Handle drag end for column reordering (keep "select" pinned first)
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setColumnOrder((items) => {
-        const oldIndex = items.indexOf(active.id as string);
-        const newIndex = items.indexOf(over.id as string);
-        return arrayMove(items, oldIndex, newIndex);
-      });
-    }
+    if (!over || active.id === over.id) return;
+    // Don't allow dragging the select column
+    if (active.id === "select" || over.id === "select") return;
+    setColumnOrder((items) => {
+      const oldIndex = items.indexOf(active.id as string);
+      const newIndex = items.indexOf(over.id as string);
+      return arrayMove(items, oldIndex, newIndex);
+    });
   };
 
   // Reset column order to default

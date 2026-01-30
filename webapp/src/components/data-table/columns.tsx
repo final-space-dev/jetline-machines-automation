@@ -50,16 +50,24 @@ export interface StoreOption {
   name: string;
 }
 
-// Action labels
-const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  NONE: { label: "—", color: "" },
-  TERMINATE: { label: "Terminate", color: "bg-red-100 text-red-700 border-red-300" },
-  TERMINATE_UPGRADE: { label: "Terminate & Upgrade", color: "bg-orange-100 text-orange-700 border-orange-300" },
-  STAY: { label: "Stay", color: "bg-emerald-100 text-emerald-700 border-emerald-300" },
-  MOVE: { label: "Move", color: "bg-blue-100 text-blue-700 border-blue-300" },
+// Action config
+const ACTION_OPTIONS = [
+  { value: "NONE", label: "None", color: "" },
+  { value: "TERMINATE", label: "Terminate", color: "text-red-700" },
+  { value: "TERMINATE_UPGRADE", label: "Terminate & Upgrade", color: "text-orange-700" },
+  { value: "STAY", label: "Stay", color: "text-emerald-700" },
+  { value: "MOVE", label: "Move", color: "text-blue-700" },
+] as const;
+
+const ACTION_COLORS: Record<string, string> = {
+  NONE: "",
+  TERMINATE: "text-red-700 font-medium",
+  TERMINATE_UPGRADE: "text-orange-700 font-medium",
+  STAY: "text-emerald-700 font-medium",
+  MOVE: "text-blue-700 font-medium",
 };
 
-// Inline editable upgrade cell - always an input, no click-to-edit
+// Inline editable upgrade cell
 function UpgradeToCell({
   machine,
   onUpdate,
@@ -141,7 +149,6 @@ export function createMachineColumns(
     if (field === "action") {
       onActionChange?.(machineId, value);
     } else {
-      // For upgradeTo or moveToCompanyId updates
       onActionChange?.(machineId, "UPDATE_FIELD", { [field]: value });
     }
   };
@@ -194,21 +201,18 @@ export function createMachineColumns(
           {row.getValue("modelName") || "-"}
         </span>
       ),
-      filterFn: (row, id, value) => {
-        const modelName = row.original.modelName;
-        return modelName === value;
-      },
+      filterFn: (row, id, value) => row.original.modelName === value,
     },
 
-    // --- Volume columns (MTD, 3M, 6M, 12M) ---
+    // --- Volume group: MTD, 3M, 6M, 12M, Monthly Avg, Balance ---
     {
       id: "volumeMtd",
       accessorFn: (row) => row.utilization?.volumeMtd ?? 0,
       header: "MTD Vol",
       cell: ({ row }) => {
-        const utilization = row.original.utilization;
-        if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
-        return <span className="font-mono text-xs">{formatNumber(utilization.volumeMtd)}</span>;
+        const u = row.original.utilization;
+        if (!u) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-xs">{formatNumber(u.volumeMtd)}</span>;
       },
     },
     {
@@ -216,9 +220,9 @@ export function createMachineColumns(
       accessorFn: (row) => row.utilization?.volume3m ?? 0,
       header: "3M Vol",
       cell: ({ row }) => {
-        const utilization = row.original.utilization;
-        if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
-        return <span className="font-mono text-xs">{formatNumber(utilization.volume3m)}</span>;
+        const u = row.original.utilization;
+        if (!u) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-xs">{formatNumber(u.volume3m)}</span>;
       },
     },
     {
@@ -226,9 +230,9 @@ export function createMachineColumns(
       accessorFn: (row) => row.utilization?.volume6m ?? 0,
       header: "6M Vol",
       cell: ({ row }) => {
-        const utilization = row.original.utilization;
-        if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
-        return <span className="font-mono text-xs">{formatNumber(utilization.volume6m)}</span>;
+        const u = row.original.utilization;
+        if (!u) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-xs">{formatNumber(u.volume6m)}</span>;
       },
     },
     {
@@ -236,22 +240,29 @@ export function createMachineColumns(
       accessorFn: (row) => row.utilization?.volume12m ?? 0,
       header: "12M Vol",
       cell: ({ row }) => {
-        const utilization = row.original.utilization;
-        if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
-        return <span className="font-mono text-xs">{formatNumber(utilization.volume12m)}</span>;
+        const u = row.original.utilization;
+        if (!u) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-xs">{formatNumber(u.volume12m)}</span>;
       },
     },
-
-    // --- Monthly average ---
     {
       id: "avgMonthlyVolume",
       accessorFn: (row) => row.utilization?.avgMonthlyVolume ?? 0,
       header: "Monthly Avg",
       cell: ({ row }) => {
-        const utilization = row.original.utilization;
-        if (!utilization) return <span className="text-muted-foreground text-xs">—</span>;
-        return <span className="font-mono text-xs">{formatNumber(utilization.avgMonthlyVolume)}</span>;
+        const u = row.original.utilization;
+        if (!u) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-xs">{formatNumber(u.avgMonthlyVolume)}</span>;
       },
+    },
+    {
+      accessorKey: "currentBalance",
+      header: "Balance",
+      cell: ({ row }) => (
+        <span className="font-mono text-right block text-xs">
+          {formatNumber(row.getValue("currentBalance"))}
+        </span>
+      ),
     },
 
     // --- Rates ---
@@ -351,7 +362,7 @@ export function createMachineColumns(
       },
     },
 
-    // --- Action status (replaces old Status) ---
+    // --- Action (plain text dropdown, no badge) ---
     {
       id: "action",
       accessorFn: (row) => row.action || "NONE",
@@ -359,30 +370,26 @@ export function createMachineColumns(
       cell: ({ row }) => {
         const machine = row.original;
         const currentAction = machine.action || "NONE";
-        const config = ACTION_LABELS[currentAction];
+        const colorClass = ACTION_COLORS[currentAction] || "";
 
         return (
           <Select
             value={currentAction}
             onValueChange={(value) => handleActionUpdate(machine.id, "action", value)}
           >
-            <SelectTrigger className={cn("h-7 w-[150px] text-xs", currentAction !== "NONE" && "font-medium")}>
+            <SelectTrigger className="h-7 w-[160px] text-xs">
               <SelectValue>
-                {currentAction !== "NONE" ? (
-                  <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", config.color)}>
-                    {config.label}
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground">Select action</span>
-                )}
+                <span className={colorClass}>
+                  {ACTION_OPTIONS.find((o) => o.value === currentAction)?.label || "Select action"}
+                </span>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="NONE">None</SelectItem>
-              <SelectItem value="TERMINATE">Terminate</SelectItem>
-              <SelectItem value="TERMINATE_UPGRADE">Terminate & Upgrade</SelectItem>
-              <SelectItem value="STAY">Stay</SelectItem>
-              <SelectItem value="MOVE">Move</SelectItem>
+              {ACTION_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <span className={opt.color}>{opt.label}</span>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         );
@@ -393,37 +400,27 @@ export function createMachineColumns(
       },
     },
 
-    // --- Upgrade To (only shown when any machine has TERMINATE_UPGRADE) ---
+    // --- Conditional: Upgrade To ---
     ...(visibleConditionalColumns?.showUpgradeTo ? [{
       id: "upgradeTo",
       accessorFn: (row: MachineWithUtilization) => row.upgradeTo || "",
       header: "Upgrade To",
       cell: ({ row }: { row: { original: MachineWithUtilization } }) => (
-        <UpgradeToCell
-          machine={row.original}
-          onUpdate={handleActionUpdate}
-        />
+        <UpgradeToCell machine={row.original} onUpdate={handleActionUpdate} />
       ),
     } as ColumnDef<MachineWithUtilization>] : []),
 
-    // --- Move To (only shown when any machine has MOVE) ---
+    // --- Conditional: Move To ---
     ...(visibleConditionalColumns?.showMoveTo ? [{
       id: "moveTo",
-      accessorFn: (row: MachineWithUtilization) => {
-        if (row.action !== "MOVE") return "";
-        return row.moveToCompanyId || "";
-      },
+      accessorFn: (row: MachineWithUtilization) => row.action !== "MOVE" ? "" : row.moveToCompanyId || "",
       header: "Move To",
       cell: ({ row }: { row: { original: MachineWithUtilization } }) => (
-        <MoveToCell
-          machine={row.original}
-          stores={stores}
-          onUpdate={handleActionUpdate}
-        />
+        <MoveToCell machine={row.original} stores={stores} onUpdate={handleActionUpdate} />
       ),
     } as ColumnDef<MachineWithUtilization>] : []),
 
-    // --- Planned Store (only shown when any machine has MOVE with a target) ---
+    // --- Conditional: Planned Store ---
     ...(visibleConditionalColumns?.showPlannedStore ? [{
       id: "plannedStore",
       accessorFn: (row: MachineWithUtilization) => {
@@ -444,17 +441,6 @@ export function createMachineColumns(
         );
       },
     } as ColumnDef<MachineWithUtilization>] : []),
-
-    // --- Balance ---
-    {
-      accessorKey: "currentBalance",
-      header: "Balance",
-      cell: ({ row }) => (
-        <span className="font-mono text-right block text-xs">
-          {formatNumber(row.getValue("currentBalance"))}
-        </span>
-      ),
-    },
 
     // --- Contract ---
     {
