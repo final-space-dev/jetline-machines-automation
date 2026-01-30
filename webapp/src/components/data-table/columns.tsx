@@ -59,7 +59,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   MOVE: { label: "Move", color: "bg-blue-100 text-blue-700 border-blue-300" },
 };
 
-// Inline editable upgrade cell
+// Inline editable upgrade cell - always an input, no click-to-edit
 function UpgradeToCell({
   machine,
   onUpdate,
@@ -68,41 +68,24 @@ function UpgradeToCell({
   onUpdate: (machineId: string, field: string, value: string) => void;
 }) {
   const [value, setValue] = useState(machine.upgradeTo || "");
-  const [editing, setEditing] = useState(false);
 
   if (machine.action !== "TERMINATE_UPGRADE") {
     return <span className="text-muted-foreground text-xs">—</span>;
   }
 
-  if (editing) {
-    return (
-      <Input
-        className="h-7 w-[140px] text-xs"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => {
-          setEditing(false);
-          onUpdate(machine.id, "upgradeTo", value);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            setEditing(false);
-            onUpdate(machine.id, "upgradeTo", value);
-          }
-        }}
-        autoFocus
-        placeholder="Model name..."
-      />
-    );
-  }
-
   return (
-    <button
-      className="text-xs text-orange-700 underline underline-offset-2 hover:text-orange-900"
-      onClick={() => setEditing(true)}
-    >
-      {machine.upgradeTo || "Set model"}
-    </button>
+    <Input
+      className="h-7 w-[140px] text-xs"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => onUpdate(machine.id, "upgradeTo", value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      placeholder="Model name..."
+    />
   );
 }
 
@@ -151,7 +134,8 @@ function MoveToCell({
 // Column generator function
 export function createMachineColumns(
   stores: StoreOption[] = [],
-  onActionChange?: (machineId: string, action: string, extra?: Record<string, string>) => void
+  onActionChange?: (machineId: string, action: string, extra?: Record<string, string>) => void,
+  visibleConditionalColumns?: { showUpgradeTo: boolean; showMoveTo: boolean; showPlannedStore: boolean }
 ): ColumnDef<MachineWithUtilization>[] {
   const handleActionUpdate = (machineId: string, field: string, value: string) => {
     if (field === "action") {
@@ -409,35 +393,57 @@ export function createMachineColumns(
       },
     },
 
-    // --- Upgrade To (visible when action = TERMINATE_UPGRADE) ---
-    {
+    // --- Upgrade To (only shown when any machine has TERMINATE_UPGRADE) ---
+    ...(visibleConditionalColumns?.showUpgradeTo ? [{
       id: "upgradeTo",
-      accessorFn: (row) => row.upgradeTo || "",
+      accessorFn: (row: MachineWithUtilization) => row.upgradeTo || "",
       header: "Upgrade To",
-      cell: ({ row }) => (
+      cell: ({ row }: { row: { original: MachineWithUtilization } }) => (
         <UpgradeToCell
           machine={row.original}
           onUpdate={handleActionUpdate}
         />
       ),
-    },
+    } as ColumnDef<MachineWithUtilization>] : []),
 
-    // --- Move To (visible when action = MOVE) ---
-    {
+    // --- Move To (only shown when any machine has MOVE) ---
+    ...(visibleConditionalColumns?.showMoveTo ? [{
       id: "moveTo",
-      accessorFn: (row) => {
+      accessorFn: (row: MachineWithUtilization) => {
         if (row.action !== "MOVE") return "";
         return row.moveToCompanyId || "";
       },
       header: "Move To",
-      cell: ({ row }) => (
+      cell: ({ row }: { row: { original: MachineWithUtilization } }) => (
         <MoveToCell
           machine={row.original}
           stores={stores}
           onUpdate={handleActionUpdate}
         />
       ),
-    },
+    } as ColumnDef<MachineWithUtilization>] : []),
+
+    // --- Planned Store (only shown when any machine has MOVE with a target) ---
+    ...(visibleConditionalColumns?.showPlannedStore ? [{
+      id: "plannedStore",
+      accessorFn: (row: MachineWithUtilization) => {
+        if (row.action !== "MOVE" || !row.moveToCompanyId) return "";
+        return stores.find((s) => s.id === row.moveToCompanyId)?.name || "";
+      },
+      header: "Planned Store",
+      cell: ({ row }: { row: { original: MachineWithUtilization } }) => {
+        const machine = row.original;
+        if (machine.action !== "MOVE" || !machine.moveToCompanyId) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const targetStore = stores.find((s) => s.id === machine.moveToCompanyId);
+        return (
+          <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-300">
+            {targetStore?.name || "—"}
+          </Badge>
+        );
+      },
+    } as ColumnDef<MachineWithUtilization>] : []),
 
     // --- Balance ---
     {
