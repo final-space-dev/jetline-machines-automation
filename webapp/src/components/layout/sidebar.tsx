@@ -23,8 +23,8 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Machines", href: "/machines", icon: Printer },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Contracts", href: "/contracts", icon: FileText },
   { name: "Lift Planner", href: "/lift", icon: ArrowUpRight },
 ];
@@ -66,7 +66,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="space-y-1">
           {navigation.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link key={item.name} href={item.href}>
                 <Button
@@ -88,7 +88,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 
         <nav className="space-y-1">
           {secondaryNavigation.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link key={item.name} href={item.href}>
                 <Button

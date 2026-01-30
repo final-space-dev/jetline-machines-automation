@@ -22,6 +22,7 @@ interface MachineUtilization {
 
   // Utilization metrics
   avgMonthlyVolume: number;
+  volumeMtd: number;
   volume3m: number;
   volume6m: number;
   volume12m: number;
@@ -151,8 +152,10 @@ export async function GET(request: NextRequest) {
       const sum6mKeys = monthKeysInWindow(6);
       const sum12mKeys = monthKeysInWindow(12);
 
-      let volume3m = 0, volume6m = 0, volume12m = 0;
+      const currentMonthKey = getMonthKey(nowDate);
+      let volumeMtd = 0, volume3m = 0, volume6m = 0, volume12m = 0;
       readingsByMonth.forEach((volume, key) => {
+        if (key === currentMonthKey) volumeMtd += volume;
         if (sum3mKeys.has(key)) volume3m += volume;
         if (sum6mKeys.has(key)) volume6m += volume;
         if (sum12mKeys.has(key)) volume12m += volume;
@@ -317,6 +320,7 @@ export async function GET(request: NextRequest) {
         companyName: machine.company.name,
         currentBalance: machine.currentBalance,
         avgMonthlyVolume,
+        volumeMtd,
         volume3m,
         volume6m,
         volume12m,

@@ -235,6 +235,11 @@ const globalFilter: FilterFn<any> = (row, _columnId, filterValue) => {
   });
 };
 
+interface BulkAction {
+  value: string;
+  label: string;
+}
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
@@ -244,8 +249,11 @@ interface DataTableProps<TData, TValue> {
   pageSize?: number;
   isLoading?: boolean;
   onRowClick?: (row: TData) => void;
-  tableId?: string; // Used for persisting column order
+  tableId?: string;
   enableColumnReorder?: boolean;
+  enableRowSelection?: boolean;
+  onBulkAction?: (selectedIds: string[], action: string) => void;
+  bulkActions?: BulkAction[];
 }
 
 export function DataTable<TData, TValue>({
@@ -259,6 +267,9 @@ export function DataTable<TData, TValue>({
   onRowClick,
   tableId = "default",
   enableColumnReorder = true,
+  enableRowSelection = false,
+  onBulkAction,
+  bulkActions = [],
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -399,16 +410,50 @@ export function DataTable<TData, TValue>({
     );
   }, [activeView, columnOrder, columnVisibility, columnFilters, sorting, globalFilterValue]);
 
+  // Add checkbox column if row selection is enabled
+  const allColumns = React.useMemo(() => {
+    if (!enableRowSelection) return columns;
+    const selectCol: ColumnDef<TData, TValue> = {
+      id: "select",
+      header: ({ table: t }) => (
+        <input
+          type="checkbox"
+          className="rounded border-gray-300"
+          checked={t.getIsAllPageRowsSelected()}
+          onChange={(e) => t.toggleAllPageRowsSelected(e.target.checked)}
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          className="rounded border-gray-300"
+          checked={row.getIsSelected()}
+          onChange={(e) => {
+            e.stopPropagation();
+            row.toggleSelected(e.target.checked);
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    };
+    return [selectCol, ...columns];
+  }, [columns, enableRowSelection]);
+
+  const noPagination = pageSize >= 10000;
+
   const table = useReactTable({
     data,
-    columns,
+    columns: allColumns,
     filterFns: {
       fuzzy: fuzzyFilter,
       global: globalFilter,
     },
     globalFilterFn: globalFilter,
+    enableRowSelection,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    ...(!noPagination && { getPaginationRowModel: getPaginationRowModel() }),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
@@ -425,10 +470,23 @@ export function DataTable<TData, TValue>({
       globalFilter: globalFilterValue,
       columnOrder,
     },
-    initialState: {
-      pagination: { pageSize },
-    },
+    ...(!noPagination && {
+      initialState: {
+        pagination: { pageSize },
+      },
+    }),
   });
+
+  // Get selected row IDs for bulk actions
+  const selectedRowIds = React.useMemo(() => {
+    return Object.keys(rowSelection)
+      .filter((key) => rowSelection[key as keyof typeof rowSelection])
+      .map((key) => {
+        const row = table.getRowModel().rows[parseInt(key)];
+        return (row?.original as Record<string, unknown>)?.id as string;
+      })
+      .filter(Boolean);
+  }, [rowSelection, table]);
 
   const handleExportCSV = () => {
     const visibleColumns = table.getAllColumns().filter((col) => col.getIsVisible());
@@ -722,72 +780,93 @@ export function DataTable<TData, TValue>({
         </DndContext>
       </div>
 
-      {/* Pagination */}
+      {/* Bulk action bar */}
+      {enableRowSelection && selectedRowIds.length > 0 && bulkActions.length > 0 && (
+        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md border">
+          <span className="text-sm font-medium">{selectedRowIds.length} selected</span>
+          {bulkActions.map((action) => (
+            <Button
+              key={action.value}
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onBulkAction?.(selectedRowIds, action.value);
+                setRowSelection({});
+              }}
+            >
+              {action.label}
+            </Button>
+          ))}
+          <Button variant="ghost" size="sm" onClick={() => setRowSelection({})}>
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        </div>
+      )}
+
+      {/* Footer */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
-          {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            table.getFilteredRowModel().rows.length
-          )}{" "}
-          of {table.getFilteredRowModel().rows.length} results
+          {table.getFilteredRowModel().rows.length} results
         </p>
 
-        <div className="flex items-center gap-2">
-          <Select
-            value={String(table.getState().pagination.pageSize)}
-            onValueChange={(value) => table.setPageSize(Number(value))}
-          >
-            <SelectTrigger className="w-[100px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[10, 25, 50, 100, 250].map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size} rows
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {!noPagination && (
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(table.getState().pagination.pageSize)}
+              onValueChange={(value) => table.setPageSize(Number(value))}
+            >
+              <SelectTrigger className="w-[100px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 25, 50, 100, 250].map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size} rows
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-3 text-sm">
-              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => table.setPageIndex(0)}
+                disabled={!table.getCanPreviousPage()}
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="px-3 text-sm">
+                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                disabled={!table.getCanNextPage()}
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Save View Dialog */}

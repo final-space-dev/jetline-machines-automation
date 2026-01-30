@@ -1,23 +1,24 @@
 "use client";
 
-import { Suspense, useEffect, useState, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { DataTable } from "@/components/data-table/data-table";
 import { createMachineColumns, type StoreOption } from "@/components/data-table/columns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoading } from "@/components/ui/page-loading";
 import { formatNumber, cn } from "@/lib/utils";
-import { AlertTriangle, TrendingDown, CheckCircle, Zap, Target } from "lucide-react";
+import { AlertTriangle, TrendingDown, CheckCircle, Zap } from "lucide-react";
 import type { MachineWithRelations, MachineUtilization, MachineWithUtilization, MachineRate } from "@/types";
 
 interface FilterOptions {
   companies: { value: string; label: string }[];
   categories: { value: string; label: string }[];
-  statuses: { value: string; label: string }[];
-  utilizationStatuses: { value: string; label: string }[];
+  models: { value: string; label: string }[];
+  actions: { value: string; label: string }[];
 }
 
 interface UtilizationSummary {
@@ -38,22 +39,16 @@ function MachinesPageContent() {
   const [machines, setMachines] = useState<MachineWithUtilization[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [utilizationSummary, setUtilizationSummary] = useState<UtilizationSummary | null>(null);
-  const [liftRefreshKey, setLiftRefreshKey] = useState(0);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     companies: [],
     categories: [],
-    statuses: [
-      { value: "ACTIVE", label: "Active" },
-      { value: "INACTIVE", label: "Inactive" },
-      { value: "MAINTENANCE", label: "Maintenance" },
-      { value: "DECOMMISSIONED", label: "Decommissioned" },
-    ],
-    utilizationStatuses: [
-      { value: "critical", label: "Critical (<20%)" },
-      { value: "low", label: "Low (20-40%)" },
-      { value: "optimal", label: "Optimal (40-80%)" },
-      { value: "high", label: "High (80-100%)" },
-      { value: "overworked", label: "Overworked (>100%)" },
+    models: [],
+    actions: [
+      { value: "NONE", label: "None" },
+      { value: "TERMINATE", label: "Terminate" },
+      { value: "TERMINATE_UPGRADE", label: "Terminate & Upgrade" },
+      { value: "STAY", label: "Stay" },
+      { value: "MOVE", label: "Move" },
     ],
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -65,8 +60,8 @@ function MachinesPageContent() {
   const fetchData = async () => {
     try {
       const machineUrl = storeFilter
-        ? `/api/machines?companyId=${storeFilter}&limit=10000&includeRates=true`
-        : "/api/machines?limit=10000&includeRates=true";
+        ? `/api/machines?companyId=${storeFilter}&limit=10000&includeRates=true&status=ACTIVE`
+        : "/api/machines?limit=10000&includeRates=true&status=ACTIVE";
       const utilizationUrl = storeFilter
         ? `/api/machines/utilization?companyId=${storeFilter}`
         : "/api/machines/utilization";
@@ -83,7 +78,6 @@ function MachinesPageContent() {
       const companiesData = await companiesRes.json();
       const categoriesData = await categoriesRes.json();
 
-      // Handle API error responses
       const companiesArray = Array.isArray(companiesData) ? companiesData : [];
       const categoriesArray = Array.isArray(categoriesData) ? categoriesData : [];
       const machinesArray: (MachineWithRelations & { rates?: MachineRate[] })[] = Array.isArray(machinesData?.data) ? machinesData.data : [];
@@ -97,7 +91,7 @@ function MachinesPageContent() {
       const machinesWithUtilization: MachineWithUtilization[] = machinesArray.map((machine) => ({
         ...machine,
         utilization: utilizationMap.get(machine.id),
-        currentRate: machine.rates?.[0], // Latest rate (already sorted by ratesFrom desc)
+        currentRate: machine.rates?.[0],
       }));
 
       setMachines(machinesWithUtilization);
@@ -106,6 +100,16 @@ function MachinesPageContent() {
         id: c.id,
         name: c.name,
       })));
+
+      // Build unique model list for filter
+      const modelSet = new Set<string>();
+      machinesArray.forEach((m) => {
+        if (m.modelName) modelSet.add(m.modelName);
+      });
+      const modelOptions = Array.from(modelSet)
+        .sort()
+        .map((name) => ({ value: name, label: name }));
+
       setFilterOptions({
         companies: companiesArray.map((c: { id: string; name: string }) => ({
           value: c.name,
@@ -115,18 +119,13 @@ function MachinesPageContent() {
           value: c.name,
           label: c.name,
         })),
-        statuses: [
-          { value: "ACTIVE", label: "Active" },
-          { value: "INACTIVE", label: "Inactive" },
-          { value: "MAINTENANCE", label: "Maintenance" },
-          { value: "DECOMMISSIONED", label: "Decommissioned" },
-        ],
-        utilizationStatuses: [
-          { value: "critical", label: "Critical (<20%)" },
-          { value: "low", label: "Low (20-40%)" },
-          { value: "optimal", label: "Optimal (40-80%)" },
-          { value: "high", label: "High (80-100%)" },
-          { value: "overworked", label: "Overworked (>100%)" },
+        models: modelOptions,
+        actions: [
+          { value: "NONE", label: "None" },
+          { value: "TERMINATE", label: "Terminate" },
+          { value: "TERMINATE_UPGRADE", label: "Terminate & Upgrade" },
+          { value: "STAY", label: "Stay" },
+          { value: "MOVE", label: "Move" },
         ],
       });
     } catch (error) {
@@ -140,20 +139,92 @@ function MachinesPageContent() {
     router.push(`/machines/${machine.id}`);
   };
 
-  // Handle lift change - trigger re-render to update UI
-  const handleLiftChange = (machineId: string, toStoreId: string | null) => {
-    setLiftRefreshKey((k) => k + 1);
-  };
+  // Handle action changes from the Action column
+  const handleActionChange = useCallback(async (machineId: string, action: string, extra?: Record<string, string>) => {
+    try {
+      if (action === "UPDATE_FIELD") {
+        // Update a specific field (upgradeTo or moveToCompanyId)
+        const field = Object.keys(extra || {})[0];
+        const value = extra?.[field] || "";
 
-  // Create columns with stores for inline lift dropdown
+        await fetch("/api/machines/action", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            machineId,
+            action: machines.find((m) => m.id === machineId)?.action || "NONE",
+            [field]: value,
+          }),
+        });
+
+        // Update local state
+        setMachines((prev) =>
+          prev.map((m) =>
+            m.id === machineId ? { ...m, [field]: value } : m
+          )
+        );
+      } else {
+        // Update action
+        await fetch("/api/machines/action", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineId, action }),
+        });
+
+        // Update local state
+        setMachines((prev) =>
+          prev.map((m) =>
+            m.id === machineId
+              ? {
+                  ...m,
+                  action: action as MachineWithUtilization["action"],
+                  // Clear related fields when action changes
+                  upgradeTo: action === "TERMINATE_UPGRADE" ? m.upgradeTo : null,
+                  moveToCompanyId: action === "MOVE" ? m.moveToCompanyId : null,
+                }
+              : m
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to update action:", error);
+    }
+  }, [machines]);
+
+  // Bulk action handler
+  const handleBulkAction = useCallback(async (selectedIds: string[], action: string) => {
+    try {
+      await fetch("/api/machines/action", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ machineIds: selectedIds, action }),
+      });
+
+      setMachines((prev) =>
+        prev.map((m) =>
+          selectedIds.includes(m.id)
+            ? {
+                ...m,
+                action: action as MachineWithUtilization["action"],
+                upgradeTo: action === "TERMINATE_UPGRADE" ? m.upgradeTo : null,
+                moveToCompanyId: action === "MOVE" ? m.moveToCompanyId : null,
+              }
+            : m
+        )
+      );
+    } catch (error) {
+      console.error("Failed to bulk update actions:", error);
+    }
+  }, []);
+
+  // Create columns with stores for action dropdowns
   const columns = useMemo(
-    () => createMachineColumns(stores, handleLiftChange),
-    [stores, liftRefreshKey]
+    () => createMachineColumns(stores, handleActionChange),
+    [stores, handleActionChange]
   );
 
   // Calculate summary stats
   const totalMachines = machines.length;
-  const activeMachines = machines.filter((m) => m.status === "ACTIVE").length;
   const totalBalance = machines.reduce((sum, m) => sum + m.currentBalance, 0);
   const uniqueStores = new Set(machines.map((m) => m.company.id)).size;
 
@@ -170,7 +241,7 @@ function MachinesPageContent() {
       <div className="space-y-4">
         <PageHeader
           title="Machines"
-          description={`${totalMachines} total · ${activeMachines} active · ${uniqueStores} stores${storeFilter ? " · Filtered" : ""}`}
+          description={`${totalMachines} active · ${uniqueStores} stores${storeFilter ? " · Filtered" : ""}`}
         />
 
         {/* Utilization Summary Badges */}
@@ -219,15 +290,6 @@ function MachinesPageContent() {
               <Zap className="h-3 w-3" />
               {utilizationSummary.overworked} Overworked
             </Badge>
-            {utilizationSummary.liftCandidates > 0 && (
-              <Badge
-                variant="outline"
-                className="text-xs px-2 py-1 gap-1.5 bg-orange-50 text-orange-700 border-orange-200"
-              >
-                <Target className="h-3 w-3" />
-                {utilizationSummary.liftCandidates} Lift Candidates
-              </Badge>
-            )}
           </div>
         )}
 
@@ -236,14 +298,6 @@ function MachinesPageContent() {
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Total:</span>
             <span className="font-mono font-bold">{formatNumber(totalMachines)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-green-600">Active:</span>
-            <span className="font-mono font-bold text-green-600">{formatNumber(activeMachines)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-yellow-600">Inactive:</span>
-            <span className="font-mono font-bold text-yellow-600">{formatNumber(totalMachines - activeMachines)}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Balance:</span>
@@ -271,19 +325,28 @@ function MachinesPageContent() {
                   options: filterOptions.categories,
                 },
                 {
-                  key: "utilizationPercent",
-                  label: "Utilization",
-                  options: filterOptions.utilizationStatuses,
+                  key: "modelName",
+                  label: "Model",
+                  options: filterOptions.models,
                 },
                 {
-                  key: "status",
-                  label: "Status",
-                  options: filterOptions.statuses,
+                  key: "action",
+                  label: "Action",
+                  options: filterOptions.actions,
                 },
               ]}
               exportFileName="jetline-machines"
-              pageSize={50}
+              pageSize={99999}
               onRowClick={handleRowClick}
+              enableRowSelection
+              onBulkAction={handleBulkAction}
+              bulkActions={[
+                { value: "TERMINATE", label: "Set Terminate" },
+                { value: "TERMINATE_UPGRADE", label: "Set Terminate & Upgrade" },
+                { value: "STAY", label: "Set Stay" },
+                { value: "MOVE", label: "Set Move" },
+                { value: "NONE", label: "Clear Action" },
+              ]}
             />
           </CardContent>
         </Card>

@@ -13,6 +13,9 @@ export interface MachineWithRelations {
   modelName: string | null;
   status: "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "DECOMMISSIONED";
   bmsStatus: number | null;
+  action: "NONE" | "TERMINATE" | "TERMINATE_UPGRADE" | "STAY" | "MOVE";
+  upgradeTo: string | null;
+  moveToCompanyId: string | null;
   installDate: Date | string | null;
   startDate: Date | string | null;
   contractNumber: string | null;
@@ -188,6 +191,7 @@ export interface MachineUtilization {
   companyName: string;
   currentBalance: number;
   avgMonthlyVolume: number;
+  volumeMtd: number;
   volume3m: number;
   volume6m: number;
   volume12m: number;

@@ -97,6 +97,11 @@ model Machine {
   // Operations
   isLifted              Boolean       @default(false) @map("is_lifted") // lift field from BMS
 
+  // Action status (user-assigned decision)
+  action                MachineAction @default(NONE) @map("action")
+  upgradeTo             String?       @map("upgrade_to") // Model name for TERMINATE_UPGRADE
+  moveToCompanyId       String?       @map("move_to_company_id") // Target store for MOVE
+
   // Current state (latest reading summary)
   currentBalance        Int           @default(0) @map("current_balance")
   lastReadingDate       DateTime?     @map("last_reading_date")
@@ -126,6 +131,14 @@ enum MachineStatus {
   INACTIVE
   MAINTENANCE
   DECOMMISSIONED
+}
+
+enum MachineAction {
+  NONE
+  TERMINATE
+  TERMINATE_UPGRADE
+  STAY
+  MOVE
 }
 
 // =============================================================================
