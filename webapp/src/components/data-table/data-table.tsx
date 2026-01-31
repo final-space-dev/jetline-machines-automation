@@ -484,12 +484,8 @@ export function DataTable<TData, TValue>({
 
   // Get selected row IDs for bulk actions
   const selectedRowIds = React.useMemo(() => {
-    return Object.keys(rowSelection)
-      .filter((key) => rowSelection[key as keyof typeof rowSelection])
-      .map((key) => {
-        const row = table.getRowModel().rows[parseInt(key)];
-        return (row?.original as Record<string, unknown>)?.id as string;
-      })
+    return table.getSelectedRowModel().rows
+      .map((row) => (row.original as Record<string, unknown>)?.id as string)
       .filter(Boolean);
   }, [rowSelection, table]);
 

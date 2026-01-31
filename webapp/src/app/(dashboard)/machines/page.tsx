@@ -6,7 +6,6 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DataTable } from "@/components/data-table/data-table";
 import { createMachineColumns, type StoreOption } from "@/components/data-table/columns";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +26,8 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoading } from "@/components/ui/page-loading";
-import { formatNumber, cn } from "@/lib/utils";
-import { AlertTriangle, TrendingDown, CheckCircle, Zap, Plus } from "lucide-react";
+import { formatNumber } from "@/lib/utils";
+import { Plus } from "lucide-react";
 import type { MachineWithRelations, MachineUtilization, MachineWithUtilization, MachineRate } from "@/types";
 
 interface FilterOptions {
@@ -36,16 +35,6 @@ interface FilterOptions {
   categories: { value: string; label: string }[];
   models: { value: string; label: string }[];
   actions: { value: string; label: string }[];
-}
-
-interface UtilizationSummary {
-  total: number;
-  critical: number;
-  low: number;
-  optimal: number;
-  high: number;
-  overworked: number;
-  liftCandidates: number;
 }
 
 function MachinesPageContent() {
@@ -56,7 +45,6 @@ function MachinesPageContent() {
   const [machines, setMachines] = useState<MachineWithUtilization[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [utilizationSummary, setUtilizationSummary] = useState<UtilizationSummary | null>(null);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     companies: [],
     categories: [],
@@ -111,11 +99,9 @@ function MachinesPageContent() {
       const machinesArray: (MachineWithRelations & { rates?: MachineRate[] })[] = Array.isArray(machinesData?.data) ? machinesData.data : [];
       const utilizationArray: MachineUtilization[] = utilizationData?.machines || [];
 
-      // Create a map of machine utilization by machineId
       const utilizationMap = new Map<string, MachineUtilization>();
       utilizationArray.forEach((u) => utilizationMap.set(u.machineId, u));
 
-      // Merge utilization and rate data with machines
       const machinesWithUtilization: MachineWithUtilization[] = machinesArray.map((machine) => ({
         ...machine,
         utilization: utilizationMap.get(machine.id),
@@ -123,7 +109,6 @@ function MachinesPageContent() {
       }));
 
       setMachines(machinesWithUtilization);
-      setUtilizationSummary(utilizationData?.summary || null);
       setStores(companiesArray.map((c: { id: string; name: string }) => ({
         id: c.id,
         name: c.name,
@@ -133,7 +118,6 @@ function MachinesPageContent() {
         name: c.name,
       })));
 
-      // Build unique model list for filter
       const modelSet = new Set<string>();
       machinesArray.forEach((m) => {
         if (m.modelName) modelSet.add(m.modelName);
@@ -167,15 +151,10 @@ function MachinesPageContent() {
     }
   };
 
-  const handleRowClick = (machine: MachineWithUtilization) => {
-    router.push(`/machines/${machine.id}`);
-  };
-
-  // Handle action changes from the Action column
+  // Handle action changes (saves immediately to DB)
   const handleActionChange = useCallback(async (machineId: string, action: string, extra?: Record<string, string>) => {
     try {
       if (action === "UPDATE_FIELD") {
-        // Update a specific field (upgradeTo or moveToCompanyId)
         const field = Object.keys(extra || {})[0];
         const value = extra?.[field] || "";
 
@@ -189,28 +168,24 @@ function MachinesPageContent() {
           }),
         });
 
-        // Update local state
         setMachines((prev) =>
           prev.map((m) =>
             m.id === machineId ? { ...m, [field]: value } : m
           )
         );
       } else {
-        // Update action
         await fetch("/api/machines/action", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ machineId, action }),
         });
 
-        // Update local state
         setMachines((prev) =>
           prev.map((m) =>
             m.id === machineId
               ? {
                   ...m,
                   action: action as MachineWithUtilization["action"],
-                  // Clear related fields when action changes
                   upgradeTo: action === "TERMINATE_UPGRADE" ? m.upgradeTo : null,
                   moveToCompanyId: action === "MOVE" ? m.moveToCompanyId : null,
                 }
@@ -226,11 +201,16 @@ function MachinesPageContent() {
   // Bulk action handler
   const handleBulkAction = useCallback(async (selectedIds: string[], action: string) => {
     try {
-      await fetch("/api/machines/action", {
+      const res = await fetch("/api/machines/action", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ machineIds: selectedIds, action }),
       });
+
+      if (!res.ok) {
+        console.error("Bulk action failed:", await res.text());
+        return;
+      }
 
       setMachines((prev) =>
         prev.map((m) =>
@@ -249,12 +229,16 @@ function MachinesPageContent() {
     }
   }, []);
 
+  // Navigate to machine detail
+  const handleNavigate = useCallback((machineId: string) => {
+    router.push(`/machines/${machineId}`);
+  }, [router]);
+
   // Add machine handler
   const handleAddMachine = useCallback(async () => {
     if (!newMachine.companyId) return;
     setAddingMachine(true);
     try {
-      // Serial is optional for planned machines - generate a placeholder if empty
       const serialNumber = newMachine.serialNumber.trim() || `PLANNED-${Date.now()}`;
 
       const res = await fetch("/api/machines", {
@@ -277,14 +261,12 @@ function MachinesPageContent() {
 
       const created = await res.json();
 
-      // Set action to STAY by default
       await fetch("/api/machines/action", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ machineId: created.id, action: "STAY" }),
       });
 
-      // Add to local state
       const newEntry: MachineWithUtilization = {
         ...created,
         action: "STAY" as const,
@@ -304,21 +286,21 @@ function MachinesPageContent() {
     }
   }, [newMachine]);
 
-  // Compute which conditional columns to show based on current machine actions
-  const conditionalColumns = useMemo(() => {
-    const hasUpgrade = machines.some((m) => m.action === "TERMINATE_UPGRADE");
-    const hasMove = machines.some((m) => m.action === "MOVE");
-    const hasPlannedStore = machines.some((m) => m.action === "MOVE" && m.moveToCompanyId);
-    return { showUpgradeTo: hasUpgrade, showMoveTo: hasMove, showPlannedStore: hasPlannedStore };
+  // Build unique model names list for the upgrade dropdown
+  const modelNames = useMemo(() => {
+    const set = new Set<string>();
+    machines.forEach((m) => {
+      if (m.modelName) set.add(m.modelName);
+    });
+    return Array.from(set).sort();
   }, [machines]);
 
-  // Create columns with stores for action dropdowns
+  // Create columns
   const columns = useMemo(
-    () => createMachineColumns(stores, handleActionChange, conditionalColumns),
-    [stores, handleActionChange, conditionalColumns]
+    () => createMachineColumns(stores, modelNames, handleActionChange, handleNavigate),
+    [stores, modelNames, handleActionChange, handleNavigate]
   );
 
-  // Calculate summary stats
   const totalMachines = machines.length;
   const totalBalance = machines.reduce((sum, m) => sum + m.currentBalance, 0);
   const uniqueStores = new Set(machines.map((m) => m.company.id)).size;
@@ -345,56 +327,7 @@ function MachinesPageContent() {
           </Button>
         </div>
 
-        {/* Utilization Summary Badges */}
-        {utilizationSummary && (
-          <div className="flex flex-wrap gap-2">
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-xs px-2 py-1 gap-1.5",
-                utilizationSummary.critical > 0
-                  ? "bg-red-50 text-red-700 border-red-200"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              <AlertTriangle className="h-3 w-3" />
-              {utilizationSummary.critical} Critical
-            </Badge>
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-xs px-2 py-1 gap-1.5",
-                utilizationSummary.low > 0
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              <TrendingDown className="h-3 w-3" />
-              {utilizationSummary.low} Low
-            </Badge>
-            <Badge
-              variant="outline"
-              className="text-xs px-2 py-1 gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200"
-            >
-              <CheckCircle className="h-3 w-3" />
-              {utilizationSummary.optimal} Optimal
-            </Badge>
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-xs px-2 py-1 gap-1.5",
-                utilizationSummary.overworked > 0
-                  ? "bg-purple-50 text-purple-700 border-purple-200"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              <Zap className="h-3 w-3" />
-              {utilizationSummary.overworked} Overworked
-            </Badge>
-          </div>
-        )}
-
-        {/* Summary Stats (inline) */}
+        {/* Summary Stats */}
         <div className="flex gap-4 text-xs">
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Total:</span>
@@ -438,7 +371,6 @@ function MachinesPageContent() {
               ]}
               exportFileName="jetline-machines"
               pageSize={99999}
-              onRowClick={handleRowClick}
               enableRowSelection
               onBulkAction={handleBulkAction}
               bulkActions={[
@@ -451,6 +383,7 @@ function MachinesPageContent() {
             />
           </CardContent>
         </Card>
+
         {/* Add Machine Dialog */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogContent className="sm:max-w-[425px]">

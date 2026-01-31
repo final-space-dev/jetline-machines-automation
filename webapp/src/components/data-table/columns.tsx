@@ -1,17 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -25,18 +16,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Input } from "@/components/ui/input";
-import { MoreHorizontal, ExternalLink, Printer, Banknote } from "lucide-react";
+import { ArrowRight, Printer, Banknote } from "lucide-react";
 import { formatNumber, formatDate, cn } from "@/lib/utils";
-import type { MachineWithUtilization, MachineRate } from "@/types";
+import type { MachineWithUtilization } from "@/types";
 
-// Helper to format rate values (cents to currency display)
 function formatRate(value: number | null | undefined): string {
   if (value === null || value === undefined) return "—";
   return `${(value * 100).toFixed(2)}c`;
 }
 
-// Helper to format cost values (ZAR)
 function formatCostShort(value: number): string {
   if (value === 0) return "—";
   if (value < 1000) return `R${value.toFixed(0)}`;
@@ -44,13 +32,11 @@ function formatCostShort(value: number): string {
   return `R${(value / 1000000).toFixed(2)}m`;
 }
 
-// Store type for move dropdown
 export interface StoreOption {
   id: string;
   name: string;
 }
 
-// Action config
 const ACTION_OPTIONS = [
   { value: "NONE", label: "None", color: "" },
   { value: "TERMINATE", label: "Terminate", color: "text-red-700" },
@@ -67,83 +53,11 @@ const ACTION_COLORS: Record<string, string> = {
   MOVE: "text-blue-700 font-medium",
 };
 
-// Inline editable upgrade cell
-function UpgradeToCell({
-  machine,
-  onUpdate,
-}: {
-  machine: MachineWithUtilization;
-  onUpdate: (machineId: string, field: string, value: string) => void;
-}) {
-  const [value, setValue] = useState(machine.upgradeTo || "");
-
-  if (machine.action !== "TERMINATE_UPGRADE") {
-    return <span className="text-muted-foreground text-xs">—</span>;
-  }
-
-  return (
-    <Input
-      className="h-7 w-[140px] text-xs"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => onUpdate(machine.id, "upgradeTo", value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
-      placeholder="Model name..."
-    />
-  );
-}
-
-// Inline move-to cell
-function MoveToCell({
-  machine,
-  stores,
-  onUpdate,
-}: {
-  machine: MachineWithUtilization;
-  stores: StoreOption[];
-  onUpdate: (machineId: string, field: string, value: string) => void;
-}) {
-  if (machine.action !== "MOVE") {
-    return <span className="text-muted-foreground text-xs">—</span>;
-  }
-
-  const availableStores = stores.filter((s) => s.id !== machine.companyId);
-  const currentTarget = stores.find((s) => s.id === machine.moveToCompanyId);
-
-  return (
-    <Select
-      value={machine.moveToCompanyId || ""}
-      onValueChange={(value) => onUpdate(machine.id, "moveToCompanyId", value)}
-    >
-      <SelectTrigger className={cn("h-7 w-[130px] text-xs", machine.moveToCompanyId && "border-blue-500 bg-blue-50")}>
-        <SelectValue placeholder="Select store">
-          {currentTarget ? (
-            <span className="text-blue-700">{currentTarget.name}</span>
-          ) : (
-            <span className="text-muted-foreground">Select store</span>
-          )}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {availableStores.map((store) => (
-          <SelectItem key={store.id} value={store.id}>
-            {store.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-// Column generator function
 export function createMachineColumns(
   stores: StoreOption[] = [],
+  modelNames: string[] = [],
   onActionChange?: (machineId: string, action: string, extra?: Record<string, string>) => void,
-  visibleConditionalColumns?: { showUpgradeTo: boolean; showMoveTo: boolean; showPlannedStore: boolean }
+  onNavigate?: (machineId: string) => void,
 ): ColumnDef<MachineWithUtilization>[] {
   const handleActionUpdate = (machineId: string, field: string, value: string) => {
     if (field === "action") {
@@ -362,7 +276,7 @@ export function createMachineColumns(
       },
     },
 
-    // --- Action (plain text dropdown, no badge) ---
+    // --- Action ---
     {
       id: "action",
       accessorFn: (row) => row.action || "NONE",
@@ -394,53 +308,84 @@ export function createMachineColumns(
           </Select>
         );
       },
-      filterFn: (row, id, value) => {
-        const action = row.original.action || "NONE";
-        return action === value;
-      },
+      filterFn: (row, id, value) => (row.original.action || "NONE") === value,
     },
 
-    // --- Conditional: Upgrade To ---
-    ...(visibleConditionalColumns?.showUpgradeTo ? [{
-      id: "upgradeTo",
-      accessorFn: (row: MachineWithUtilization) => row.upgradeTo || "",
-      header: "Upgrade To",
-      cell: ({ row }: { row: { original: MachineWithUtilization } }) => (
-        <UpgradeToCell machine={row.original} onUpdate={handleActionUpdate} />
-      ),
-    } as ColumnDef<MachineWithUtilization>] : []),
-
-    // --- Conditional: Move To ---
-    ...(visibleConditionalColumns?.showMoveTo ? [{
-      id: "moveTo",
-      accessorFn: (row: MachineWithUtilization) => row.action !== "MOVE" ? "" : row.moveToCompanyId || "",
-      header: "Move To",
-      cell: ({ row }: { row: { original: MachineWithUtilization } }) => (
-        <MoveToCell machine={row.original} stores={stores} onUpdate={handleActionUpdate} />
-      ),
-    } as ColumnDef<MachineWithUtilization>] : []),
-
-    // --- Conditional: Planned Store ---
-    ...(visibleConditionalColumns?.showPlannedStore ? [{
-      id: "plannedStore",
-      accessorFn: (row: MachineWithUtilization) => {
-        if (row.action !== "MOVE" || !row.moveToCompanyId) return "";
-        return stores.find((s) => s.id === row.moveToCompanyId)?.name || "";
-      },
-      header: "Planned Store",
-      cell: ({ row }: { row: { original: MachineWithUtilization } }) => {
-        const machine = row.original;
-        if (machine.action !== "MOVE" || !machine.moveToCompanyId) {
-          return <span className="text-muted-foreground text-xs">—</span>;
+    // --- Action Result (contextual: store dropdown for Move, model dropdown for Upgrade) ---
+    {
+      id: "actionResult",
+      accessorFn: (row) => {
+        if (row.action === "MOVE") {
+          return stores.find((s) => s.id === row.moveToCompanyId)?.name || "";
         }
-        const targetStore = stores.find((s) => s.id === machine.moveToCompanyId);
-        return (
-          <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-300">
-            {targetStore?.name || "—"}
-          </Badge>
-        );
+        if (row.action === "TERMINATE_UPGRADE") {
+          return row.upgradeTo || "";
+        }
+        return "";
       },
-    } as ColumnDef<MachineWithUtilization>] : []),
+      header: "Action Detail",
+      cell: ({ row }) => {
+        const machine = row.original;
+
+        // Move → store dropdown
+        if (machine.action === "MOVE") {
+          const availableStores = stores.filter((s) => s.id !== machine.companyId);
+          const currentTarget = stores.find((s) => s.id === machine.moveToCompanyId);
+          return (
+            <Select
+              value={machine.moveToCompanyId || ""}
+              onValueChange={(value) => handleActionUpdate(machine.id, "moveToCompanyId", value)}
+            >
+              <SelectTrigger className={cn("h-7 w-[150px] text-xs", machine.moveToCompanyId && "border-blue-500 bg-blue-50")}>
+                <SelectValue placeholder="Select store">
+                  {currentTarget ? (
+                    <span className="text-blue-700">{currentTarget.name}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Select store</span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {availableStores.map((store) => (
+                  <SelectItem key={store.id} value={store.id}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        // Terminate & Upgrade → model dropdown from existing fleet
+        if (machine.action === "TERMINATE_UPGRADE") {
+          return (
+            <Select
+              value={machine.upgradeTo || ""}
+              onValueChange={(value) => handleActionUpdate(machine.id, "upgradeTo", value)}
+            >
+              <SelectTrigger className={cn("h-7 w-[150px] text-xs", machine.upgradeTo && "border-orange-500 bg-orange-50")}>
+                <SelectValue placeholder="Select model">
+                  {machine.upgradeTo ? (
+                    <span className="text-orange-700">{machine.upgradeTo}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Select model</span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {modelNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        return <span className="text-muted-foreground text-xs">—</span>;
+      },
+    },
 
     // --- Contract ---
     {
@@ -474,7 +419,7 @@ export function createMachineColumns(
       ),
     },
 
-    // --- Date columns at the end ---
+    // --- Date columns ---
     {
       accessorKey: "installDate",
       header: "Installed",
@@ -494,36 +439,24 @@ export function createMachineColumns(
       ),
     },
 
-    // --- Actions (triple-dot) at the very end ---
+    // --- Navigate arrow (replaces triple-dot menu) ---
     {
-      id: "actions",
-      cell: ({ row }) => {
-        const machine = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(machine.serialNumber)}>
-                Copy serial number
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View details
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
+      id: "navigate",
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNavigate?.(row.original.id);
+          }}
+        >
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      ),
     },
   ];
 }
 
-// Backwards compatible export
 export const machineColumns = createMachineColumns();
