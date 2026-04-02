@@ -4,7 +4,6 @@ import * as React from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
-  ColumnOrderState,
   SortingState,
   VisibilityState,
   flexRender,
@@ -14,25 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
   FilterFn,
-  Header,
 } from "@tanstack/react-table";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  horizontalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronDown,
   ChevronLeft,
@@ -44,11 +25,7 @@ import {
   Search,
   SlidersHorizontal,
   X,
-  GripVertical,
   Save,
-  Bookmark,
-  Trash2,
-  Check,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -56,12 +33,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -87,10 +61,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 // Storage keys for persisting state
-const COLUMN_ORDER_STORAGE_KEY = "jetline-table-column-order";
+const COLUMN_VISIBILITY_STORAGE_KEY = "jetline-table-column-visibility";
 const SAVED_VIEWS_STORAGE_KEY = "jetline-table-saved-views";
 const ACTIVE_VIEW_STORAGE_KEY = "jetline-table-active-view";
 
@@ -99,27 +76,26 @@ interface SavedView {
   id: string;
   name: string;
   createdAt: string;
-  columnOrder: string[];
   columnVisibility: VisibilityState;
   columnFilters: ColumnFiltersState;
   sorting: SortingState;
   globalFilter: string;
 }
 
-// Helper to get/set column order from localStorage
-function getStoredColumnOrder(tableId: string): string[] | null {
+// Helper to get/set column visibility from localStorage
+function getStoredColumnVisibility(tableId: string): VisibilityState | null {
   if (typeof window === "undefined") return null;
   try {
-    const stored = localStorage.getItem(`${COLUMN_ORDER_STORAGE_KEY}-${tableId}`);
+    const stored = localStorage.getItem(`${COLUMN_VISIBILITY_STORAGE_KEY}-${tableId}`);
     return stored ? JSON.parse(stored) : null;
   } catch {
     return null;
   }
 }
 
-function setStoredColumnOrder(tableId: string, order: string[]): void {
+function setStoredColumnVisibility(tableId: string, visibility: VisibilityState): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(`${COLUMN_ORDER_STORAGE_KEY}-${tableId}`, JSON.stringify(order));
+  localStorage.setItem(`${COLUMN_VISIBILITY_STORAGE_KEY}-${tableId}`, JSON.stringify(visibility));
 }
 
 // Helper functions for saved views
@@ -156,64 +132,6 @@ function setActiveViewId(tableId: string, viewId: string | null): void {
   }
 }
 
-// Sortable header cell component
-function SortableHeaderCell<TData>({
-  header,
-}: {
-  header: Header<TData, unknown>;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: header.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <TableHead
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "relative group",
-        header.column.getCanSort() && "cursor-pointer select-none hover:bg-muted/50",
-        isDragging && "z-50 bg-muted"
-      )}
-    >
-      <div className="flex items-center gap-1">
-        {/* Drag handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <GripVertical className="h-3 w-3" />
-        </div>
-
-        {/* Header content */}
-        <div
-          className="flex items-center gap-2 flex-1"
-          onClick={header.column.getToggleSortingHandler()}
-        >
-          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-          {header.column.getIsSorted() && (
-            <span className="text-muted-foreground">
-              {header.column.getIsSorted() === "asc" ? "↑" : "↓"}
-            </span>
-          )}
-        </div>
-      </div>
-    </TableHead>
-  );
-}
-
 // Fuzzy filter function for semantic search
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fuzzyFilter: FilterFn<any> = (row, columnId, value) => {
@@ -235,6 +153,95 @@ const globalFilter: FilterFn<any> = (row, _columnId, filterValue) => {
   });
 };
 
+// Multi-select filter function
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const multiSelectFilter: FilterFn<any> = (row, columnId, filterValue) => {
+  if (!filterValue || !Array.isArray(filterValue) || filterValue.length === 0) return true;
+  const cellValue = row.getValue(columnId);
+  return filterValue.includes(String(cellValue));
+};
+
+// Multi-select filter popover component
+function MultiSelectFilter({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const [search, setSearch] = React.useState("");
+
+  const filteredOptions = React.useMemo(() => {
+    if (!search) return options;
+    const lower = search.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(lower));
+  }, [options, search]);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className={cn("h-9 w-[150px] justify-between", value.length > 0 && "border-primary")}>
+          <span className="truncate">
+            {label}
+            {value.length > 0 && (
+              <span className="ml-1 rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] font-medium">
+                {value.length}
+              </span>
+            )}
+          </span>
+          <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-2" align="start">
+        <Input
+          placeholder={`Search ${label.toLowerCase()}...`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-8 mb-2"
+        />
+        <div className="max-h-[200px] overflow-auto space-y-1">
+          {filteredOptions.map((option) => {
+            const checked = value.includes(option.value);
+            return (
+              <label
+                key={option.value}
+                className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm"
+              >
+                <Checkbox
+                  checked={checked}
+                  onCheckedChange={(c) => {
+                    if (c) {
+                      onChange([...value, option.value]);
+                    } else {
+                      onChange(value.filter((v) => v !== option.value));
+                    }
+                  }}
+                />
+                <span className="truncate">{option.label}</span>
+              </label>
+            );
+          })}
+          {filteredOptions.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-2">No options found</p>
+          )}
+        </div>
+        {value.length > 0 && (
+          <button
+            className="w-full text-xs text-muted-foreground hover:text-foreground text-center pt-2 border-t mt-2"
+            onClick={() => onChange([])}
+          >
+            Clear
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface BulkAction {
   value: string;
   label: string;
@@ -250,10 +257,16 @@ interface DataTableProps<TData, TValue> {
   isLoading?: boolean;
   onRowClick?: (row: TData) => void;
   tableId?: string;
-  enableColumnReorder?: boolean;
   enableRowSelection?: boolean;
   onBulkAction?: (selectedIds: string[], action: string) => void;
   bulkActions?: BulkAction[];
+  getRowClassName?: (row: TData) => string;
+  externalColumnFilters?: ColumnFiltersState;
+  onExternalColumnFiltersChange?: React.Dispatch<React.SetStateAction<ColumnFiltersState>>;
+  onFilteredDataChange?: (filteredData: TData[]) => void;
+  hideViewsToolbar?: boolean;
+  externalColumnVisibility?: VisibilityState;
+  onExternalColumnVisibilityChange?: (v: VisibilityState) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -266,14 +279,35 @@ export function DataTable<TData, TValue>({
   isLoading = false,
   onRowClick,
   tableId = "default",
-  enableColumnReorder = true,
   enableRowSelection = false,
   onBulkAction,
   bulkActions = [],
+  getRowClassName,
+  externalColumnFilters,
+  onExternalColumnFiltersChange,
+  onFilteredDataChange,
+  hideViewsToolbar = false,
+  externalColumnVisibility,
+  onExternalColumnVisibilityChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [internalColumnFilters, setInternalColumnFilters] = React.useState<ColumnFiltersState>([]);
+
+  const columnFilters = externalColumnFilters ?? internalColumnFilters;
+  const setColumnFilters = onExternalColumnFiltersChange ?? setInternalColumnFilters;
+  const [internalColumnVisibility, setInternalColumnVisibility] = React.useState<VisibilityState>(
+    () => getStoredColumnVisibility(tableId) || {}
+  );
+  const columnVisibility = externalColumnVisibility ?? internalColumnVisibility;
+  const setColumnVisibility = React.useCallback((updater: VisibilityState | ((prev: VisibilityState) => VisibilityState)) => {
+    const next = typeof updater === "function" ? updater(columnVisibility) : updater;
+    if (onExternalColumnVisibilityChange) {
+      onExternalColumnVisibilityChange(next);
+    } else {
+      setInternalColumnVisibility(next);
+      setStoredColumnVisibility(tableId, next);
+    }
+  }, [columnVisibility, onExternalColumnVisibilityChange, tableId]);
   const [globalFilterValue, setGlobalFilterValue] = React.useState("");
   const [rowSelection, setRowSelection] = React.useState({});
 
@@ -282,63 +316,6 @@ export function DataTable<TData, TValue>({
   const [activeViewId, setActiveViewIdState] = React.useState<string | null>(() => getActiveViewId(tableId));
   const [showSaveDialog, setShowSaveDialog] = React.useState(false);
   const [newViewName, setNewViewName] = React.useState("");
-
-  // Column order state - initialize from localStorage or use default column order
-  const defaultColumnOrder = React.useMemo(
-    () => {
-      const base = columns.map((col) => (col as { accessorKey?: string; id?: string }).accessorKey || (col as { id?: string }).id || "");
-      return enableRowSelection ? ["select", ...base] : base;
-    },
-    [columns, enableRowSelection]
-  );
-
-  const [columnOrder, setColumnOrder] = React.useState<ColumnOrderState>(() => {
-    const stored = getStoredColumnOrder(tableId);
-    if (stored) {
-      // Remove "select" from stored - we pin it first ourselves
-      const cleaned = stored.filter((id) => id !== "select");
-      const validStored = cleaned.filter((id) => defaultColumnOrder.includes(id));
-      const newColumns = defaultColumnOrder.filter((id) => id !== "select" && !validStored.includes(id));
-      const base = [...validStored, ...newColumns];
-      return enableRowSelection ? ["select", ...base] : base;
-    }
-    return defaultColumnOrder;
-  });
-
-  // Save column order to localStorage when it changes (exclude "select" from storage)
-  React.useEffect(() => {
-    if (columnOrder.length > 0) {
-      setStoredColumnOrder(tableId, columnOrder.filter((id) => id !== "select"));
-    }
-  }, [columnOrder, tableId]);
-
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  // Handle drag end for column reordering (keep "select" pinned first)
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    // Don't allow dragging the select column
-    if (active.id === "select" || over.id === "select") return;
-    setColumnOrder((items) => {
-      const oldIndex = items.indexOf(active.id as string);
-      const newIndex = items.indexOf(over.id as string);
-      return arrayMove(items, oldIndex, newIndex);
-    });
-  };
-
-  // Reset column order to default
-  const resetColumnOrder = () => {
-    setColumnOrder(defaultColumnOrder);
-  };
 
   // Get the active view
   const activeView = React.useMemo(
@@ -352,7 +329,6 @@ export function DataTable<TData, TValue>({
       id: `view-${Date.now()}`,
       name,
       createdAt: new Date().toISOString(),
-      columnOrder,
       columnVisibility,
       columnFilters,
       sorting,
@@ -369,10 +345,6 @@ export function DataTable<TData, TValue>({
 
   // Load a saved view
   const loadView = (view: SavedView) => {
-    // Filter column order to only include columns that exist
-    const validColumnOrder = view.columnOrder.filter((id) => defaultColumnOrder.includes(id));
-    const newColumns = defaultColumnOrder.filter((id) => !validColumnOrder.includes(id));
-    setColumnOrder([...validColumnOrder, ...newColumns]);
     setColumnVisibility(view.columnVisibility);
     setColumnFilters(view.columnFilters);
     setSorting(view.sorting);
@@ -394,7 +366,6 @@ export function DataTable<TData, TValue>({
 
   // Reset to default view (clear all customizations)
   const resetToDefault = () => {
-    setColumnOrder(defaultColumnOrder);
     setColumnVisibility({});
     setColumnFilters([]);
     setSorting([]);
@@ -407,13 +378,12 @@ export function DataTable<TData, TValue>({
   const isViewModified = React.useMemo(() => {
     if (!activeView) return false;
     return (
-      JSON.stringify(columnOrder) !== JSON.stringify(activeView.columnOrder) ||
       JSON.stringify(columnVisibility) !== JSON.stringify(activeView.columnVisibility) ||
       JSON.stringify(columnFilters) !== JSON.stringify(activeView.columnFilters) ||
       JSON.stringify(sorting) !== JSON.stringify(activeView.sorting) ||
       globalFilterValue !== activeView.globalFilter
     );
-  }, [activeView, columnOrder, columnVisibility, columnFilters, sorting, globalFilterValue]);
+  }, [activeView, columnVisibility, columnFilters, sorting, globalFilterValue]);
 
   // Add checkbox column if row selection is enabled
   const allColumns = React.useMemo(() => {
@@ -454,6 +424,10 @@ export function DataTable<TData, TValue>({
     filterFns: {
       fuzzy: fuzzyFilter,
       global: globalFilter,
+      multiSelect: multiSelectFilter,
+    },
+    defaultColumn: {
+      filterFn: multiSelectFilter,
     },
     globalFilterFn: globalFilter,
     enableRowSelection,
@@ -466,14 +440,12 @@ export function DataTable<TData, TValue>({
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilterValue,
-    onColumnOrderChange: setColumnOrder,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
       globalFilter: globalFilterValue,
-      columnOrder,
     },
     ...(!noPagination && {
       initialState: {
@@ -482,11 +454,32 @@ export function DataTable<TData, TValue>({
     }),
   });
 
+  // Notify parent of filtered data changes
+  const filteredRows = table.getFilteredRowModel().rows;
+  React.useEffect(() => {
+    if (onFilteredDataChange) {
+      onFilteredDataChange(filteredRows.map((r) => r.original));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredRows.length, onFilteredDataChange]);
+
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && Object.keys(rowSelection).length > 0) {
+        setRowSelection({});
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [rowSelection]);
+
   // Get selected row IDs for bulk actions
   const selectedRowIds = React.useMemo(() => {
     return table.getSelectedRowModel().rows
       .map((row) => (row.original as Record<string, unknown>)?.id as string)
       .filter(Boolean);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowSelection, table]);
 
   const handleExportCSV = () => {
@@ -549,151 +542,139 @@ export function DataTable<TData, TValue>({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center gap-2">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={globalFilterValue}
-              onChange={(e) => setGlobalFilterValue(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          {/* Column Filters */}
-          {filterColumns.map((filter) => (
-            <Select
-              key={filter.key}
-              value={(table.getColumn(filter.key)?.getFilterValue() as string) ?? ""}
-              onValueChange={(value) =>
-                table.getColumn(filter.key)?.setFilterValue(value === "all" ? "" : value)
-              }
-            >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder={filter.label} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All {filter.label}</SelectItem>
-                {filter.options.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ))}
-
-          {activeFilters > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2">
-              <X className="h-4 w-4 mr-1" />
-              Clear ({activeFilters})
-            </Button>
-          )}
+    <div className="space-y-2">
+      {/* Toolbar Row 1: Search + Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={searchPlaceholder}
+            value={globalFilterValue}
+            onChange={(e) => setGlobalFilterValue(e.target.value)}
+            className="pl-9 h-9"
+          />
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Saved Views */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className={activeView ? "border-primary" : ""}>
-                <Bookmark className="h-4 w-4 mr-2" />
-                {activeView ? (
-                  <span className="flex items-center gap-1">
-                    {activeView.name}
-                    {isViewModified && <span className="text-amber-500">*</span>}
-                  </span>
-                ) : (
-                  "Views"
-                )}
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => setShowSaveDialog(true)}>
-                <Save className="h-4 w-4 mr-2" />
-                Save current view
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={resetToDefault}>
-                <X className="h-4 w-4 mr-2" />
-                Reset to default
-              </DropdownMenuItem>
-              {savedViews.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">Saved Views</DropdownMenuLabel>
-                  {savedViews.map((view) => (
-                    <DropdownMenuItem
-                      key={view.id}
-                      className="flex items-center justify-between group"
-                    >
-                      <div
-                        className="flex items-center gap-2 flex-1 cursor-pointer"
-                        onClick={() => loadView(view)}
-                      >
-                        {activeViewId === view.id && <Check className="h-3 w-3 text-primary" />}
-                        <span className={activeViewId === view.id ? "font-medium" : ""}>{view.name}</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteView(view.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity p-1"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {filterColumns.map((filter) => {
+          const filterValue = (table.getColumn(filter.key)?.getFilterValue() as string[]) ?? [];
+          return (
+            <MultiSelectFilter
+              key={filter.key}
+              label={filter.label}
+              options={filter.options}
+              value={filterValue}
+              onChange={(val) => {
+                table.getColumn(filter.key)?.setFilterValue(val.length > 0 ? val : undefined);
+              }}
+            />
+          );
+        })}
 
-          {/* Column Visibility & Order */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <SlidersHorizontal className="h-4 w-4 mr-2" />
-                Columns
-                <ChevronDown className="h-4 w-4 ml-2" />
+        {activeFilters > 0 && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2">
+            <X className="h-4 w-4 mr-1" />
+            Clear ({activeFilters})
+          </Button>
+        )}
+      </div>
+
+      {/* Toolbar Row 2: Views (left) + Columns/Export (right) */}
+      {!hideViewsToolbar && <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          {/* View tabs */}
+          <Button
+            variant={!activeViewId ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={resetToDefault}
+          >
+            All
+          </Button>
+          {savedViews.map((view) => (
+            <div key={view.id} className="flex items-center group">
+              <Button
+                variant={activeViewId === view.id ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => loadView(view)}
+              >
+                {view.name}
+                {activeViewId === view.id && isViewModified && (
+                  <span className="text-amber-500 ml-0.5">*</span>
+                )}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {enableColumnReorder && (
-                <>
-                  <DropdownMenuItem onClick={resetColumnOrder} className="text-xs text-muted-foreground">
-                    <GripVertical className="h-3 w-3 mr-2" />
-                    Reset column order
-                  </DropdownMenuItem>
-                  <div className="my-1 h-px bg-border" />
-                </>
-              )}
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                    className="capitalize"
-                  >
-                    {column.id.replace(/_/g, " ")}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteView(view.id); }}
+                className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity p-0.5 -ml-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground"
+            onClick={() => setShowSaveDialog(true)}
+          >
+            <Save className="h-3 w-3 mr-1" />
+            Save view
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {/* Column Visibility */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 text-xs">
+                <SlidersHorizontal className="h-3 w-3 mr-1" />
+                Columns
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="end">
+              <div className="space-y-1 max-h-[300px] overflow-auto">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => (
+                    <label
+                      key={column.id}
+                      className="flex items-center gap-2 px-1 py-1.5 rounded hover:bg-muted cursor-pointer text-sm"
+                    >
+                      <Checkbox
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) => {
+                          column.toggleVisibility(!!value);
+                          setTimeout(() => {
+                            const updated = { ...columnVisibility, [column.id]: !!value };
+                            if (updated[column.id]) delete updated[column.id];
+                            setStoredColumnVisibility(tableId, updated);
+                          }, 0);
+                        }}
+                      />
+                      <span className="capitalize text-xs">{column.id.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}</span>
+                    </label>
+                  ))}
+              </div>
+              <button
+                className="w-full text-xs text-muted-foreground hover:text-foreground text-center pt-2 border-t mt-2"
+                onClick={() => {
+                  setColumnVisibility({});
+                  setStoredColumnVisibility(tableId, {});
+                  toast.success("Columns reset to default");
+                }}
+              >
+                Show all columns
+              </button>
+            </PopoverContent>
+          </Popover>
 
           {/* Export */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
+              <Button variant="ghost" size="sm" className="h-7 text-xs">
+                <Download className="h-3 w-3 mr-1" />
                 Export
-                <ChevronDown className="h-4 w-4 ml-2" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -708,62 +689,81 @@ export function DataTable<TData, TValue>({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
+      </div>}
+
+      {/* Bulk action bar */}
+      {enableRowSelection && selectedRowIds.length > 0 && bulkActions.length > 0 && (
+        <div className="sticky top-0 z-20 flex items-center gap-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+          <span className="text-sm font-medium text-blue-900">{selectedRowIds.length} selected</span>
+          <div className="flex items-center gap-1">
+            {bulkActions.map((action) => (
+              <Button
+                key={action.value}
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  onBulkAction?.(selectedRowIds, action.value);
+                  toast.success(`Applied "${action.label}" to ${selectedRowIds.length} machines`);
+                  setRowSelection({});
+                }}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+          <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs text-blue-700" onClick={() => setRowSelection({})}>
+            <X className="h-3 w-3 mr-1" />
+            Deselect all
+          </Button>
+        </div>
+      )}
 
       {/* Table */}
-      <div className="rounded-md border">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  <SortableContext
-                    items={headerGroup.headers.map((h) => h.id)}
-                    strategy={horizontalListSortingStrategy}
-                  >
-                    {headerGroup.headers.map((header) =>
-                      enableColumnReorder ? (
-                        <SortableHeaderCell key={header.id} header={header} />
-                      ) : (
-                        <TableHead
-                          key={header.id}
-                          className={cn(
-                            header.column.getCanSort() && "cursor-pointer select-none hover:bg-muted/50"
-                          )}
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          {header.isPlaceholder ? null : (
-                            <div className="flex items-center gap-2">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                              {header.column.getIsSorted() && (
-                                <span className="text-muted-foreground">
-                                  {header.column.getIsSorted() === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </TableHead>
-                      )
+      <div className="rounded-md border max-h-[calc(100vh-220px)] overflow-y-auto">
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-background">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className={cn(
+                      header.column.getCanSort() && "cursor-pointer select-none hover:bg-muted/50",
+                      (header.column.columnDef.meta as { align?: string } | undefined)?.align === "right" && "text-right"
                     )}
-                  </SortableContext>
-                </TableRow>
-              ))}
-            </TableHeader>
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    {header.isPlaceholder ? null : (
+                      <div className="flex items-center gap-1">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.column.getIsSorted() && (
+                          <span className="text-muted-foreground text-xs">
+                            {header.column.getIsSorted() === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={cn(onRowClick && "cursor-pointer hover:bg-muted/50")}
+                  className={cn(
+                    "even:bg-blue-50/40",
+                    onRowClick && "cursor-pointer hover:bg-blue-50/60",
+                    getRowClassName?.(row.original)
+                  )}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="py-1 px-2">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -771,44 +771,34 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results found.
+                <TableCell colSpan={allColumns.length} className="h-32 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Search className="h-8 w-8" />
+                    <p className="text-sm font-medium">No results found</p>
+                    {activeFilters > 0 && (
+                      <Button variant="link" size="sm" onClick={clearFilters}>
+                        Clear all filters
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
-          </Table>
-        </DndContext>
+        </Table>
       </div>
-
-      {/* Bulk action bar */}
-      {enableRowSelection && selectedRowIds.length > 0 && bulkActions.length > 0 && (
-        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md border">
-          <span className="text-sm font-medium">{selectedRowIds.length} selected</span>
-          {bulkActions.map((action) => (
-            <Button
-              key={action.value}
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                onBulkAction?.(selectedRowIds, action.value);
-                setRowSelection({});
-              }}
-            >
-              {action.label}
-            </Button>
-          ))}
-          <Button variant="ghost" size="sm" onClick={() => setRowSelection({})}>
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-        </div>
-      )}
 
       {/* Footer */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {table.getFilteredRowModel().rows.length} results
+        <p className="text-xs text-muted-foreground">
+          {table.getFilteredRowModel().rows.length === data.length
+            ? `${data.length} rows`
+            : `Showing ${table.getFilteredRowModel().rows.length} of ${data.length}`}
+          {Object.keys(rowSelection).length > 0 && (
+            <span className="ml-2 font-medium text-foreground">
+              · {Object.keys(rowSelection).length} selected
+            </span>
+          )}
         </p>
 
         {!noPagination && (

@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoading } from "@/components/ui/page-loading";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Download } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
+import * as XLSX from "xlsx";
+import { getFeatureToggles, setFeatureToggles, type FeatureToggles } from "@/lib/feature-toggles";
 
 interface Company {
   id: string;
@@ -30,6 +34,8 @@ export default function SettingsPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [connectionTests, setConnectionTests] = useState<Map<string, ConnectionTest>>(new Map());
+  const [toggles, setToggles] = useState<FeatureToggles>(getFeatureToggles);
+  const [exportingReport, setExportingReport] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -89,6 +95,27 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAnomalyReport = async () => {
+    setExportingReport(true);
+    try {
+      const res = await fetch("/api/anomalies/report");
+      const json = await res.json();
+      if (!json.data || json.data.length === 0) {
+        alert("No data returned");
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(json.data);
+      XLSX.utils.book_append_sheet(wb, ws, "Anomaly Report");
+      XLSX.writeFile(wb, `anomaly-report-${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (err) {
+      console.error("Anomaly report export error:", err);
+      alert("Failed to export report");
+    } finally {
+      setExportingReport(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <AppShell>
@@ -104,8 +131,77 @@ export default function SettingsPage() {
       <div className="space-y-4">
         <PageHeader
           title="Settings"
-          description="BMS connection configuration"
+          description="Feature toggles and BMS connections"
         />
+
+        {/* Feature Toggles */}
+        <Card>
+          <CardHeader className="pb-2 pt-3 px-3">
+            <CardTitle className="text-sm">Feature Toggles</CardTitle>
+            <CardDescription className="text-xs">Show or hide pages in the sidebar. Settings and Xerox Reporting are always visible.</CardDescription>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="space-y-1">
+              {([
+                { key: "machines"       as const, label: "Machines",        description: "Machine list and planning" },
+                { key: "machinesAudit"  as const, label: "Machines Audit",  description: "Audit trail and data quality" },
+                { key: "performance"    as const, label: "Performance",     description: "Volume and utilisation pivot" },
+                { key: "reports"        as const, label: "Reports",         description: "3-month billing report" },
+                { key: "existenceRecon" as const, label: "Existence Recon", description: "BMS vs Xerox machine matching" },
+                { key: "syncStatus"     as const, label: "Sync Status",     description: "BMS sync log and status" },
+                { key: "dashboard"      as const, label: "Dashboard",       description: "Overview stats and charts" },
+                { key: "contracts"      as const, label: "Contracts",       description: "Contract management" },
+                { key: "liftPlanner"    as const, label: "Lift Planner",    description: "Machine move planning tool" },
+              ]).map((item) => (
+                <div key={item.key} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div>
+                    <Label htmlFor={`toggle-${item.key}`} className="text-sm font-medium cursor-pointer">{item.label}</Label>
+                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                  </div>
+                  <Switch
+                    id={`toggle-${item.key}`}
+                    checked={toggles[item.key]}
+                    onCheckedChange={(checked) => {
+                      const next = { ...toggles, [item.key]: checked };
+                      setToggles(next);
+                      setFeatureToggles(next);
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Reports */}
+        <Card>
+          <CardHeader className="pb-2 pt-3 px-3">
+            <CardTitle className="text-sm">Reports</CardTitle>
+            <CardDescription className="text-xs">Export data for manual review</CardDescription>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Anomaly Report</p>
+                <p className="text-xs text-muted-foreground">All readings from Jan 2024+, sorted by company/serial/date. Flags movements &gt;7,500 or &gt;25%.</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs shrink-0"
+                onClick={handleAnomalyReport}
+                disabled={exportingReport}
+              >
+                {exportingReport ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Download className="h-3 w-3 mr-1" />
+                )}
+                {exportingReport ? "Exporting..." : "Download"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Summary */}
         <Card>

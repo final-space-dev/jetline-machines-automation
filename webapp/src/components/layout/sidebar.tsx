@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -7,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
-  LayoutDashboard,
   Printer,
   ArrowUpRight,
   Settings,
@@ -15,27 +15,83 @@ import {
   ChevronLeft,
   Menu,
   FileText,
+  ClipboardCheck,
+  BarChart3,
+  FileBarChart,
+  GitCompare,
+  ScanLine,
+  LayoutDashboard,
 } from "lucide-react";
+import { getFeatureToggles, type FeatureToggles } from "@/lib/feature-toggles";
 
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
 }
 
-const navigation = [
-  { name: "Machines", href: "/machines", icon: Printer },
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Contracts", href: "/contracts", icon: FileText },
-  { name: "Lift Planner", href: "/lift", icon: ArrowUpRight },
+type NavItem = { name: string; href: string; icon: typeof Printer; toggleKey?: keyof FeatureToggles };
+
+const mainNavigation: NavItem[] = [
+  { name: "Xerox Reporting", href: "/xerox-reporting", icon: ScanLine },
 ];
 
-const secondaryNavigation = [
-  { name: "Sync Status", href: "/sync", icon: RefreshCw },
-  { name: "Settings", href: "/settings", icon: Settings },
+const otherToolsNavigation: NavItem[] = [
+  { name: "Machines",        href: "/machines",        icon: Printer,        toggleKey: "machines" },
+  { name: "Machines Audit",  href: "/machines-audit",  icon: ClipboardCheck, toggleKey: "machinesAudit" },
+  { name: "Performance",     href: "/performance",     icon: BarChart3,      toggleKey: "performance" },
+  { name: "Reports",         href: "/reports",         icon: FileBarChart,   toggleKey: "reports" },
+  { name: "Existence Recon", href: "/existence-recon", icon: GitCompare,     toggleKey: "existenceRecon" },
+  { name: "Dashboard",       href: "/dashboard",       icon: LayoutDashboard, toggleKey: "dashboard" },
+  { name: "Contracts",       href: "/contracts",       icon: FileText,       toggleKey: "contracts" },
+  { name: "Lift Planner",    href: "/lift",            icon: ArrowUpRight,   toggleKey: "liftPlanner" },
+];
+
+const secondaryNavigation: NavItem[] = [
+  { name: "Sync Status", href: "/sync",     icon: RefreshCw, toggleKey: "syncStatus" },
+  { name: "Settings",    href: "/settings", icon: Settings },
 ];
 
 export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const [toggles, setToggles] = useState<FeatureToggles>(getFeatureToggles);
+
+  useEffect(() => {
+    const handler = () => setToggles(getFeatureToggles());
+    window.addEventListener("storage", handler);
+    const interval = setInterval(() => setToggles(getFeatureToggles()), 1000);
+    return () => {
+      window.removeEventListener("storage", handler);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const visibleOtherTools = otherToolsNavigation.filter(
+    (item) => !item.toggleKey || toggles[item.toggleKey]
+  );
+
+  const visibleSecondary = secondaryNavigation.filter(
+    (item) => !item.toggleKey || toggles[item.toggleKey]
+  );
+
+  function NavButton({ item }: { item: NavItem }) {
+    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+    return (
+      <Link key={item.name} href={item.href}>
+        <button
+          className={cn(
+            "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+            isActive
+              ? "bg-blue-600 text-white"
+              : "text-gray-600 hover:bg-blue-50 hover:text-blue-700",
+            isCollapsed && "justify-center px-2"
+          )}
+        >
+          <item.icon className="h-4 w-4 shrink-0" />
+          {!isCollapsed && item.name}
+        </button>
+      </Link>
+    );
+  }
 
   return (
     <div
@@ -65,45 +121,27 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="space-y-1">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link key={item.name} href={item.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start",
-                    isCollapsed && "justify-center px-2"
-                  )}
-                >
-                  <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                  {!isCollapsed && item.name}
-                </Button>
-              </Link>
-            );
-          })}
+          {mainNavigation.map((item) => <NavButton key={item.href} item={item} />)}
         </nav>
+
+        {visibleOtherTools.length > 0 && (
+          <>
+            <Separator className="my-4" />
+            {!isCollapsed && (
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-1">
+                Other Tools
+              </p>
+            )}
+            <nav className="space-y-1">
+              {visibleOtherTools.map((item) => <NavButton key={item.href} item={item} />)}
+            </nav>
+          </>
+        )}
 
         <Separator className="my-4" />
 
         <nav className="space-y-1">
-          {secondaryNavigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link key={item.name} href={item.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start",
-                    isCollapsed && "justify-center px-2"
-                  )}
-                >
-                  <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                  {!isCollapsed && item.name}
-                </Button>
-              </Link>
-            );
-          })}
+          {visibleSecondary.map((item) => <NavButton key={item.href} item={item} />)}
         </nav>
       </ScrollArea>
 
@@ -111,7 +149,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       {!isCollapsed && (
         <div className="p-4 border-t">
           <p className="text-xs text-muted-foreground text-center">
-            v1.0.0 &middot; Last sync: Just now
+            v1.0.0
           </p>
         </div>
       )}
