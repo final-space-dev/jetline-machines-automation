@@ -174,8 +174,29 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
         },
       },
       ...(report === "machine-age" ? [
-        { accessorKey: "install_date",          header: "Install Date",          enableSorting: true, cell: ({ getValue }: { getValue: () => unknown }) => <span className={C.mono}>{(getValue() as string | null) || "—"}</span> },
-        { accessorKey: "original_install_date", header: "Original Install Date", enableSorting: true, cell: ({ getValue }: { getValue: () => unknown }) => <span className={C.mono}>{(getValue() as string | null) || "—"}</span> },
+        {
+          accessorKey: "original_install_date",
+          header: "Install Date",
+          enableSorting: true,
+          cell: ({ getValue }: { getValue: () => unknown }) => {
+            const v = getValue() as string | null;
+            return <span className={C.mono}>{v || "—"}</span>;
+          },
+        },
+        {
+          accessorKey: "age_years",
+          header: "Age",
+          enableSorting: true,
+          meta: { align: "right" },
+          cell: ({ getValue }: { getValue: () => unknown }) => {
+            const v = getValue() as number | null;
+            if (v == null) return <span className={C.muted}>—</span>;
+            const years = Math.floor(v);
+            const months = Math.round((v - years) * 12);
+            const label = years > 0 ? `${years}y ${months}m` : `${months}m`;
+            return <span className={cn(C.num, v >= 7 ? "text-red-600" : v >= 5 ? "text-amber-600" : "text-foreground")}>{label}</span>;
+          },
+        },
       ] : []),
     ];
   }

@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
         model: string;
         asset_status: string;
         printer_type: string;
-        install_date: string | null;
         original_install_date: string | null;
+        age_years: number | null;
         last_reading_date: string | null;
       }>(
         `SELECT
@@ -68,14 +68,17 @@ export async function GET(request: NextRequest) {
             WHERE mv.printer_id = pd.printer_id
               AND mv.meter_type IN ('color_impressions','color_large_impressions')
           ) THEN 'Colour' ELSE 'B&W' END AS printer_type,
-          psm.install_date::text,
           psm.original_install_date::text,
+          CASE WHEN psm.original_install_date IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (now() - psm.original_install_date)) / 86400.0 / 365.25
+            ELSE NULL
+          END AS age_years,
           MAX(mr.report_date)::text AS last_reading_date
         FROM xerox.printer_dimensions pd
         LEFT JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
         LEFT JOIN xerox.meter_readings_normalised mr ON mr.printer_id = pd.printer_id
-        GROUP BY pd.printer_id, pd.serial_number, psm.store, psm.company_group, pd.model, pd.asset_status, psm.install_date, psm.original_install_date
-        ORDER BY psm.install_date ASC NULLS LAST, psm.store NULLS LAST`
+        GROUP BY pd.printer_id, pd.serial_number, psm.store, psm.company_group, pd.model, pd.asset_status, psm.original_install_date
+        ORDER BY psm.original_install_date ASC NULLS LAST, psm.store NULLS LAST`
       );
 
       return NextResponse.json({ data: result.rows, rowCount: result.rows.length });
