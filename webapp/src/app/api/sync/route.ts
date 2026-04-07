@@ -100,7 +100,51 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const current = searchParams.get("current");
     const limit = parseInt(searchParams.get("limit") || "10", 10);
+
+    // If ?current=true, return the latest RUNNING sync (for polling)
+    if (current === "true") {
+      const running = await prisma.syncLog.findFirst({
+        where: { status: "RUNNING" },
+        orderBy: { startedAt: "desc" },
+      });
+
+      if (running) {
+        return NextResponse.json({
+          running: true,
+          syncId: running.id,
+          currentCompany: running.currentCompany,
+          totalCompanies: running.totalCompanies,
+          companiesProcessed: running.companiesProcessed,
+          machinesProcessed: running.machinesProcessed,
+          readingsProcessed: running.readingsProcessed,
+          startedAt: running.startedAt,
+        });
+      }
+
+      // No running sync — check if one just finished (within last 5s)
+      const recent = await prisma.syncLog.findFirst({
+        where: { completedAt: { not: null } },
+        orderBy: { completedAt: "desc" },
+      });
+
+      return NextResponse.json({
+        running: false,
+        lastCompleted: recent
+          ? {
+              syncId: recent.id,
+              status: recent.status,
+              companiesProcessed: recent.companiesProcessed,
+              machinesProcessed: recent.machinesProcessed,
+              readingsProcessed: recent.readingsProcessed,
+              startedAt: recent.startedAt,
+              completedAt: recent.completedAt,
+              errors: recent.errors,
+            }
+          : null,
+      });
+    }
 
     const syncLogs = await prisma.syncLog.findMany({
       orderBy: { startedAt: "desc" },

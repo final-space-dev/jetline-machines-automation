@@ -16,6 +16,7 @@ export interface MachineWithRelations {
   action: "NONE" | "TERMINATE" | "TERMINATE_UPGRADE" | "STAY" | "MOVE";
   upgradeTo: string | null;
   moveToCompanyId: string | null;
+  notes: string | null;
   installDate: Date | string | null;
   startDate: Date | string | null;
   contractNumber: string | null;
@@ -33,6 +34,7 @@ export interface MachineWithRelations {
     name: string;
     bmsSchema: string;
     region: string | null;
+    companyGroup: string | null;
   };
   category: {
     id: string;
@@ -212,6 +214,13 @@ export interface MachineUtilization {
   monoCost: number;
   colourCost: number;
   hasRates: boolean;
+  // Xerox actual cost (from imported billing data)
+  xeroxCost: number | null;
+  xeroxRental: number | null;
+  xeroxVolumeCharges: number | null;
+  xeroxBillingMonth: string | null;
+  xeroxTotalClicks: number | null;
+  xeroxCpc: number | null;
   // Lift scoring
   liftScore: number;
   insights: string[];

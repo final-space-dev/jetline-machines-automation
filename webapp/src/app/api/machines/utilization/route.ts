@@ -51,6 +51,14 @@ interface MachineUtilization {
   colourCost: number;          // Colour component
   hasRates: boolean;           // Whether this machine has rate data
 
+  // Xerox actual cost (from imported billing data)
+  xeroxCost: number | null;
+  xeroxRental: number | null;
+  xeroxVolumeCharges: number | null;
+  xeroxBillingMonth: string | null;
+  xeroxTotalClicks: number | null;
+  xeroxCpc: number | null; // Weighted average CPC from Xerox billing
+
   // Insights
   liftScore: number; // 0-100, higher = better lift candidate
   insights: string[];
@@ -340,10 +348,58 @@ export async function GET(request: NextRequest) {
         monoCost,
         colourCost,
         hasRates,
+        xeroxCost: null,
+        xeroxRental: null,
+        xeroxVolumeCharges: null,
+        xeroxBillingMonth: null,
+        xeroxTotalClicks: null,
+        xeroxCpc: null,
         liftScore,
         insights,
       };
     });
+
+    // --- Xerox actual cost: find latest billing month and merge ---
+    const latestBillingMonth = await prisma.xeroxBilling.findFirst({
+      select: { billingMonth: true },
+      orderBy: { billingMonth: "desc" },
+    });
+
+    if (latestBillingMonth) {
+      const xeroxBillings = await prisma.xeroxBilling.findMany({
+        where: { billingMonth: latestBillingMonth.billingMonth, machineId: { not: null } },
+        select: { machineId: true, rental: true, volumeCharges: true, totalCharges: true, totalClicks: true, cpc: true },
+      });
+
+      // Aggregate by machineId (sum charges/clicks, weighted-avg CPC)
+      const xeroxByMachine = new Map<string, { rental: number; volumeCharges: number; totalCharges: number; totalClicks: number; cpcWeightedSum: number; cpcClickSum: number }>();
+      for (const b of xeroxBillings) {
+        if (!b.machineId) continue;
+        const existing = xeroxByMachine.get(b.machineId) ?? { rental: 0, volumeCharges: 0, totalCharges: 0, totalClicks: 0, cpcWeightedSum: 0, cpcClickSum: 0 };
+        existing.rental += Number(b.rental ?? 0);
+        existing.volumeCharges += Number(b.volumeCharges ?? 0);
+        existing.totalCharges += Number(b.totalCharges ?? 0);
+        const clicks = Number(b.totalClicks ?? 0);
+        existing.totalClicks += clicks;
+        if (b.cpc != null && clicks > 0) {
+          existing.cpcWeightedSum += Number(b.cpc) * clicks;
+          existing.cpcClickSum += clicks;
+        }
+        xeroxByMachine.set(b.machineId, existing);
+      }
+
+      for (const u of utilizationData) {
+        const xerox = xeroxByMachine.get(u.machineId);
+        if (xerox) {
+          u.xeroxCost = xerox.totalCharges;
+          u.xeroxRental = xerox.rental;
+          u.xeroxVolumeCharges = xerox.volumeCharges;
+          u.xeroxBillingMonth = latestBillingMonth.billingMonth;
+          u.xeroxTotalClicks = xerox.totalClicks;
+          u.xeroxCpc = xerox.cpcClickSum > 0 ? xerox.cpcWeightedSum / xerox.cpcClickSum : null;
+        }
+      }
+    }
 
     // Sort by lift score (best candidates first)
     utilizationData.sort((a, b) => b.liftScore - a.liftScore);

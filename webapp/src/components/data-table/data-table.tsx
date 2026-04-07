@@ -725,12 +725,13 @@ export function DataTable<TData, TValue>({
           <TableHeader className="sticky top-0 z-10 bg-background">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header, colIdx) => (
                   <TableHead
                     key={header.id}
                     className={cn(
                       header.column.getCanSort() && "cursor-pointer select-none hover:bg-muted/50",
-                      (header.column.columnDef.meta as { align?: string } | undefined)?.align === "right" && "text-right"
+                      (header.column.columnDef.meta as { align?: string } | undefined)?.align === "right" && "text-right",
+                      colIdx % 2 === 1 && "bg-blue-50/50"
                     )}
                     onClick={header.column.getToggleSortingHandler()}
                   >
@@ -762,8 +763,8 @@ export function DataTable<TData, TValue>({
                   )}
                   onClick={() => onRowClick?.(row.original)}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-1 px-2">
+                  {row.getVisibleCells().map((cell, colIdx) => (
+                    <TableCell key={cell.id} className={cn("py-1 px-2", colIdx % 2 === 1 && "bg-blue-50/50")}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

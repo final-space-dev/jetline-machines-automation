@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
        GROUP BY printer_id`
     );
 
-    // 4. Printer dimensions + store map join + colour flag
+    // 4. Printer dimensions + store map join + printer_type from psm
     const dimsResult = await client.query<{
       printer_id: number;
       serial_number: string;
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       store: string | null;
       company_group: string | null;
       install_date: string | null;
-      is_colour: boolean;
+      printer_type: string | null;
     }>(
       `SELECT
         pd.printer_id,
@@ -72,13 +72,9 @@ export async function GET(request: NextRequest) {
         psm.store,
         psm.company_group,
         psm.install_date::text,
-        EXISTS (
-          SELECT 1 FROM xerox.meter_volumes mv
-          WHERE mv.printer_id = pd.printer_id
-            AND mv.meter_type IN ('color_impressions', 'color_large_impressions')
-        ) AS is_colour
+        COALESCE(psm.printer_type, 'Unknown') AS printer_type
       FROM xerox.printer_dimensions pd
-      LEFT JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number`
+      INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number`
     );
 
     // Build lookup maps
@@ -131,7 +127,7 @@ export async function GET(request: NextRequest) {
         servicePlan: dim.service_plan ?? "",
         pricePlan: dim.price_plan ?? "",
         assetStatus: dim.asset_status ?? "",
-        printerType: dim.is_colour ? "Colour" : "B&W",
+        printerType: dim.printer_type ?? "Unknown",
         installDate: dim.install_date ?? null,
         lastReadingDate: lastRdgDate,
         blackVol,

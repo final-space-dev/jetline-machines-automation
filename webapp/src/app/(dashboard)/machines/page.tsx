@@ -5,18 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { DataTable } from "@/components/data-table/data-table";
 import { createMachineColumns, type StoreOption } from "@/components/data-table/columns";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -24,16 +14,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageHeader } from "@/components/ui/page-header";
 import { PageLoading } from "@/components/ui/page-loading";
-import { formatNumber } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
+import type { ColumnFiltersState } from "@tanstack/react-table";
 import type { MachineWithRelations, MachineUtilization, MachineWithUtilization, MachineRate } from "@/types";
 
 interface FilterOptions {
   companies: { value: string; label: string }[];
   categories: { value: string; label: string }[];
   models: { value: string; label: string }[];
+  groups: { value: string; label: string }[];
   actions: { value: string; label: string }[];
 }
 
@@ -44,11 +35,11 @@ function MachinesPageContent() {
 
   const [machines, setMachines] = useState<MachineWithUtilization[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     companies: [],
     categories: [],
     models: [],
+    groups: [],
     actions: [
       { value: "NONE", label: "None" },
       { value: "TERMINATE", label: "Terminate" },
@@ -58,6 +49,7 @@ function MachinesPageContent() {
     ],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   // Add Machine dialog
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -68,6 +60,18 @@ function MachinesPageContent() {
     categoryId: "",
     modelName: "",
   });
+
+  // Escape key to close add bar
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showAddDialog) {
+        setShowAddDialog(false);
+        setNewMachine({ serialNumber: "", companyId: "", categoryId: "", modelName: "" });
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showAddDialog]);
 
   useEffect(() => {
     fetchData();
@@ -113,10 +117,6 @@ function MachinesPageContent() {
         id: c.id,
         name: c.name,
       })));
-      setCategories(categoriesArray.map((c: { id: string; name: string }) => ({
-        id: c.id,
-        name: c.name,
-      })));
 
       const modelSet = new Set<string>();
       machinesArray.forEach((m) => {
@@ -125,6 +125,13 @@ function MachinesPageContent() {
       const modelOptions = Array.from(modelSet)
         .sort()
         .map((name) => ({ value: name, label: name }));
+
+      const groupSet = new Set<string>();
+      machinesArray.forEach((m) => {
+        const g = (m.company as { companyGroup?: string | null })?.companyGroup;
+        if (g) groupSet.add(g);
+      });
+      const groupOptions = Array.from(groupSet).sort().map((g) => ({ value: g, label: g }));
 
       setFilterOptions({
         companies: companiesArray.map((c: { id: string; name: string }) => ({
@@ -136,6 +143,7 @@ function MachinesPageContent() {
           label: c.name,
         })),
         models: modelOptions,
+        groups: groupOptions,
         actions: [
           { value: "NONE", label: "None" },
           { value: "TERMINATE", label: "Terminate" },
@@ -146,6 +154,7 @@ function MachinesPageContent() {
       });
     } catch (error) {
       console.error("Failed to fetch data:", error);
+      toast.error("Failed to load machines data");
     } finally {
       setIsLoading(false);
     }
@@ -163,7 +172,6 @@ function MachinesPageContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             machineId,
-            action: machines.find((m) => m.id === machineId)?.action || "NONE",
             [field]: value,
           }),
         });
@@ -195,6 +203,7 @@ function MachinesPageContent() {
       }
     } catch (error) {
       console.error("Failed to update action:", error);
+      toast.error("Failed to save action");
     }
   }, [machines]);
 
@@ -208,7 +217,7 @@ function MachinesPageContent() {
       });
 
       if (!res.ok) {
-        console.error("Bulk action failed:", await res.text());
+        toast.error("Bulk action failed");
         return;
       }
 
@@ -226,6 +235,7 @@ function MachinesPageContent() {
       );
     } catch (error) {
       console.error("Failed to bulk update actions:", error);
+      toast.error("Failed to update actions");
     }
   }, []);
 
@@ -255,7 +265,7 @@ function MachinesPageContent() {
 
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || "Failed to add machine");
+        toast.error(err.error || "Failed to add machine");
         return;
       }
 
@@ -272,15 +282,17 @@ function MachinesPageContent() {
         action: "STAY" as const,
         upgradeTo: null,
         moveToCompanyId: null,
+        notes: null,
         utilization: undefined,
         currentRate: undefined,
       };
       setMachines((prev) => [newEntry, ...prev]);
       setShowAddDialog(false);
       setNewMachine({ serialNumber: "", companyId: "", categoryId: "", modelName: "" });
+      toast.success("Machine added successfully");
     } catch (error) {
       console.error("Failed to add machine:", error);
-      alert("Failed to add machine");
+      toast.error("Failed to add machine");
     } finally {
       setAddingMachine(false);
     }
@@ -302,8 +314,17 @@ function MachinesPageContent() {
   );
 
   const totalMachines = machines.length;
-  const totalBalance = machines.reduce((sum, m) => sum + m.currentBalance, 0);
   const uniqueStores = new Set(machines.map((m) => m.company.id)).size;
+
+  // Action summary counts (must be before early return to satisfy hooks rules)
+  const actionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    machines.forEach((m) => {
+      const a = m.action || "NONE";
+      counts[a] = (counts[a] || 0) + 1;
+    });
+    return counts;
+  }, [machines]);
 
   if (isLoading) {
     return (
@@ -315,39 +336,124 @@ function MachinesPageContent() {
 
   return (
     <AppShell>
-      <div className="space-y-4">
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <PageHeader
-            title="Machines"
-            description={`${totalMachines} active · ${uniqueStores} stores${storeFilter ? " · Filtered" : ""}`}
-          />
-          <Button onClick={() => setShowAddDialog(true)} size="sm">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold">Machines</h1>
+            <span className="text-xs text-muted-foreground">
+              {totalMachines} active · {uniqueStores} stores{storeFilter ? " · Filtered" : ""}
+            </span>
+          </div>
+          <Button onClick={() => setShowAddDialog((v) => !v)} size="sm" variant={showAddDialog ? "secondary" : "outline"}>
             <Plus className="h-4 w-4 mr-1" />
             Add Machine
           </Button>
         </div>
 
-        {/* Summary Stats */}
-        <div className="flex gap-4 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Total:</span>
-            <span className="font-mono font-bold">{formatNumber(totalMachines)}</span>
+        {/* Inline add machine bar */}
+        {showAddDialog && (
+          <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30">
+            <Select
+              value={newMachine.companyId}
+              onValueChange={(value) => setNewMachine((prev) => ({ ...prev, companyId: value }))}
+            >
+              <SelectTrigger className="h-8 w-[200px] text-xs">
+                <SelectValue placeholder="Store *" />
+              </SelectTrigger>
+              <SelectContent>
+                {stores.map((store) => (
+                  <SelectItem key={store.id} value={store.id}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Serial (optional)"
+              value={newMachine.serialNumber}
+              onChange={(e) => setNewMachine((prev) => ({ ...prev, serialNumber: e.target.value }))}
+              className="h-8 w-[180px] text-xs"
+            />
+            <Input
+              placeholder="Model (optional)"
+              value={newMachine.modelName}
+              onChange={(e) => setNewMachine((prev) => ({ ...prev, modelName: e.target.value }))}
+              className="h-8 w-[180px] text-xs"
+            />
+            <Button
+              size="sm"
+              className="h-8 text-xs"
+              onClick={handleAddMachine}
+              disabled={!newMachine.companyId || addingMachine}
+            >
+              {addingMachine ? "Adding..." : "Add"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs"
+              onClick={() => {
+                setShowAddDialog(false);
+                setNewMachine({ serialNumber: "", companyId: "", categoryId: "", modelName: "" });
+              }}
+            >
+              Cancel
+            </Button>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Balance:</span>
-            <span className="font-mono font-bold">{formatNumber(totalBalance)}</span>
-          </div>
+        )}
+
+        {/* Action summary pills (clickable to filter) */}
+        <div className="flex items-center gap-2 text-[11px]">
+          {([
+            { key: "STAY", label: "Stay", bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-400" },
+            { key: "TERMINATE", label: "Terminate", bg: "bg-red-50", text: "text-red-700", ring: "ring-red-400" },
+            { key: "TERMINATE_UPGRADE", label: "Upgrade", bg: "bg-orange-50", text: "text-orange-700", ring: "ring-orange-400" },
+            { key: "MOVE", label: "Move", bg: "bg-blue-50", text: "text-blue-700", ring: "ring-blue-400" },
+            { key: "NONE", label: "Unassigned", bg: "bg-muted", text: "text-muted-foreground", ring: "ring-gray-400" },
+          ] as const).map(({ key, label, bg, text, ring }) => {
+            if (!actionCounts[key]) return null;
+            const actionFilter = columnFilters.find((f) => f.id === "action");
+            const activeValues = (actionFilter?.value as string[] | undefined) ?? [];
+            const isActive = activeValues.includes(key);
+            return (
+              <button
+                key={key}
+                onClick={() => {
+                  setColumnFilters((prev) => {
+                    const existing = prev.find((f) => f.id === "action");
+                    const current = (existing?.value as string[] | undefined) ?? [];
+                    const next = isActive ? current.filter((v) => v !== key) : [...current, key];
+                    const without = prev.filter((f) => f.id !== "action");
+                    return next.length > 0 ? [...without, { id: "action", value: next }] : without;
+                  });
+                }}
+                className={`px-2 py-0.5 rounded-full font-medium transition-all cursor-pointer ${bg} ${text} ${isActive ? `ring-2 ${ring}` : "opacity-75 hover:opacity-100"}`}
+              >
+                {actionCounts[key]} {label}
+              </button>
+            );
+          })}
+          {columnFilters.some((f) => f.id === "action") && (
+            <button
+              onClick={() => setColumnFilters((prev) => prev.filter((f) => f.id !== "action"))}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
 
-        {/* Data Table */}
-        <Card>
-          <CardContent className="p-3">
-            <DataTable
+        <DataTable
               columns={columns}
               data={machines}
               tableId="machines"
               searchPlaceholder="Search serial, model, store..."
               filterColumns={[
+                {
+                  key: "companyGroup",
+                  label: "Group",
+                  options: filterOptions.groups,
+                },
                 {
                   key: "companyName",
                   label: "Store",
@@ -372,6 +478,8 @@ function MachinesPageContent() {
               exportFileName="jetline-machines"
               pageSize={99999}
               enableRowSelection
+              externalColumnFilters={columnFilters}
+              onExternalColumnFiltersChange={setColumnFilters}
               onBulkAction={handleBulkAction}
               bulkActions={[
                 { value: "TERMINATE", label: "Set Terminate" },
@@ -380,85 +488,16 @@ function MachinesPageContent() {
                 { value: "MOVE", label: "Set Move" },
                 { value: "NONE", label: "Clear Action" },
               ]}
+              getRowClassName={(row: MachineWithUtilization) => {
+                const a = row.action;
+                if (a === "TERMINATE") return "bg-red-50/50";
+                if (a === "TERMINATE_UPGRADE") return "bg-orange-50/50";
+                if (a === "STAY") return "bg-emerald-50/40";
+                if (a === "MOVE") return "bg-blue-50/50";
+                return "";
+              }}
             />
-          </CardContent>
-        </Card>
 
-        {/* Add Machine Dialog */}
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add New Machine</DialogTitle>
-              <DialogDescription>
-                Add a planned machine. Leave serial blank for machines not yet received — it will sync automatically once a serial is captured and exists in BMS.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="add-serial">Serial Number (optional)</Label>
-                <Input
-                  id="add-serial"
-                  placeholder="Leave blank for planned machines"
-                  value={newMachine.serialNumber}
-                  onChange={(e) => setNewMachine((prev) => ({ ...prev, serialNumber: e.target.value }))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="add-store">Store *</Label>
-                <Select
-                  value={newMachine.companyId}
-                  onValueChange={(value) => setNewMachine((prev) => ({ ...prev, companyId: value }))}
-                >
-                  <SelectTrigger id="add-store">
-                    <SelectValue placeholder="Select store" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="add-category">Category</Label>
-                <Select
-                  value={newMachine.categoryId}
-                  onValueChange={(value) => setNewMachine((prev) => ({ ...prev, categoryId: value }))}
-                >
-                  <SelectTrigger id="add-category">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="add-model">Model Name</Label>
-                <Input
-                  id="add-model"
-                  placeholder="e.g., Xerox VersaLink C7025"
-                  value={newMachine.modelName}
-                  onChange={(e) => setNewMachine((prev) => ({ ...prev, modelName: e.target.value }))}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddMachine} disabled={!newMachine.companyId || addingMachine}>
-                {addingMachine ? "Adding..." : "Add Machine"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </AppShell>
   );

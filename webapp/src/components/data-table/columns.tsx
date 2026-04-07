@@ -16,20 +16,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowRight, Printer, Banknote } from "lucide-react";
+import { ArrowRight, Pencil } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { formatNumber, formatDate, cn } from "@/lib/utils";
 import type { MachineWithUtilization } from "@/types";
 
-function formatRate(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return `${(value * 100).toFixed(2)}c`;
-}
-
-function formatCostShort(value: number): string {
+function formatCost(value: number): string {
   if (value === 0) return "—";
-  if (value < 1000) return `R${value.toFixed(0)}`;
-  if (value < 1000000) return `R${(value / 1000).toFixed(1)}k`;
-  return `R${(value / 1000000).toFixed(2)}m`;
+  return `R${value.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export interface StoreOption {
@@ -53,6 +47,64 @@ const ACTION_COLORS: Record<string, string> = {
   MOVE: "text-blue-700 font-medium",
 };
 
+function InlineNotesCell({
+  value,
+  onSave,
+  placeholder = "Add note...",
+}: {
+  value: string | null;
+  onSave: (val: string) => void;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const save = () => {
+    setEditing(false);
+    if (draft !== (value || "")) {
+      onSave(draft);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="w-full min-w-[120px] h-7 px-1.5 text-xs border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") { setDraft(value || ""); setEditing(false); }
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-1 cursor-text min-w-[80px] group"
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+    >
+      {value ? (
+        <span className="text-xs truncate max-w-[150px]">{value}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
+          <Pencil className="h-3 w-3 inline mr-0.5" />
+          {placeholder}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function createMachineColumns(
   stores: StoreOption[] = [],
   modelNames: string[] = [],
@@ -71,20 +123,42 @@ export function createMachineColumns(
     // --- Core identification ---
     {
       accessorKey: "serialNumber",
-      header: "Serial Number",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Printer className="h-4 w-4 text-muted-foreground" />
-          <span className="font-mono text-sm">{row.getValue("serialNumber")}</span>
-        </div>
-      ),
+      header: "Serial",
+      cell: ({ row }) => {
+        const serial = row.getValue("serialNumber") as string;
+        const isPlanned = serial?.startsWith("PLANNED-");
+        if (isPlanned) {
+          return (
+            <div className="flex items-center gap-1">
+              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-300">
+                Planned
+              </Badge>
+              <InlineNotesCell
+                value=""
+                placeholder="Enter serial..."
+                onSave={(val) => {
+                  if (val.trim()) handleActionUpdate(row.original.id, "serialNumber", val.trim());
+                }}
+              />
+            </div>
+          );
+        }
+        return (
+          <span className="font-mono text-xs">{serial}</span>
+        );
+      },
     },
     {
       id: "companyName",
       accessorFn: (row) => row.company?.name,
       header: "Store",
       cell: ({ row }) => row.original.company?.name || "-",
-      filterFn: (row, id, value) => row.original.company?.name === value,
+    },
+    {
+      id: "companyGroup",
+      accessorFn: (row) => row.company?.companyGroup,
+      header: "Group",
+      cell: ({ row }) => row.original.company?.companyGroup || "-",
     },
     {
       id: "categoryName",
@@ -105,7 +179,6 @@ export function createMachineColumns(
           </Badge>
         );
       },
-      filterFn: (row, id, value) => row.original.category?.name === value,
     },
     {
       accessorKey: "modelName",
@@ -115,7 +188,6 @@ export function createMachineColumns(
           {row.getValue("modelName") || "-"}
         </span>
       ),
-      filterFn: (row, id, value) => row.original.modelName === value,
     },
 
     // --- Volume group: MTD, 3M, 6M, 12M, Monthly Avg, Balance ---
@@ -179,51 +251,35 @@ export function createMachineColumns(
       ),
     },
 
-    // --- Rates ---
+    // --- Cost (from Xerox billing) ---
     {
-      id: "rateA4Mono",
-      accessorFn: (row) => row.currentRate?.a4Mono ?? null,
-      header: "A4 Mono",
+      id: "xeroxCost",
+      accessorFn: (row) => row.utilization?.xeroxCost ?? null,
+      header: "Cost",
       cell: ({ row }) => {
-        const rate = row.original.currentRate;
-        if (!rate?.a4Mono) return <span className="text-muted-foreground text-xs">—</span>;
+        const utilization = row.original.utilization;
+        if (utilization?.xeroxCost == null || utilization.xeroxCost === 0) {
+          return <span className="text-muted-foreground text-xs">{"\u2014"}</span>;
+        }
         return (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="font-mono text-xs text-gray-700">{formatRate(rate.a4Mono)}</span>
+                <span className="font-mono text-xs font-medium">
+                  {formatCost(utilization.xeroxCost)}
+                </span>
               </TooltipTrigger>
               <TooltipContent>
                 <div className="space-y-1">
-                  <p className="font-medium">A4 Mono Rate</p>
-                  <p className="text-xs text-muted-foreground">Effective: {formatDate(rate.ratesFrom)}</p>
-                  {rate.a3Mono && <p className="text-xs">A3 Mono: {formatRate(rate.a3Mono)}</p>}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-      },
-    },
-    {
-      id: "rateA4Colour",
-      accessorFn: (row) => row.currentRate?.a4Colour ?? null,
-      header: "A4 Colour",
-      cell: ({ row }) => {
-        const rate = row.original.currentRate;
-        if (!rate?.a4Colour) return <span className="text-muted-foreground text-xs">—</span>;
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="font-mono text-xs text-blue-700">{formatRate(rate.a4Colour)}</span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="space-y-1">
-                  <p className="font-medium">A4 Colour Rate</p>
-                  <p className="text-xs text-muted-foreground">Effective: {formatDate(rate.ratesFrom)}</p>
-                  {rate.a3Colour && <p className="text-xs">A3 Colour: {formatRate(rate.a3Colour)}</p>}
-                  {rate.colourExtraLarge && <p className="text-xs">Extra Large: {formatRate(rate.colourExtraLarge)}</p>}
+                  <p className="font-medium">Xerox Charges ({utilization.xeroxBillingMonth})</p>
+                  <div className="text-xs space-y-0.5">
+                    {utilization.xeroxRental != null && utilization.xeroxRental > 0 && (
+                      <p>Rental: {formatCost(utilization.xeroxRental)}</p>
+                    )}
+                    {utilization.xeroxVolumeCharges != null && utilization.xeroxVolumeCharges > 0 && (
+                      <p>Volume: {formatCost(utilization.xeroxVolumeCharges)}</p>
+                    )}
+                  </div>
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -232,46 +288,20 @@ export function createMachineColumns(
       },
     },
 
-    // --- FSMA Cost ---
+    // --- Rate (CPC from Xerox billing) ---
     {
-      id: "monthlyCost",
-      accessorFn: (row) => row.utilization?.monthlyCost ?? 0,
-      header: "FSMA Cost",
+      id: "xeroxRate",
+      accessorFn: (row) => row.utilization?.xeroxCpc ?? null,
+      header: "Rate",
       cell: ({ row }) => {
-        const utilization = row.original.utilization;
-        if (!utilization?.hasRates || utilization.monthlyCost === 0) {
-          return <span className="text-muted-foreground text-xs">—</span>;
+        const cpc = row.original.utilization?.xeroxCpc;
+        if (cpc == null) {
+          return <span className="text-muted-foreground text-xs">{"\u2014"}</span>;
         }
         return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1">
-                  <Banknote className="h-3 w-3 text-red-600" />
-                  <span className="font-mono text-xs font-medium text-red-700">
-                    {formatCostShort(utilization.monthlyCost)}
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="space-y-1">
-                  <p className="font-medium">Monthly FSMA Lease Cost (Volume × Rates)</p>
-                  <div className="text-xs space-y-0.5">
-                    <p className="text-gray-600">
-                      Mono: R{utilization.monoCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-blue-600">
-                      Colour: R{utilization.colourCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
-                    </p>
-                    <hr className="my-1" />
-                    <p className="font-medium">
-                      Total: R{utilization.monthlyCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <span className="font-mono text-xs">
+            {cpc.toFixed(2)}c
+          </span>
         );
       },
     },
@@ -308,7 +338,6 @@ export function createMachineColumns(
           </Select>
         );
       },
-      filterFn: (row, id, value) => (row.original.action || "NONE") === value,
     },
 
     // --- Action Result (contextual: store dropdown for Move, model dropdown for Upgrade) ---
@@ -387,6 +416,22 @@ export function createMachineColumns(
       },
     },
 
+    // --- Notes ---
+    {
+      accessorKey: "notes",
+      header: "Notes",
+      cell: ({ row }) => {
+        const machine = row.original;
+        return (
+          <InlineNotesCell
+            value={machine.notes}
+            onSave={(val) => handleActionUpdate(machine.id, "notes", val)}
+          />
+        );
+      },
+      enableSorting: false,
+    },
+
     // --- Contract ---
     {
       accessorKey: "rentalMonthsRemaining",
@@ -432,11 +477,18 @@ export function createMachineColumns(
     {
       accessorKey: "lastReadingDate",
       header: "Last Reading",
-      cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">
-          {formatDate(row.getValue("lastReadingDate"))}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const date = row.getValue("lastReadingDate") as string | null;
+        if (!date) return <span className="text-muted-foreground text-xs">—</span>;
+        const daysSince = Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
+        const isStale = daysSince > 30;
+        return (
+          <span className={cn("text-xs", isStale ? "text-amber-600 font-medium" : "text-muted-foreground")}>
+            {isStale && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 align-middle" />}
+            {formatDate(date)}
+          </span>
+        );
+      },
     },
 
     // --- Navigate arrow (replaces triple-dot menu) ---
@@ -459,4 +511,3 @@ export function createMachineColumns(
   ];
 }
 
-export const machineColumns = createMachineColumns();

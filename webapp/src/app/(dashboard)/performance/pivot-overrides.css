@@ -1,0 +1,240 @@
+/* Override react-pivottable styles to match shadcn neutral theme */
+
+.pivot-container {
+  width: 100%;
+}
+
+.pvtUi {
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  color: var(--foreground);
+  font-size: 12px;
+  width: 100%;
+}
+
+.pvtUi select {
+  font-size: 11px;
+}
+
+/* Axis containers (filter/row/col/val drop zones) */
+.pvtAxisContainer,
+.pvtVals {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 4px;
+}
+
+/* Unused fields list — allow wrapping but constrain width */
+.pvtAxisContainer.pvtHorizList {
+  max-width: 200px;
+}
+
+/* Vertical lists (row/col drop zones) */
+.pvtAxisContainer.pvtVertList {
+  max-width: 200px;
+}
+
+/* Value drop zone */
+.pvtVals {
+  max-width: 200px;
+  padding-bottom: 6px;
+}
+
+/* Renderer dropdown area */
+.pvtRenderers {
+  padding-left: 4px;
+}
+
+/* Dropdown width */
+.pvtDropdownCurrent {
+  width: 160px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--foreground);
+  font-size: 11px;
+}
+
+.pvtDropdownCurrentOpen {
+  border-radius: 6px 6px 0 0;
+}
+
+.pvtDropdownMenu {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: 0 0 6px 6px;
+  z-index: 50;
+}
+
+.pvtDropdownValue {
+  padding: 3px 6px;
+  font-size: 11px;
+  color: var(--popover-foreground);
+}
+
+.pvtDropdownActiveValue {
+  background: var(--secondary);
+}
+
+.pvtDropdownIcon {
+  color: var(--muted-foreground);
+}
+
+/* Draggable field pills */
+.pvtAxisContainer li {
+  padding: 3px 3px;
+}
+
+.pvtAxisContainer li span.pvtAttr {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.pvtAxisContainer li.pvtPlaceholder {
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+}
+
+/* Triangle (filter indicator) */
+.pvtTriangle {
+  color: var(--muted-foreground);
+}
+
+/* Pivot output table */
+table.pvtTable {
+  font-size: 11px;
+  text-align: left;
+  border-collapse: collapse;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  margin-top: 4px;
+  margin-left: 0;
+}
+
+table.pvtTable thead tr th,
+table.pvtTable tbody tr th {
+  background-color: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  font-weight: 500;
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+table.pvtTable tbody tr td {
+  color: var(--foreground);
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+/* Grand totals */
+.pvtTotal,
+.pvtGrandTotal {
+  font-weight: 600;
+}
+
+table.pvtTable tbody tr td.pvtTotal,
+table.pvtTable tbody tr td.pvtGrandTotal,
+table.pvtTable thead tr th.pvtTotalLabel {
+  background-color: var(--muted) !important;
+  font-weight: 600;
+}
+
+/* Sort arrows */
+.pvtRowOrder,
+.pvtColOrder {
+  color: var(--muted-foreground);
+}
+
+/* Filter box (popup) */
+.pvtFilterBox {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.pvtFilterBox h4 {
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.pvtFilterBox input[type="text"] {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.pvtFilterBox input[type="text"]:focus {
+  border-color: var(--ring);
+  outline: none;
+}
+
+.pvtCheckContainer {
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.pvtCheckContainer p.selected {
+  background: var(--secondary);
+}
+
+/* Buttons in filter box */
+.pvtButton {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.pvtButton:hover {
+  background: var(--muted);
+}
+
+/* Drag handle */
+.pvtDragHandle {
+  color: var(--muted-foreground);
+}
+
+/* Close X */
+.pvtCloseX {
+  color: var(--muted-foreground);
+}
+
+/* Output area: scrollable */
+td.pvtOutput {
+  vertical-align: top;
+  overflow: auto;
+  max-height: calc(100vh - 280px);
+}
+
+.pvtUi td {
+  vertical-align: top;
+}
+
+/* Row labels area */
+.pvtRows {
+  min-height: 28px;
+}
+
+/* Column labels area */
+.pvtCols {
+  min-height: 28px;
+}

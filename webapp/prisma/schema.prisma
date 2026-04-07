@@ -19,6 +19,7 @@ model Company {
   bmsSchema   String    @unique @map("bms_schema") // BMS database name (e.g., "menlynbms2")
   bmsHost     String?   @map("bms_host") // Database hostname
   region      String?   // Geographic region
+  companyGroup String?  @map("company_group") // Business group (e.g., "JCP Group", "Copper Moon")
   isActive    Boolean   @default(true) @map("is_active")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -101,6 +102,7 @@ model Machine {
   action                MachineAction @default(NONE) @map("action")
   upgradeTo             String?       @map("upgrade_to") // Model name for TERMINATE_UPGRADE
   moveToCompanyId       String?       @map("move_to_company_id") // Target store for MOVE
+  notes                 String?       @map("notes") // Free-text notes for planning context
 
   // Current state (latest reading summary)
   currentBalance        Int           @default(0) @map("current_balance")
@@ -117,6 +119,7 @@ model Machine {
   model                 PrinterModel? @relation(fields: [modelId], references: [id])
   readings              MeterReading[]
   rates                 MachineRate[]
+  xeroxBillings         XeroxBilling[]
   scenarioMachines      ScenarioMachine[]
 
   @@index([companyId])
@@ -178,6 +181,9 @@ model MeterReading {
   forBilling          Boolean   @default(false) @map("for_billing")
   isOpeningReading    Boolean   @default(false) @map("is_opening_reading")
   isClosingReading    Boolean   @default(false) @map("is_closing_reading")
+
+  // Anomaly flag — tagged readings are excluded from performance aggregation
+  isAnomaly           Boolean   @default(false) @map("is_anomaly")
 
   // Metadata
   source              String    @default("BMS") // BMS or XEROX
@@ -254,10 +260,12 @@ model SyncLog {
   id                String     @id @default(cuid())
   syncType          String     @map("sync_type") // FULL, INCREMENTAL, COMPANY
   targetCompany     String?    @map("target_company") // If syncing specific company
+  currentCompany    String?    @map("current_company") // Company currently being synced
   startedAt         DateTime   @map("started_at")
   completedAt       DateTime?  @map("completed_at")
 
   // Stats
+  totalCompanies     Int       @default(0) @map("total_companies") // Total companies to sync
   companiesProcessed Int       @default(0) @map("companies_processed")
   machinesProcessed  Int       @default(0) @map("machines_processed")
   readingsProcessed  Int       @default(0) @map("readings_processed")
@@ -333,4 +341,91 @@ model MachineRate {
   @@index([ratesFrom])
   @@index([machineId, ratesFrom])
   @@map("machine_rates")
+}
+
+// =============================================================================
+// XEROX BILLING - Actual charges from Xerox invoices (source of truth)
+// =============================================================================
+
+model XeroxBilling {
+  id                String    @id @default(cuid())
+
+  // Key identifiers
+  serialNumber      String    @map("serial_number")
+  billingMonth      String    @map("billing_month")       // YYYY-MM (actual usage month)
+  printType         String    @default("") @map("print_type") // "A4 Mono", "A3 Mono", "A4 Color", "A3 Color", "" for no type
+  lineDescription   String?   @map("line_description") // "Black Impressions", "Color Large Impressions", etc. — used for BMS counter mapping
+  lineIndex         Int       @default(0) @map("line_index") // Distinguishes duplicate print types for same serial (e.g. two A3 Color rows)
+
+  // Invoice info
+  invoiceMonth      String    @map("invoice_month")        // YYYY-MM (month Xerox billed)
+  invoiceDate       DateTime? @map("invoice_date")
+  invoiceNumber     String?   @map("invoice_number")
+
+  // Contract info
+  contractNumber    String?   @map("contract_number")
+  contractStartDate DateTime? @map("contract_start_date")
+  contractEndDate   DateTime? @map("contract_end_date")
+  contractStatus    String?   @map("contract_status")
+
+  // Product & customer
+  product           String?
+  customer          String?
+  customerAccount   String?   @map("customer_account")
+  siteCustomer      String?   @map("site_customer")
+  locationAddress   String?   @map("location_address")
+
+  // Financial charges (ZAR, ex-VAT)
+  rental            Decimal?  @db.Decimal(12, 2)
+  fixedCharge       Decimal?  @map("fixed_charge") @db.Decimal(12, 2)
+  otherCharge       Decimal?  @map("other_charge") @db.Decimal(12, 2)
+  volumeCharges     Decimal?  @map("volume_charges") @db.Decimal(12, 2)
+  totalCharges      Decimal?  @map("total_charges") @db.Decimal(12, 2)
+
+  // Meter readings from Xerox
+  readingDate       DateTime? @map("reading_date")
+  currentReading    Int?      @map("current_reading")
+  previousReading   Int?      @map("previous_reading")
+
+  // Volumes per print type
+  volumeA4Mono      Int?      @map("volume_a4_mono")
+  volumeA3Mono      Int?      @map("volume_a3_mono")
+  volumeA4Color     Int?      @map("volume_a4_color")
+  volumeA3Color     Int?      @map("volume_a3_color")
+  totalClicks       Int?      @map("total_clicks")
+
+  // Cost per click
+  cpc               Decimal?  @db.Decimal(12, 6)
+
+  // Coverage period
+  coverageFrom      DateTime? @map("coverage_from")
+  coverageTo        DateTime? @map("coverage_to")
+
+  // Machine FK (nullable -- some Xerox serials may not be in our BMS)
+  machineId         String?   @map("machine_id")
+  machine           Machine?  @relation(fields: [machineId], references: [id])
+
+  // Audit
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([serialNumber, billingMonth, printType, lineIndex], name: "xerox_billing_unique")
+  @@index([serialNumber])
+  @@index([billingMonth])
+  @@index([machineId])
+  @@map("xerox_billings")
+}
+
+// =============================================================================
+// PIVOT VIEWS (shared across all users)
+// =============================================================================
+
+model PivotView {
+  id         String   @id @default(cuid())
+  name       String
+  pivotState Json     @map("pivot_state")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("pivot_views")
 }

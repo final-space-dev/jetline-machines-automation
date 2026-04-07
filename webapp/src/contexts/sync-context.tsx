@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 
 export interface SyncCompanyResult {
   company: string;
@@ -21,6 +21,8 @@ export interface SyncState {
   companyResults: SyncCompanyResult[];
   totalMachines: number;
   totalReadings: number;
+  totalCompanies: number;
+  companiesProcessed: number;
   error: string | null;
 }
 
@@ -37,7 +39,7 @@ interface SyncContextType {
   syncState: SyncState;
   notifications: Notification[];
   unreadCount: number;
-  startSync: () => Promise<void>;
+  startSync: () => void;
   togglePanel: () => void;
   closePanel: () => void;
   markNotificationRead: (id: string) => void;
@@ -55,6 +57,8 @@ const initialSyncState: SyncState = {
   companyResults: [],
   totalMachines: 0,
   totalReadings: 0,
+  totalCompanies: 0,
+  companiesProcessed: 0,
   error: null,
 };
 
@@ -63,6 +67,7 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 export function SyncProvider({ children }: { children: ReactNode }) {
   const [syncState, setSyncState] = useState<SyncState>(initialSyncState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const addNotification = useCallback((notification: Omit<Notification, "id" | "timestamp" | "read">) => {
     const newNotification: Notification = {
@@ -71,10 +76,127 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       timestamp: new Date(),
       read: false,
     };
-    setNotifications((prev) => [newNotification, ...prev].slice(0, 50)); // Keep last 50
+    setNotifications((prev) => [newNotification, ...prev].slice(0, 50));
   }, []);
 
-  const startSync = useCallback(async () => {
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const pollSyncStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/sync?current=true");
+      const data = await res.json();
+
+      if (data.running) {
+        const progress = data.totalCompanies > 0
+          ? Math.round((data.companiesProcessed / data.totalCompanies) * 100)
+          : 0;
+
+        setSyncState((prev) => ({
+          ...prev,
+          isSyncing: true,
+          isOpen: true,
+          currentCompany: data.currentCompany,
+          progress,
+          totalMachines: data.machinesProcessed,
+          totalReadings: data.readingsProcessed,
+          totalCompanies: data.totalCompanies,
+          companiesProcessed: data.companiesProcessed,
+          startedAt: prev.startedAt || new Date(data.startedAt),
+        }));
+      } else {
+        // Sync finished (or was never running)
+        stopPolling();
+
+        const last = data.lastCompleted;
+        if (last) {
+          setSyncState((prev) => {
+            // Only update if we were actually tracking a sync
+            if (!prev.isSyncing) return prev;
+
+            return {
+              ...prev,
+              isSyncing: false,
+              progress: 100,
+              currentCompany: null,
+              completedAt: new Date(last.completedAt),
+              totalMachines: last.machinesProcessed,
+              totalReadings: last.readingsProcessed,
+              companiesProcessed: last.companiesProcessed,
+              error: last.status === "FAILED" ? (last.errors || "Sync failed") : null,
+            };
+          });
+
+          // Check if this was a completion we haven't notified about
+          setSyncState((prev) => {
+            if (prev.completedAt && prev.isSyncing === false && prev.progress === 100) {
+              if (!prev.error) {
+                addNotification({
+                  title: "Sync Completed",
+                  message: `Synced ${last.machinesProcessed} machines and ${last.readingsProcessed} readings`,
+                  type: "success",
+                });
+              } else {
+                addNotification({
+                  title: "Sync Failed",
+                  message: prev.error,
+                  type: "error",
+                });
+              }
+            }
+            return prev;
+          });
+        }
+      }
+    } catch {
+      // Network error during poll — keep trying
+    }
+  }, [addNotification, stopPolling]);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    // Poll immediately, then every 2 seconds
+    pollSyncStatus();
+    pollingRef.current = setInterval(pollSyncStatus, 2000);
+  }, [pollSyncStatus, stopPolling]);
+
+  // On mount: check if there's already a running sync (page refresh recovery)
+  useEffect(() => {
+    const checkRunningSync = async () => {
+      try {
+        const res = await fetch("/api/sync?current=true");
+        const data = await res.json();
+        if (data.running) {
+          // Restore syncing state and start polling
+          setSyncState((prev) => ({
+            ...prev,
+            isSyncing: true,
+            isOpen: true,
+            startedAt: new Date(data.startedAt),
+            currentCompany: data.currentCompany,
+            totalCompanies: data.totalCompanies,
+            companiesProcessed: data.companiesProcessed,
+            totalMachines: data.machinesProcessed,
+            totalReadings: data.readingsProcessed,
+            progress: data.totalCompanies > 0
+              ? Math.round((data.companiesProcessed / data.totalCompanies) * 100)
+              : 0,
+          }));
+          startPolling();
+        }
+      } catch {
+        // Ignore — server might be unreachable
+      }
+    };
+    checkRunningSync();
+    return stopPolling;
+  }, [startPolling, stopPolling]);
+
+  const startSync = useCallback(() => {
     setSyncState((prev) => ({
       ...prev,
       isOpen: true,
@@ -86,6 +208,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       companyResults: [],
       totalMachines: 0,
       totalReadings: 0,
+      totalCompanies: 0,
+      companiesProcessed: 0,
       error: null,
     }));
 
@@ -95,92 +219,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       type: "info",
     });
 
-    try {
-      // First, get the list of companies to show progress
-      const companiesRes = await fetch("/api/companies");
-      const companiesData = await companiesRes.json();
+    // Fire-and-forget: don't await the POST
+    fetch("/api/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "full" }),
+    }).catch(() => {
+      // POST errors are caught via polling status
+    });
 
-      // Handle API error responses
-      const companies = Array.isArray(companiesData) ? companiesData : [];
-
-      // Initialize company results
-      const initialResults: SyncCompanyResult[] = companies
-        .filter((c: { isActive: boolean }) => c.isActive)
-        .map((c: { name: string }) => ({
-          company: c.name,
-          machines: 0,
-          readings: 0,
-          errors: 0,
-          duration: 0,
-          status: "pending" as const,
-        }));
-
-      setSyncState((prev) => ({
-        ...prev,
-        companyResults: initialResults,
-      }));
-
-      // Start the actual sync
-      const res = await fetch("/api/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "full" }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        // Update with final results
-        const finalResults: SyncCompanyResult[] = data.companyResults.map((r: {
-          company: string;
-          machines: number;
-          readings: number;
-          errors: number;
-          duration: number;
-        }) => ({
-          company: r.company,
-          machines: r.machines,
-          readings: r.readings,
-          errors: r.errors,
-          duration: r.duration,
-          status: r.errors > 0 ? "error" : "completed",
-        }));
-
-        setSyncState((prev) => ({
-          ...prev,
-          isSyncing: false,
-          progress: 100,
-          completedAt: new Date(),
-          companyResults: finalResults,
-          totalMachines: data.summary.totalMachines,
-          totalReadings: data.summary.totalReadings,
-        }));
-
-        addNotification({
-          title: "Sync Completed",
-          message: `Synced ${data.summary.totalMachines} machines and ${data.summary.totalReadings} readings`,
-          type: "success",
-        });
-      } else {
-        throw new Error(data.details || "Sync failed");
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-      setSyncState((prev) => ({
-        ...prev,
-        isSyncing: false,
-        completedAt: new Date(),
-        error: errorMessage,
-      }));
-
-      addNotification({
-        title: "Sync Failed",
-        message: errorMessage,
-        type: "error",
-      });
-    }
-  }, [addNotification]);
+    // Start polling for progress
+    startPolling();
+  }, [addNotification, startPolling]);
 
   const togglePanel = useCallback(() => {
     setSyncState((prev) => ({ ...prev, isOpen: !prev.isOpen }));

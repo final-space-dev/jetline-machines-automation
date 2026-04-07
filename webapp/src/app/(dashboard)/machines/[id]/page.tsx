@@ -31,7 +31,6 @@ import {
   AlertTriangle,
   Lightbulb,
   Calendar,
-  Banknote,
 } from "lucide-react";
 import { formatNumber, formatDate, cn, getStatusVariant } from "@/lib/utils";
 import { utilizationConfig, type UtilizationStatus } from "@/components/ui/utilization-badge";
@@ -53,6 +52,16 @@ interface MonthlyReading {
   change: number | null;
 }
 
+interface BillingMonth {
+  billingMonth: string;
+  rental: number;
+  fixedCharge: number;
+  volumeCharges: number;
+  otherCharge: number;
+  totalCharges: number;
+  totalClicks: number;
+}
+
 export default function MachineDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -62,6 +71,7 @@ export default function MachineDetailPage() {
   const [utilization, setUtilization] = useState<MachineUtilization | null>(null);
   const [monthlyReadings, setMonthlyReadings] = useState<MonthlyReading[]>([]);
   const [currentRate, setCurrentRate] = useState<MachineRate | null>(null);
+  const [billingHistory, setBillingHistory] = useState<BillingMonth[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>("");
@@ -73,12 +83,13 @@ export default function MachineDetailPage() {
 
   const fetchData = async () => {
     try {
-      const [machineRes, readingsRes, utilizationRes, companiesRes, ratesRes] = await Promise.all([
+      const [machineRes, readingsRes, utilizationRes, companiesRes, ratesRes, billingRes] = await Promise.all([
         fetch(`/api/machines/${machineId}`),
         fetch(`/api/machines/${machineId}/readings?months=${period}`),
         fetch(`/api/machines/utilization`),
         fetch("/api/companies"),
         fetch(`/api/machines/rates?machineId=${machineId}&current=true`),
+        fetch(`/api/machines/${machineId}/billing`),
       ]);
 
       const machineData = await machineRes.json();
@@ -86,6 +97,7 @@ export default function MachineDetailPage() {
       const utilizationData = await utilizationRes.json();
       const companiesData = await companiesRes.json();
       const ratesData = await ratesRes.json();
+      const billingData = await billingRes.json();
 
       // Handle API error responses
       const companiesArray = Array.isArray(companiesData) ? companiesData : [];
@@ -102,6 +114,7 @@ export default function MachineDetailPage() {
       setMachine(machineData?.id ? machineData : null);
       setUtilization(machineUtilization);
       setMonthlyReadings(Array.isArray(readingsData?.monthly) ? readingsData.monthly : []);
+      setBillingHistory(Array.isArray(billingData?.months) ? billingData.months : []);
       setStores(companiesArray.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
       setSelectedStore(machineData.companyId);
     } catch (error) {
@@ -448,6 +461,74 @@ export default function MachineDetailPage() {
                 )}
               </CardContent>
             </Card>
+            {/* Billing History (from Xerox imports) */}
+            {billingHistory.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm">
+                    Billing History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50 border-y">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-medium sticky left-0 bg-muted/50">Metric</th>
+                          {billingHistory.map((b) => (
+                            <th key={b.billingMonth} className="px-2 py-1.5 text-right font-medium whitespace-nowrap">
+                              {b.billingMonth}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        <tr className="bg-green-50/30">
+                          <td className="px-2 py-1.5 font-medium text-green-700 sticky left-0 bg-green-50/30">Total Charges</td>
+                          {billingHistory.map((b) => (
+                            <td key={b.billingMonth} className="px-2 py-1.5 text-right font-mono font-medium text-green-700">
+                              R{b.totalCharges.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                        </tr>
+                        <tr>
+                          <td className="px-2 py-1.5 font-medium text-muted-foreground sticky left-0 bg-background">Volume Charges</td>
+                          {billingHistory.map((b) => (
+                            <td key={b.billingMonth} className="px-2 py-1.5 text-right font-mono">
+                              R{b.volumeCharges.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                        </tr>
+                        <tr>
+                          <td className="px-2 py-1.5 font-medium text-muted-foreground sticky left-0 bg-background">Rental</td>
+                          {billingHistory.map((b) => (
+                            <td key={b.billingMonth} className="px-2 py-1.5 text-right font-mono">
+                              {b.rental > 0 ? `R${b.rental.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "\u2014"}
+                            </td>
+                          ))}
+                        </tr>
+                        <tr>
+                          <td className="px-2 py-1.5 font-medium text-muted-foreground sticky left-0 bg-background">Fixed Charge</td>
+                          {billingHistory.map((b) => (
+                            <td key={b.billingMonth} className="px-2 py-1.5 text-right font-mono">
+                              {b.fixedCharge > 0 ? `R${b.fixedCharge.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "\u2014"}
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="bg-blue-50/30">
+                          <td className="px-2 py-1.5 font-medium sticky left-0 bg-blue-50/30">Total Clicks</td>
+                          {billingHistory.map((b) => (
+                            <td key={b.billingMonth} className="px-2 py-1.5 text-right font-mono font-medium">
+                              {b.totalClicks > 0 ? formatNumber(b.totalClicks) : "\u2014"}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column - Key Metrics & Actions */}
@@ -519,7 +600,7 @@ export default function MachineDetailPage() {
               <Card>
                 <CardHeader className="pb-2 pt-3 px-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm">Current Rates</CardTitle>
+                    <CardTitle className="text-sm">Rates</CardTitle>
                     <span className="text-[10px] text-muted-foreground">
                       From: {formatDate(currentRate.ratesFrom)}
                     </span>
@@ -569,41 +650,44 @@ export default function MachineDetailPage() {
               </Card>
             )}
 
-            {/* Monthly FSMA Cost Card */}
-            {utilization && utilization.hasRates && utilization.monthlyCost > 0 && (
-              <Card className="border-l-4 border-l-red-500">
+            {/* Cost Card (from Xerox billing) */}
+            {billingHistory.length > 0 && (
+              <Card>
                 <CardHeader className="pb-2 pt-3 px-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm flex items-center gap-1.5">
-                      <Banknote className="h-4 w-4 text-red-600" />
-                      Monthly FSMA Cost
-                    </CardTitle>
-                  </div>
+                  <CardTitle className="text-sm">
+                    Cost ({billingHistory[0].billingMonth})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 px-3 pb-3 text-xs">
                   <div className="text-center py-2">
-                    <p className="text-2xl font-bold text-red-700 font-mono">
-                      R{utilization.monthlyCost.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <p className="text-2xl font-bold font-mono">
+                      R{billingHistory[0].totalCharges.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">Volume × Rates = Cost to FSMA</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                    <div className="bg-gray-50 rounded-lg p-2 text-center">
-                      <p className="text-[10px] text-muted-foreground">Mono</p>
-                      <p className="font-mono font-medium text-gray-700">
-                        R{utilization.monoCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    <div className="bg-muted/50 rounded-lg p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground">Volume</p>
+                      <p className="font-mono font-medium">
+                        R{billingHistory[0].volumeCharges.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                       </p>
                     </div>
-                    <div className="bg-blue-50 rounded-lg p-2 text-center">
-                      <p className="text-[10px] text-muted-foreground">Colour</p>
-                      <p className="font-mono font-medium text-blue-700">
-                        R{utilization.colourCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    <div className="bg-muted/50 rounded-lg p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground">Rental</p>
+                      <p className="font-mono font-medium">
+                        {billingHistory[0].rental > 0 ? `R${billingHistory[0].rental.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "\u2014"}
                       </p>
                     </div>
                   </div>
-                  <div className="text-[10px] text-muted-foreground pt-1">
-                    Based on {formatNumber(utilization.avgMonthlyVolume)} avg monthly clicks
-                  </div>
+                  {billingHistory[0].totalClicks > 0 && (
+                    <div className="text-[10px] text-muted-foreground pt-1">
+                      {formatNumber(billingHistory[0].totalClicks)} total clicks
+                      {billingHistory[0].totalClicks > 0 && billingHistory[0].volumeCharges > 0 && (
+                        <span className="ml-2">
+                          &middot; Rate: {(billingHistory[0].volumeCharges / billingHistory[0].totalClicks).toFixed(2)}c/click
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

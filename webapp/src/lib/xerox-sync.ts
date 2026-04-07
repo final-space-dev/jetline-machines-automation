@@ -9,6 +9,16 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+// Map BMS category name → display label
+function categoryToType(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const n = name.toLowerCase();
+  if (n.includes("colour") || n.includes("color")) return "Colour";
+  if (n.includes("black")) return "B&W";
+  if (n.includes("plan")) return "Plan";
+  return name;
+}
+
 export async function syncXeroxStoreMap(): Promise<{ upserted: number; duration: number }> {
   const start = Date.now();
 
@@ -20,6 +30,9 @@ export async function syncXeroxStoreMap(): Promise<{ upserted: number; duration:
           name: true,
           companyGroup: true,
         },
+      },
+      category: {
+        select: { name: true },
       },
     },
     where: {
@@ -33,27 +46,28 @@ export async function syncXeroxStoreMap(): Promise<{ upserted: number; duration:
 
   const client = await xeroxPool.connect();
   try {
-    // Chunk at 500 rows (4 params each = 2000 params per batch, well under 65535 limit)
     const batches = chunkArray(machines, 500);
     let totalUpserted = 0;
 
     for (const batch of batches) {
       const values = batch.map((_, i) => {
-        const base = i * 3;
-        return `($${base + 1}, $${base + 2}, $${base + 3})`;
+        const base = i * 4;
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
       });
       const params = batch.flatMap((m) => [
         m.serialNumber,
         m.company?.name ?? null,
         m.company?.companyGroup ?? null,
+        categoryToType(m.category?.name),
       ]);
 
       await client.query(
-        `INSERT INTO xerox.printer_store_map (serial_number, store, company_group)
+        `INSERT INTO xerox.printer_store_map (serial_number, store, company_group, printer_type)
          VALUES ${values.join(", ")}
          ON CONFLICT (serial_number) DO UPDATE SET
            store         = EXCLUDED.store,
            company_group = EXCLUDED.company_group,
+           printer_type  = EXCLUDED.printer_type,
            updated_at    = now()`,
         params
       );

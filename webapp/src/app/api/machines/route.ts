@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
               name: true,
               bmsSchema: true,
               region: true,
+              companyGroup: true,
             },
           },
           category: {

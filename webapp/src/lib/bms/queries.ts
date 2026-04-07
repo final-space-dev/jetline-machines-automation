@@ -38,7 +38,8 @@ export async function fetchAllMachines(
  * Returns full reading history with all sub-meters
  */
 export async function fetchAllMeterReadings(
-  config: BMSConnectionConfig
+  config: BMSConnectionConfig,
+  sinceDate: string = "2023-12-01"
 ): Promise<BMSMeterReadingRow[]> {
   const query = `
     SELECT
@@ -47,10 +48,11 @@ export async function fetchAllMeterReadings(
     FROM bms_meterreading mrd
     LEFT JOIN vtiger_crmentity crm ON crm.crmid = mrd.meterreadingid
     WHERE mrd.asset IS NOT NULL
+      AND mrd.reading_date >= ?
     ORDER BY mrd.asset, mrd.reading_date
   `;
 
-  return queryBMS<BMSMeterReadingRow & RowDataPacket>(config, query);
+  return queryBMS<BMSMeterReadingRow & RowDataPacket>(config, query, [sinceDate]);
 }
 
 /**

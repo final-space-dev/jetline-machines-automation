@@ -5,22 +5,34 @@ import prisma from "@/lib/prisma";
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { machineId, action, upgradeTo, moveToCompanyId } = body;
+    const { machineId, action, upgradeTo, moveToCompanyId, notes, serialNumber } = body;
 
-    if (!machineId || !action) {
-      return NextResponse.json({ error: "machineId and action are required" }, { status: 400 });
+    if (!machineId) {
+      return NextResponse.json({ error: "machineId is required" }, { status: 400 });
     }
 
-    const validActions = ["NONE", "TERMINATE", "TERMINATE_UPGRADE", "STAY", "MOVE"];
-    if (!validActions.includes(action)) {
-      return NextResponse.json({ error: `Invalid action. Must be one of: ${validActions.join(", ")}` }, { status: 400 });
+    const updateData: Record<string, unknown> = {};
+
+    // Handle notes update
+    if (notes !== undefined) {
+      updateData.notes = notes || null;
     }
 
-    const updateData: Record<string, unknown> = {
-      action,
-      upgradeTo: action === "TERMINATE_UPGRADE" ? (upgradeTo || null) : null,
-      moveToCompanyId: action === "MOVE" ? (moveToCompanyId || null) : null,
-    };
+    // Handle serial number update (for planned machines)
+    if (serialNumber !== undefined) {
+      updateData.serialNumber = serialNumber;
+    }
+
+    // Handle action update
+    if (action) {
+      const validActions = ["NONE", "TERMINATE", "TERMINATE_UPGRADE", "STAY", "MOVE"];
+      if (!validActions.includes(action)) {
+        return NextResponse.json({ error: `Invalid action. Must be one of: ${validActions.join(", ")}` }, { status: 400 });
+      }
+      updateData.action = action;
+      updateData.upgradeTo = action === "TERMINATE_UPGRADE" ? (upgradeTo || null) : null;
+      updateData.moveToCompanyId = action === "MOVE" ? (moveToCompanyId || null) : null;
+    }
 
     const machine = await prisma.machine.update({
       where: { id: machineId },
