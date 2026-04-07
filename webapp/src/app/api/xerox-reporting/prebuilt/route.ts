@@ -282,6 +282,63 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: result.rows, rowCount: result.rows.length });
     }
 
+    if (report === "reading-frequency") {
+      // Total distinct reading dates across all machines (= total unique emails/reports received)
+      const totalResult = await client.query<{ total_report_days: string }>(
+        `SELECT COUNT(DISTINCT report_date) AS total_report_days FROM xerox.meter_readings_normalised`
+      );
+      const totalReportDays = Number(totalResult.rows[0]?.total_report_days ?? 0);
+
+      const result = await client.query<{
+        serial_number: string;
+        store: string | null;
+        company_group: string | null;
+        model: string;
+        printer_type: string | null;
+        unique_readings: string;
+        first_reading_date: string | null;
+        last_reading_date: string | null;
+        days_in_range: string | null;
+        success_rate: string | null;
+      }>(
+        `WITH per_machine AS (
+          SELECT
+            mr.printer_id,
+            COUNT(DISTINCT mr.reading_date::date) AS unique_readings,
+            MIN(mr.report_date)::text            AS first_reading_date,
+            MAX(mr.report_date)::text            AS last_reading_date,
+            (MAX(mr.report_date) - MIN(mr.report_date) + 1) AS days_in_range
+          FROM xerox.meter_readings_normalised mr
+          GROUP BY mr.printer_id
+        )
+        SELECT
+          pd.serial_number,
+          psm.store,
+          psm.company_group,
+          pd.model,
+          COALESCE(psm.printer_type, 'Unknown') AS printer_type,
+          pm.unique_readings::text,
+          pm.first_reading_date,
+          pm.last_reading_date,
+          pm.days_in_range::text,
+          CASE
+            WHEN $1 > 0 THEN ROUND((pm.unique_readings::numeric / $1) * 100, 1)::text
+            ELSE NULL
+          END AS success_rate
+        FROM per_machine pm
+        JOIN xerox.printer_dimensions pd ON pd.printer_id = pm.printer_id
+        INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+        ORDER BY pm.unique_readings ASC, psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`,
+        [totalReportDays]
+      );
+
+      return NextResponse.json({
+        data: result.rows,
+        totalReportDays,
+        rowCount: result.rows.length,
+      });
+    }
+
     return NextResponse.json({ error: "Unknown report" }, { status: 400 });
 
   } catch (error) {

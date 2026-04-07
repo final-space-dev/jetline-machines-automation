@@ -22,7 +22,7 @@ import {
 
 // ─── Report types ─────────────────────────────────────────────────────────────
 
-type ReportType = "live" | "not-transmitting" | "machine-age" | "last-balance" | "monthly-volume" | "no-data";
+type ReportType = "live" | "not-transmitting" | "machine-age" | "last-balance" | "monthly-volume" | "no-data" | "daily" | "reading-frequency";
 
 const REPORT_OPTIONS: { id: ReportType; label: string; description: string }[] = [
   { id: "live",             label: "Live View",                description: "All printers with volumes over selected date range" },
@@ -31,6 +31,8 @@ const REPORT_OPTIONS: { id: ReportType; label: string; description: string }[] =
   { id: "last-balance",     label: "Last Balance per Machine", description: "Latest cumulative reading per machine by store and model" },
   { id: "monthly-volume",   label: "Monthly Volume",           description: "Volume per machine per month going back as far as available" },
   { id: "no-data",          label: "No Data",                  description: "Machines registered in Xerox but never sent any readings" },
+  { id: "daily",             label: "Daily Report",             description: "Day-by-day volume movement with anomaly detection" },
+  { id: "reading-frequency", label: "Reading Frequency",        description: "Unique readings per machine vs total reports — shows which machines are stale or disconnected" },
 ];
 
 // ─── Row types ────────────────────────────────────────────────────────────────
@@ -254,6 +256,68 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
     ];
   }
 
+  if (report === "daily") {
+    return [
+      { accessorKey: "store",          header: "Store",   cell: ({ getValue }) => <span className={C.bold}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "company_group",  header: "Group",   cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "serial_number",  header: "Serial",  cell: ({ getValue }) => <span className={C.mono}>{getValue<string>() || "—"}</span> },
+      { accessorKey: "model",          header: "Model",   cell: ({ getValue }) => <span className={C.text}>{getValue<string>() || "—"}</span> },
+      { accessorKey: "printer_type",   header: "Type",    cell: ({ getValue }) => { const v = getValue<string>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
+      { accessorKey: "report_date",    header: "Date",    enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "total_movement", header: "Volume",  enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
+      {
+        accessorKey: "anomaly",
+        header: "Anomaly",
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className={C.muted}>—</span>;
+          return <span className="text-xs font-medium text-amber-600">{v}</span>;
+        },
+      },
+    ];
+  }
+
+  if (report === "reading-frequency") {
+    return [
+      ...identity,
+      {
+        accessorKey: "unique_readings",
+        header: "Unique Readings",
+        enableSorting: true,
+        meta: { align: "right" },
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = Number(getValue());
+          return <span className={C.num}>{v.toLocaleString("en-ZA")}</span>;
+        },
+      },
+      {
+        accessorKey: "days_in_range",
+        header: "Days in Range",
+        enableSorting: true,
+        meta: { align: "right" },
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as string | null;
+          return <span className={C.num}>{v ? Number(v).toLocaleString("en-ZA") : "—"}</span>;
+        },
+      },
+      { accessorKey: "first_reading_date", header: "First Reading", enableSorting: true, cell: ({ getValue }: { getValue: () => unknown }) => <span className={C.mono}>{(getValue() as string | null) || "—"}</span> },
+      { accessorKey: "last_reading_date",  header: "Last Reading",  enableSorting: true, cell: ({ getValue }: { getValue: () => unknown }) => <span className={C.mono}>{(getValue() as string | null) || "—"}</span> },
+      {
+        accessorKey: "success_rate",
+        header: "% of Reports",
+        enableSorting: true,
+        meta: { align: "right" },
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className={C.muted}>—</span>;
+          const n = Number(v);
+          const colour = n >= 80 ? "text-green-700" : n >= 50 ? "text-amber-600" : "text-red-600";
+          return <span className={cn(C.num, colour)}>{n}%</span>;
+        },
+      },
+    ];
+  }
+
   return identity;
 }
 
@@ -289,6 +353,7 @@ export default function XeroxReportingPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any[]>([]);
   const [months, setMonths] = useState<string[]>([]);
+  const [totalReportDays, setTotalReportDays] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -306,6 +371,21 @@ export default function XeroxReportingPage() {
 
   const appliedFrom = appliedRange.from ? format(appliedRange.from, "yyyy-MM-dd") : "";
   const appliedTo   = appliedRange.to   ? format(appliedRange.to,   "yyyy-MM-dd") : "";
+
+  // ── Pipeline status ──
+  const [pipelineStatus, setPipelineStatus] = useState<{
+    found: boolean;
+    status?: string;
+    endTime?: number;
+    error?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/xerox-reporting/pipeline-status")
+      .then((r) => r.json())
+      .then((d) => setPipelineStatus(d))
+      .catch(() => setPipelineStatus({ found: false, error: "Unreachable" }));
+  }, []);
 
   // ── When activeReport changes, load its column visibility from localStorage ──
   useEffect(() => {
@@ -337,8 +417,9 @@ export default function XeroxReportingPage() {
         throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
       }
       const json = await res.json();
-      setData((json as { data?: unknown[]; months?: string[] }).data ?? []);
+      setData((json as { data?: unknown[]; months?: string[]; totalReportDays?: number }).data ?? []);
       setMonths((json as { data?: unknown[]; months?: string[] }).months ?? []);
+      setTotalReportDays((json as { totalReportDays?: number }).totalReportDays ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setData([]);
@@ -349,6 +430,18 @@ export default function XeroxReportingPage() {
 
   useEffect(() => {
     fetchData(activeReport, appliedFrom, appliedTo);
+  }, [fetchData, activeReport, appliedFrom, appliedTo]);
+
+  // ── Auto-refresh every 5 minutes ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData(activeReport, appliedFrom, appliedTo);
+      fetch("/api/xerox-reporting/pipeline-status")
+        .then((r) => r.json())
+        .then((d) => setPipelineStatus(d))
+        .catch(() => {});
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [fetchData, activeReport, appliedFrom, appliedTo]);
 
   const handleApply = useCallback(() => {
@@ -473,6 +566,8 @@ export default function XeroxReportingPage() {
     ? "Error loading data"
     : activeReport === "live"
     ? `${data.length} printers · ${formatRange(appliedFrom, appliedTo)}`
+    : activeReport === "reading-frequency" && totalReportDays != null
+    ? `${data.length} machines · ${totalReportDays} total report days received`
     : `${data.length} rows`;
 
   // ── Column visibility panel helpers ──
@@ -628,6 +723,33 @@ export default function XeroxReportingPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Pipeline status card */}
+              {pipelineStatus && (
+                <div className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs",
+                  pipelineStatus.found && pipelineStatus.status === "SUCCESS"
+                    ? "bg-green-50 border-green-200 text-green-800"
+                    : pipelineStatus.found && pipelineStatus.status === "FAILURE"
+                    ? "bg-red-50 border-red-200 text-red-800"
+                    : "bg-gray-50 border-gray-200 text-gray-500"
+                )}>
+                  <span className={cn(
+                    "h-1.5 w-1.5 rounded-full shrink-0",
+                    pipelineStatus.found && pipelineStatus.status === "SUCCESS" ? "bg-green-500" :
+                    pipelineStatus.found && pipelineStatus.status === "FAILURE" ? "bg-red-500" : "bg-gray-400"
+                  )} />
+                  <span className="font-medium">Last Xerox Automation</span>
+                  <span className="text-[11px] opacity-75">
+                    {pipelineStatus.found && pipelineStatus.endTime
+                      ? format(new Date(pipelineStatus.endTime * 1000), "d MMM yyyy, HH:mm")
+                      : "No runs found"}
+                  </span>
+                  {pipelineStatus.found && pipelineStatus.status && pipelineStatus.status !== "SUCCESS" && (
+                    <span className="font-semibold uppercase tracking-wide text-[10px]">{pipelineStatus.status}</span>
+                  )}
+                </div>
+              )}
+
               {showDatePicker && (
               <Popover open={calOpen} onOpenChange={setCalOpen}>
                 <PopoverTrigger asChild>
