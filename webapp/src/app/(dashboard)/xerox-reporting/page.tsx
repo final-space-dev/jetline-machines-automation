@@ -278,6 +278,17 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
       { accessorKey: "printer_type",   header: "Type",         cell: ({ getValue }) => { const v = getValue<string | null>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
       { accessorKey: "model",          header: "Model",        cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
       {
+        accessorKey: "bms_status",
+        header: "BMS Status",
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as number | null;
+          if (v === null) return <span className={C.muted}>—</span>;
+          return v === 1
+            ? <span className="text-xs text-green-700">Active</span>
+            : <span className="text-xs text-muted-foreground">Inactive</span>;
+        },
+      },
+      {
         accessorKey: "in_xerox",
         header: "In Xerox",
         cell: ({ getValue }: { getValue: () => unknown }) => {
@@ -539,8 +550,9 @@ export default function XeroxReportingPage() {
       { key: "printer_type",   label: "Type",      options: types.map((v) => ({ value: v, label: v })) },
       { key: "category",       label: "Type",      options: uniq(pick("category")).map((v) => ({ value: v, label: v })) },
       { key: "in_bms",         label: "In BMS",    options: inBmsNoDataOptions },
-      { key: "in_xerox",       label: "In Xerox",  options: d.some((r) => "in_xerox" in r) ? boolOpts : [] },
-      { key: "in_bms",         label: "In BMS",    options: d.some((r) => "in_xerox" in r && "in_bms" in r) ? boolOpts : [] },
+      { key: "bms_status",     label: "BMS Status", options: d.some((r) => "bms_status" in r && "in_xerox" in r) ? [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] : [] },
+      { key: "in_xerox",       label: "In Xerox",   options: d.some((r) => "in_xerox" in r) ? boolOpts : [] },
+      { key: "in_bms",         label: "In BMS",     options: d.some((r) => "in_xerox" in r && "in_bms" in r) ? boolOpts : [] },
     ].filter((f) => f.options.length > 0)
      .filter((f, i, arr) => arr.findIndex((x) => x.label === f.label) === i);
   }, [data]);

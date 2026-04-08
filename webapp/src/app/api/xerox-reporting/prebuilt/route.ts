@@ -323,6 +323,12 @@ export async function GET(request: NextRequest) {
       // - In Xerox only  → Xerox billing us but BMS has no record (ghost billing?)
       // - In BMS only    → BMS knows it but Xerox dropped it (decommissioned/removed?)
       // - In both        → normal, matched machine
+      // Pull bms_status from the synced machines table in jetline_machines
+      const bmsStatusRows = await prisma.machine.findMany({
+        select: { serialNumber: true, bmsStatus: true },
+      });
+      const bmsStatusMap = new Map(bmsStatusRows.map((m) => [m.serialNumber.trim().toUpperCase(), m.bmsStatus]));
+
       const result = await client.query<{
         serial_number: string;
         store: string | null;
@@ -348,7 +354,12 @@ export async function GET(request: NextRequest) {
           COALESCE(pd.serial_number, psm.serial_number)`
       );
 
-      return NextResponse.json({ data: result.rows, rowCount: result.rows.length });
+      const data = result.rows.map((r) => ({
+        ...r,
+        bms_status: bmsStatusMap.get((r.serial_number ?? "").trim().toUpperCase()) ?? null,
+      }));
+
+      return NextResponse.json({ data, rowCount: data.length });
     }
 
     return NextResponse.json({ error: "Unknown report" }, { status: 400 });
