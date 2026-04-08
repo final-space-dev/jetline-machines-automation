@@ -272,26 +272,29 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
 
   if (report === "bms-machines") {
     return [
-      { accessorKey: "company_name",   header: "Store",    cell: ({ getValue }) => <span className={C.bold}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "serial_number",  header: "Serial",   cell: ({ getValue }) => <span className={C.mono}>{getValue<string>() || "—"}</span> },
-      { accessorKey: "category",       header: "Type",     cell: ({ getValue }) => { const v = getValue<string | null>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
-      { accessorKey: "model_name",     header: "Model",    cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "install_date",   header: "Install Date", enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "bms_status",     header: "BMS Status", cell: ({ getValue }: { getValue: () => unknown }) => {
-          const v = getValue() as number | null;
-          return v === 1
-            ? <span className="text-xs text-green-700">Active</span>
-            : <span className="text-xs text-muted-foreground">Inactive</span>;
-        },
-      },
+      { accessorKey: "store",          header: "Store",        cell: ({ getValue }) => <span className={C.bold}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "company_group",  header: "Group",        cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "serial_number",  header: "Serial",       cell: ({ getValue }) => <span className={C.mono}>{getValue<string>() || "—"}</span> },
+      { accessorKey: "printer_type",   header: "Type",         cell: ({ getValue }) => { const v = getValue<string | null>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
+      { accessorKey: "model",          header: "Model",        cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
       {
-        accessorKey: "in_xerox_portal",
-        header: "Xerox Billing",
+        accessorKey: "in_xerox",
+        header: "In Xerox",
         cell: ({ getValue }: { getValue: () => unknown }) => {
           const v = getValue() as boolean;
           return v
-            ? <span className="text-xs text-green-700">Xerox</span>
-            : <span className="text-xs text-amber-600">Undefined</span>;
+            ? <span className="text-xs text-green-700">Yes</span>
+            : <span className="text-xs text-red-600">No</span>;
+        },
+      },
+      {
+        accessorKey: "in_bms",
+        header: "In BMS",
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as boolean;
+          return v
+            ? <span className="text-xs text-green-700">Yes</span>
+            : <span className="text-xs text-red-600">No</span>;
         },
       },
     ];
@@ -517,31 +520,27 @@ export default function XeroxReportingPage() {
     const models   = uniq(pick("model"));
     const types    = uniq([...pick("printerType"), ...pick("printer_type")]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const inBmsOptions = (data as any[]).some((r) => "in_bms" in r)
+    const d = data as any[];
+    const boolOpts = [{ value: "true", label: "Yes" }, { value: "false", label: "No" }];
+
+    // no-data report uses in_bms with custom labels
+    const inBmsNoDataOptions = d.some((r) => "in_bms" in r && !("in_xerox" in r))
       ? [{ value: "true", label: "Yes" }, { value: "false", label: "No — query Xerox" }]
       : [];
 
-    const bmsStatusOptions = (data as any[]).some((r) => "bms_status" in r)
-      ? [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }]
-      : [];
-
-    const xeroxBillingOptions = (data as any[]).some((r) => "in_xerox_portal" in r)
-      ? [{ value: "true", label: "Xerox" }, { value: "false", label: "Undefined" }]
-      : [];
-
     return [
-      { key: "companyGroup",    label: "Group",          options: groups.map((v) => ({ value: v, label: v })) },
-      { key: "company_group",   label: "Group",          options: groups.map((v) => ({ value: v, label: v })) },
-      { key: "company_name",    label: "Store",          options: stores.map((v) => ({ value: v, label: v })) },
-      { key: "store",           label: "Store",          options: stores.map((v) => ({ value: v, label: v })) },
-      { key: "model",           label: "Model",          options: models.map((v) => ({ value: v, label: v })) },
-      { key: "model_name",      label: "Model",          options: uniq(pick("model_name")).map((v) => ({ value: v, label: v })) },
-      { key: "printerType",     label: "Type",           options: types.map((v) => ({ value: v, label: v })) },
-      { key: "printer_type",    label: "Type",           options: types.map((v) => ({ value: v, label: v })) },
-      { key: "category",        label: "Type",           options: uniq(pick("category")).map((v) => ({ value: v, label: v })) },
-      { key: "in_bms",          label: "In BMS",         options: inBmsOptions },
-      { key: "bms_status",      label: "BMS Status",     options: bmsStatusOptions },
-      { key: "in_xerox_portal", label: "Xerox Billing",  options: xeroxBillingOptions },
+      { key: "companyGroup",   label: "Group",     options: groups.map((v) => ({ value: v, label: v })) },
+      { key: "company_group",  label: "Group",     options: groups.map((v) => ({ value: v, label: v })) },
+      { key: "company_name",   label: "Store",     options: stores.map((v) => ({ value: v, label: v })) },
+      { key: "store",          label: "Store",     options: stores.map((v) => ({ value: v, label: v })) },
+      { key: "model",          label: "Model",     options: models.map((v) => ({ value: v, label: v })) },
+      { key: "model_name",     label: "Model",     options: uniq(pick("model_name")).map((v) => ({ value: v, label: v })) },
+      { key: "printerType",    label: "Type",      options: types.map((v) => ({ value: v, label: v })) },
+      { key: "printer_type",   label: "Type",      options: types.map((v) => ({ value: v, label: v })) },
+      { key: "category",       label: "Type",      options: uniq(pick("category")).map((v) => ({ value: v, label: v })) },
+      { key: "in_bms",         label: "In BMS",    options: inBmsNoDataOptions },
+      { key: "in_xerox",       label: "In Xerox",  options: d.some((r) => "in_xerox" in r) ? boolOpts : [] },
+      { key: "in_bms",         label: "In BMS",    options: d.some((r) => "in_xerox" in r && "in_bms" in r) ? boolOpts : [] },
     ].filter((f) => f.options.length > 0)
      .filter((f, i, arr) => arr.findIndex((x) => x.label === f.label) === i);
   }, [data]);

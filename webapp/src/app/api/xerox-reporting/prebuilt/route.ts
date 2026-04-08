@@ -318,53 +318,37 @@ export async function GET(request: NextRequest) {
     }
 
     if (report === "bms-machines") {
-      // BMS machines that are mapped as Xerox (in printer_store_map), flagged by whether
-      // Xerox portal has ever seen them (exists in printer_dimensions)
-      const bmsRows = await prisma.machine.findMany({
-        select: {
-          serialNumber: true,
-          machineName: true,
-          makeName: true,
-          modelName: true,
-          status: true,
-          bmsStatus: true,
-          installDate: true,
-          company: { select: { name: true } },
-          category: { select: { name: true } },
-        },
-        orderBy: [{ company: { name: "asc" } }, { serialNumber: "asc" }],
-      });
-
-      // Get all serials in the Xerox printer_store_map (= Xerox-enrolled machines)
-      const psmResult = await client.query<{ serial_number: string }>(
-        `SELECT serial_number FROM xerox.printer_store_map`
-      );
-      const psmSerials = new Set(
-        psmResult.rows.map((r) => (r.serial_number ?? "").trim().toUpperCase()).filter(Boolean)
-      );
-
-      // Get all serials in Xerox printer_dimensions (= actively in Xerox portal)
-      const dimResult = await client.query<{ serial_number: string }>(
-        `SELECT serial_number FROM xerox.printer_dimensions`
-      );
-      const dimSerials = new Set(
-        dimResult.rows.map((r) => (r.serial_number ?? "").trim().toUpperCase()).filter(Boolean)
+      // Full outer join: Xerox portal (printer_dimensions) vs BMS store map (printer_store_map)
+      // Shows every serial that appears on either side, flagging which side it appears on.
+      // - In Xerox only  → Xerox billing us but BMS has no record (ghost billing?)
+      // - In BMS only    → BMS knows it but Xerox dropped it (decommissioned/removed?)
+      // - In both        → normal, matched machine
+      const result = await client.query<{
+        serial_number: string;
+        store: string | null;
+        company_group: string | null;
+        model: string | null;
+        printer_type: string | null;
+        in_xerox: boolean;
+        in_bms: boolean;
+      }>(
+        `SELECT
+          COALESCE(pd.serial_number, psm.serial_number) AS serial_number,
+          psm.store,
+          psm.company_group,
+          pd.model,
+          COALESCE(psm.printer_type, 'Unknown') AS printer_type,
+          (pd.serial_number IS NOT NULL) AS in_xerox,
+          (psm.serial_number IS NOT NULL) AS in_bms
+        FROM xerox.printer_dimensions pd
+        FULL OUTER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+        ORDER BY
+          psm.company_group NULLS LAST,
+          psm.store NULLS LAST,
+          COALESCE(pd.serial_number, psm.serial_number)`
       );
 
-      // Only return BMS machines that are in the store map (Xerox machines)
-      const data = bmsRows
-        .filter((m) => m.serialNumber && psmSerials.has(m.serialNumber.trim().toUpperCase()))
-        .map((m) => ({
-          serial_number: m.serialNumber,
-          company_name: m.company.name,
-          category: m.category?.name ?? null,
-          model_name: m.modelName ?? null,
-          bms_status: m.bmsStatus,
-          install_date: m.installDate ? m.installDate.toISOString().split("T")[0] : null,
-          in_xerox_portal: dimSerials.has(m.serialNumber.trim().toUpperCase()),
-        }));
-
-      return NextResponse.json({ data, rowCount: data.length });
+      return NextResponse.json({ data: result.rows, rowCount: result.rows.length });
     }
 
     return NextResponse.json({ error: "Unknown report" }, { status: 400 });
