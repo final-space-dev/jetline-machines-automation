@@ -228,35 +228,16 @@ export async function GET(request: NextRequest) {
         model: string;
         printer_type: string;
         report_date: string;
-        total_movement: number | null;
-        anomaly: string | null;
+        daily_volume: number | null;
+        running_balance: number | null;
       }>(
         `WITH daily_vols AS (
           SELECT
             mv.printer_id,
             mv.date AS report_date,
-            SUM(mv.volume) AS total_movement,
-            bool_or(mv.volume < 0) AS has_negative
+            SUM(mv.volume) AS daily_volume
           FROM xerox.meter_volumes mv
           GROUP BY mv.printer_id, mv.date
-        ),
-        rolling AS (
-          SELECT
-            printer_id,
-            report_date,
-            total_movement,
-            has_negative,
-            AVG(total_movement) OVER (
-              PARTITION BY printer_id
-              ORDER BY report_date
-              ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING
-            ) AS rolling_avg
-          FROM daily_vols
-        ),
-        printer_has_nonzero AS (
-          SELECT DISTINCT printer_id
-          FROM daily_vols
-          WHERE total_movement > 0
         )
         SELECT
           psm.store,
@@ -264,19 +245,16 @@ export async function GET(request: NextRequest) {
           pd.serial_number,
           pd.model,
           COALESCE(psm.printer_type, 'Unknown') AS printer_type,
-          r.report_date::text,
-          r.total_movement::bigint AS total_movement,
-          CASE
-            WHEN r.has_negative THEN 'Negative'
-            WHEN r.total_movement = 0 AND phnz.printer_id IS NOT NULL THEN 'Zero'
-            WHEN r.rolling_avg IS NOT NULL AND r.rolling_avg > 0 AND r.total_movement > r.rolling_avg * 3 THEN 'Spike'
-            ELSE NULL
-          END AS anomaly
-        FROM rolling r
-        JOIN xerox.printer_dimensions pd ON pd.printer_id = r.printer_id
+          dv.report_date::text,
+          dv.daily_volume::bigint AS daily_volume,
+          SUM(dv.daily_volume) OVER (
+            PARTITION BY dv.printer_id
+            ORDER BY dv.report_date
+          )::bigint AS running_balance
+        FROM daily_vols dv
+        JOIN xerox.printer_dimensions pd ON pd.printer_id = dv.printer_id
         INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
-        LEFT JOIN printer_has_nonzero phnz ON phnz.printer_id = r.printer_id
-        ORDER BY r.report_date DESC, psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`
+        ORDER BY dv.report_date DESC, psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`
       );
 
       return NextResponse.json({ data: result.rows, rowCount: result.rows.length });

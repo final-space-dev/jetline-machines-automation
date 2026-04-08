@@ -258,22 +258,14 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
 
   if (report === "daily") {
     return [
-      { accessorKey: "store",          header: "Store",   cell: ({ getValue }) => <span className={C.bold}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "company_group",  header: "Group",   cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "serial_number",  header: "Serial",  cell: ({ getValue }) => <span className={C.mono}>{getValue<string>() || "—"}</span> },
-      { accessorKey: "model",          header: "Model",   cell: ({ getValue }) => <span className={C.text}>{getValue<string>() || "—"}</span> },
-      { accessorKey: "printer_type",   header: "Type",    cell: ({ getValue }) => { const v = getValue<string>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
-      { accessorKey: "report_date",    header: "Date",    enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "total_movement", header: "Volume",  enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
-      {
-        accessorKey: "anomaly",
-        header: "Anomaly",
-        cell: ({ getValue }: { getValue: () => unknown }) => {
-          const v = getValue() as string | null;
-          if (!v) return <span className={C.muted}>—</span>;
-          return <span className="text-xs font-medium text-amber-600">{v}</span>;
-        },
-      },
+      { accessorKey: "store",            header: "Store",    cell: ({ getValue }) => <span className={C.bold}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "company_group",    header: "Group",    cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "serial_number",    header: "Serial",   cell: ({ getValue }) => <span className={C.mono}>{getValue<string>() || "—"}</span> },
+      { accessorKey: "model",            header: "Model",    cell: ({ getValue }) => <span className={C.text}>{getValue<string>() || "—"}</span> },
+      { accessorKey: "printer_type",     header: "Type",     cell: ({ getValue }) => { const v = getValue<string>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
+      { accessorKey: "report_date",      header: "Date",     enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "daily_volume",     header: "Volume",   enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
+      { accessorKey: "running_balance",  header: "Balance",  enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
     ];
   }
 
