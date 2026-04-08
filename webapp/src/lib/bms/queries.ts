@@ -27,6 +27,7 @@ export async function fetchAllMachines(
     LEFT JOIN vtiger_crmentity crm ON crm.crmid = ma.machinesid
     WHERE ma.serialnumber IS NOT NULL
       AND ma.serialnumber != ''
+      AND ma.machine_make_name = 'Xerox'
     ORDER BY ma.machinesid
   `;
 
@@ -198,6 +199,7 @@ export async function fetchMachinesWithLatestReading(
     ) latest ON latest.asset = ma.machinesid
     WHERE ma.serialnumber IS NOT NULL
       AND ma.serialnumber != ''
+      AND ma.machine_make_name = 'Xerox'
     ORDER BY ma.machinesid
   `;
 
