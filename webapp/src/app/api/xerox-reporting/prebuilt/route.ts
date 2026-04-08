@@ -317,6 +317,52 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    if (report === "bms-machines") {
+      // BMS machines that are mapped as Xerox (in printer_store_map), flagged by whether
+      // Xerox portal has ever seen them (exists in printer_dimensions)
+      const bmsRows = await prisma.machine.findMany({
+        select: {
+          serialNumber: true,
+          machineName: true,
+          makeName: true,
+          modelName: true,
+          status: true,
+          bmsStatus: true,
+          installDate: true,
+          company: { select: { name: true } },
+          category: { select: { name: true } },
+        },
+        orderBy: [{ company: { name: "asc" } }, { serialNumber: "asc" }],
+      });
+
+      // Get all serials in the Xerox printer_store_map (= Xerox-enrolled machines)
+      const psmResult = await client.query<{ serial_number: string }>(
+        `SELECT serial_number FROM xerox.printer_store_map`
+      );
+      const psmSerials = new Set(psmResult.rows.map((r) => r.serial_number.trim().toUpperCase()));
+
+      // Get all serials in Xerox printer_dimensions (= actively in Xerox portal)
+      const dimResult = await client.query<{ serial_number: string }>(
+        `SELECT serial_number FROM xerox.printer_dimensions`
+      );
+      const dimSerials = new Set(dimResult.rows.map((r) => r.serial_number.trim().toUpperCase()));
+
+      // Only return BMS machines that are in the store map (Xerox machines)
+      const data = bmsRows
+        .filter((m) => psmSerials.has(m.serialNumber.trim().toUpperCase()))
+        .map((m) => ({
+          serial_number: m.serialNumber,
+          company_name: m.company.name,
+          category: m.category?.name ?? null,
+          model_name: m.modelName ?? null,
+          bms_status: m.bmsStatus,
+          install_date: m.installDate ? m.installDate.toISOString().split("T")[0] : null,
+          in_xerox_portal: dimSerials.has(m.serialNumber.trim().toUpperCase()),
+        }));
+
+      return NextResponse.json({ data, rowCount: data.length });
+    }
+
     return NextResponse.json({ error: "Unknown report" }, { status: 400 });
 
   } catch (error) {

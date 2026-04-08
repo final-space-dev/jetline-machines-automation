@@ -22,7 +22,7 @@ import {
 
 // ─── Report types ─────────────────────────────────────────────────────────────
 
-type ReportType = "live" | "not-transmitting" | "machine-age" | "last-balance" | "monthly-volume" | "no-data" | "daily" | "reading-frequency";
+type ReportType = "live" | "not-transmitting" | "machine-age" | "last-balance" | "monthly-volume" | "no-data" | "daily" | "reading-frequency" | "bms-machines";
 
 const REPORT_OPTIONS: { id: ReportType; label: string; description: string }[] = [
   { id: "live",             label: "Live View",                description: "All printers with volumes over selected date range" },
@@ -33,6 +33,7 @@ const REPORT_OPTIONS: { id: ReportType; label: string; description: string }[] =
   { id: "no-data",          label: "No Data",                  description: "Machines registered in Xerox but never sent any readings" },
   { id: "daily",             label: "Daily Report",             description: "Day-by-day volume movement with anomaly detection" },
   { id: "reading-frequency", label: "Reading Frequency",        description: "Unique readings per machine vs total reports — shows which machines are stale or disconnected" },
+  { id: "bms-machines",      label: "BMS Machines",             description: "All Xerox machines in BMS — flagged by whether Xerox is actively billing or reporting on them" },
 ];
 
 // ─── Row types ────────────────────────────────────────────────────────────────
@@ -266,6 +267,33 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
       { accessorKey: "report_date",      header: "Date",     enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
       { accessorKey: "daily_volume",     header: "Volume",   enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
       { accessorKey: "running_balance",  header: "Balance",  enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
+    ];
+  }
+
+  if (report === "bms-machines") {
+    return [
+      { accessorKey: "company_name",   header: "Store",    cell: ({ getValue }) => <span className={C.bold}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "serial_number",  header: "Serial",   cell: ({ getValue }) => <span className={C.mono}>{getValue<string>() || "—"}</span> },
+      { accessorKey: "category",       header: "Type",     cell: ({ getValue }) => { const v = getValue<string | null>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
+      { accessorKey: "model_name",     header: "Model",    cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "install_date",   header: "Install Date", enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
+      { accessorKey: "bms_status",     header: "BMS Status", cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as number | null;
+          return v === 1
+            ? <span className="text-xs text-green-700">Active</span>
+            : <span className="text-xs text-muted-foreground">Inactive</span>;
+        },
+      },
+      {
+        accessorKey: "in_xerox_portal",
+        header: "Xerox Billing",
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as boolean;
+          return v
+            ? <span className="text-xs text-green-700">Xerox</span>
+            : <span className="text-xs text-amber-600">Undefined</span>;
+        },
+      },
     ];
   }
 
