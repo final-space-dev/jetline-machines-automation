@@ -339,17 +339,21 @@ export async function GET(request: NextRequest) {
       const psmResult = await client.query<{ serial_number: string }>(
         `SELECT serial_number FROM xerox.printer_store_map`
       );
-      const psmSerials = new Set(psmResult.rows.map((r) => r.serial_number.trim().toUpperCase()));
+      const psmSerials = new Set(
+        psmResult.rows.map((r) => (r.serial_number ?? "").trim().toUpperCase()).filter(Boolean)
+      );
 
       // Get all serials in Xerox printer_dimensions (= actively in Xerox portal)
       const dimResult = await client.query<{ serial_number: string }>(
         `SELECT serial_number FROM xerox.printer_dimensions`
       );
-      const dimSerials = new Set(dimResult.rows.map((r) => r.serial_number.trim().toUpperCase()));
+      const dimSerials = new Set(
+        dimResult.rows.map((r) => (r.serial_number ?? "").trim().toUpperCase()).filter(Boolean)
+      );
 
       // Only return BMS machines that are in the store map (Xerox machines)
       const data = bmsRows
-        .filter((m) => psmSerials.has(m.serialNumber.trim().toUpperCase()))
+        .filter((m) => m.serialNumber && psmSerials.has(m.serialNumber.trim().toUpperCase()))
         .map((m) => ({
           serial_number: m.serialNumber,
           company_name: m.company.name,
