@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ColumnDef, VisibilityState } from "@tanstack/react-table";
+import { ColumnDef, ColumnFiltersState, SortingState, VisibilityState } from "@tanstack/react-table";
 import { addDays, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { AppShell } from "@/components/layout/app-shell";
@@ -55,33 +55,37 @@ interface LiveRow {
   anyEstimated: boolean;
 }
 
-// ─── Saved views ──────────────────────────────────────────────────────────────
+// ─── Saved views / Bookmarks ──────────────────────────────────────────────────
 
 interface SavedView {
   id: string;
   name: string;
   reportType: ReportType;
   columnVisibility: VisibilityState;
+  columnFilters: { id: string; value: unknown }[];
+  sorting: { id: string; desc: boolean }[];
+  globalFilter: string;
 }
 
-type SavedViewsStore = Partial<Record<ReportType, SavedView[]>>;
+// Flat list — bookmarks are global, not per-report
+type SavedViewsStore = SavedView[];
 
-const SAVED_VIEWS_LS_KEY = "xerox-saved-views-v1";
+const SAVED_VIEWS_LS_KEY = "xerox-saved-views-v2";
 const COLUMN_VIS_LS_PREFIX = "jetline-table-column-visibility-xerox-reporting-";
 
 function loadSavedViews(): SavedViewsStore {
-  if (typeof window === "undefined") return {};
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(SAVED_VIEWS_LS_KEY);
-    return raw ? (JSON.parse(raw) as SavedViewsStore) : {};
+    return raw ? (JSON.parse(raw) as SavedViewsStore) : [];
   } catch {
-    return {};
+    return [];
   }
 }
 
-function persistSavedViews(store: SavedViewsStore): void {
+function persistSavedViews(views: SavedViewsStore): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(SAVED_VIEWS_LS_KEY, JSON.stringify(store));
+  localStorage.setItem(SAVED_VIEWS_LS_KEY, JSON.stringify(views));
 }
 
 function loadColumnVisibility(report: ReportType): VisibilityState {
@@ -403,13 +407,17 @@ export default function XeroxReportingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Column visibility — controlled in page, written to localStorage for DataTable
+  // Column visibility — controlled in page
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => loadColumnVisibility("live"));
+  // Column filters + sorting — controlled in page so bookmarks can capture/restore them
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
 
-  // tableKey — increment to remount DataTable (e.g. after loading a saved view)
+  // tableKey — increment to remount DataTable (e.g. after loading a bookmark)
   const [tableKey, setTableKey] = useState(0);
 
-  // Saved views
+  // Bookmarks (saved views)
   const [savedViews, setSavedViews] = useState<SavedViewsStore>(() => loadSavedViews());
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -433,10 +441,13 @@ export default function XeroxReportingPage() {
       .catch(() => setPipelineStatus({ found: false, error: "Unreachable" }));
   }, []);
 
-  // ── When activeReport changes, load its column visibility from localStorage ──
+  // ── When activeReport changes, reset filters/sort and load column visibility ──
   useEffect(() => {
     const vis = loadColumnVisibility(activeReport);
     setColumnVisibility(vis);
+    setColumnFilters([]);
+    setSorting([]);
+    setGlobalFilter("");
     setActiveViewId(null);
     setShowSaveInput(false);
   }, [activeReport]);
@@ -577,7 +588,7 @@ export default function XeroxReportingPage() {
     return Array.from(seen.values());
   }, [data]);
 
-  // ── Saved view actions ──
+  // ── Bookmark actions ──
   const saveView = useCallback(() => {
     const name = newViewName.trim();
     if (!name) return;
@@ -586,39 +597,40 @@ export default function XeroxReportingPage() {
       name,
       reportType: activeReport,
       columnVisibility,
+      columnFilters,
+      sorting,
+      globalFilter,
     };
     setSavedViews((prev) => {
-      const updated: SavedViewsStore = {
-        ...prev,
-        [activeReport]: [...(prev[activeReport] ?? []), view],
-      };
+      const updated = [...prev, view];
       persistSavedViews(updated);
       return updated;
     });
     setActiveViewId(view.id);
     setNewViewName("");
     setShowSaveInput(false);
-  }, [newViewName, activeReport, columnVisibility]);
+  }, [newViewName, activeReport, columnVisibility, columnFilters, sorting, globalFilter]);
 
   const loadView = useCallback((view: SavedView) => {
-    // Write column visibility to localStorage then remount DataTable
-    persistColumnVisibility(activeReport, view.columnVisibility);
+    // Switch report first, then restore all state
+    setActiveReport(view.reportType);
+    persistColumnVisibility(view.reportType, view.columnVisibility);
     setColumnVisibility(view.columnVisibility);
+    setColumnFilters(view.columnFilters ?? []);
+    setSorting(view.sorting ?? []);
+    setGlobalFilter(view.globalFilter ?? "");
     setActiveViewId(view.id);
     setTableKey((k) => k + 1);
-  }, [activeReport]);
+  }, []);
 
   const deleteView = useCallback((id: string) => {
     setSavedViews((prev) => {
-      const updated: SavedViewsStore = {
-        ...prev,
-        [activeReport]: (prev[activeReport] ?? []).filter((v) => v.id !== id),
-      };
+      const updated = prev.filter((v) => v.id !== id);
       persistSavedViews(updated);
       return updated;
     });
     if (activeViewId === id) setActiveViewId(null);
-  }, [activeReport, activeViewId]);
+  }, [activeViewId]);
 
   // ── Derived ──
   const currentReport = REPORT_OPTIONS.find((r) => r.id === activeReport) ?? REPORT_OPTIONS[0];
@@ -683,15 +695,15 @@ export default function XeroxReportingPage() {
             ))}
           </div>
 
-          {/* Saved views */}
+          {/* Bookmarks */}
           <div className="p-3 border-b flex-1">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Saved Views</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Bookmarks</p>
               <button
-                onClick={() => setShowSaveInput(true)}
+                onClick={() => setShowSaveInput((v) => !v)}
                 className="text-[10px] text-blue-600 hover:underline"
               >
-                + Save
+                + Save current
               </button>
             </div>
 
@@ -705,41 +717,44 @@ export default function XeroxReportingPage() {
                     if (e.key === "Enter") saveView();
                     if (e.key === "Escape") setShowSaveInput(false);
                   }}
-                  placeholder="View name..."
+                  placeholder="Bookmark name..."
                   className="flex-1 text-xs border rounded px-2 py-1 h-7 bg-background"
                 />
-                <button
-                  onClick={saveView}
-                  className="text-xs bg-blue-600 text-white px-2 rounded h-7"
-                >
+                <button onClick={saveView} className="text-xs bg-blue-600 text-white px-2 rounded h-7">
                   Save
                 </button>
               </div>
             )}
 
-            {(savedViews[activeReport] ?? []).map((view) => (
+            {savedViews.map((view) => (
               <div
                 key={view.id}
                 className={cn(
-                  "flex items-center gap-1 group px-2 py-1.5 rounded-md cursor-pointer text-xs",
+                  "flex items-start gap-1 group px-2 py-1.5 rounded-md cursor-pointer",
                   activeViewId === view.id
-                    ? "bg-blue-50 text-blue-700 font-medium"
+                    ? "bg-blue-50 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50"
                 )}
                 onClick={() => loadView(view)}
               >
-                <span className="flex-1 truncate">{view.name}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={cn("text-xs font-medium truncate", activeViewId === view.id ? "text-blue-700" : "text-gray-700")}>{view.name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {REPORT_OPTIONS.find((r) => r.id === view.reportType)?.label ?? view.reportType}
+                    {view.columnFilters.length > 0 && ` · ${view.columnFilters.length} filter${view.columnFilters.length > 1 ? "s" : ""}`}
+                  </p>
+                </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteView(view.id); }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity text-base leading-none"
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity text-base leading-none mt-0.5 shrink-0"
                 >
                   ×
                 </button>
               </div>
             ))}
 
-            {(savedViews[activeReport] ?? []).length === 0 && !showSaveInput && (
-              <p className="text-[10px] text-muted-foreground px-2">No saved views</p>
+            {savedViews.length === 0 && !showSaveInput && (
+              <p className="text-[10px] text-muted-foreground px-2">No bookmarks yet — filter a report and save it</p>
             )}
           </div>
 
@@ -901,6 +916,8 @@ export default function XeroxReportingPage() {
               hideViewsToolbar
               externalColumnVisibility={columnVisibility}
               onExternalColumnVisibilityChange={(v) => setColumnVisibility(v)}
+              externalColumnFilters={columnFilters}
+              onExternalColumnFiltersChange={setColumnFilters}
               onFilteredDataChange={setFilteredData}
             />
           )}

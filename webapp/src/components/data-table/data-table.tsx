@@ -462,7 +462,7 @@ export function DataTable<TData, TValue>({
       onFilteredDataChange(filteredRows.map((r) => r.original));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredRows.length, onFilteredDataChange]);
+  }, [filteredRows, onFilteredDataChange]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
