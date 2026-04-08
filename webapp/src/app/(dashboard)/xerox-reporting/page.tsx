@@ -308,6 +308,16 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
             : <span className="text-xs text-red-600">No</span>;
         },
       },
+      {
+        accessorKey: "has_readings",
+        header: "Xerox Readings",
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as boolean;
+          return v
+            ? <span className="text-xs text-green-700">Yes</span>
+            : <span className="text-xs text-red-600">No</span>;
+        },
+      },
     ];
   }
 
@@ -386,6 +396,8 @@ export default function XeroxReportingPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [filteredData, setFilteredData] = useState<any[]>([]);
   const [months, setMonths] = useState<string[]>([]);
   const [totalReportDays, setTotalReportDays] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -492,25 +504,26 @@ export default function XeroxReportingPage() {
   const exportFileName = `xerox-${activeReport}-${appliedFrom || format(new Date(), "yyyy-MM-dd")}`;
 
   const handleExportCSV = useCallback(() => {
-    if (!data.length) return;
-    const headers = Object.keys(data[0] as object);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = (data as any[]).map((row) => headers.map((h) => row[h] ?? ""));
-    const csv = [headers.join(","), ...rows.map((r) => r.map((v: unknown) => `"${String(v)}"`).join(","))].join("\n");
+    const rows = filteredData.length ? filteredData : data;
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0] as object);
+    const csvRows = rows.map((row) => headers.map((h) => (row as Record<string, unknown>)[h] ?? ""));
+    const csv = [headers.join(","), ...csvRows.map((r) => r.map((v) => `"${String(v)}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `${exportFileName}.csv`; a.click();
     URL.revokeObjectURL(url);
-  }, [data, exportFileName]);
+  }, [filteredData, data, exportFileName]);
 
   const handleExportExcel = useCallback(() => {
-    if (!data.length) return;
-    const ws = XLSX.utils.json_to_sheet(data as object[]);
+    const rows = filteredData.length ? filteredData : data;
+    if (!rows.length) return;
+    const ws = XLSX.utils.json_to_sheet(rows as object[]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data");
     XLSX.writeFile(wb, `${exportFileName}.xlsx`);
-  }, [data, exportFileName]);
+  }, [filteredData, data, exportFileName]);
 
   // ── Columns ──
   const columns = useMemo(() => {
@@ -539,22 +552,29 @@ export default function XeroxReportingPage() {
       ? [{ value: "true", label: "Yes" }, { value: "false", label: "No — query Xerox" }]
       : [];
 
-    return [
-      { key: "companyGroup",   label: "Group",     options: groups.map((v) => ({ value: v, label: v })) },
-      { key: "company_group",  label: "Group",     options: groups.map((v) => ({ value: v, label: v })) },
-      { key: "company_name",   label: "Store",     options: stores.map((v) => ({ value: v, label: v })) },
-      { key: "store",          label: "Store",     options: stores.map((v) => ({ value: v, label: v })) },
-      { key: "model",          label: "Model",     options: models.map((v) => ({ value: v, label: v })) },
-      { key: "model_name",     label: "Model",     options: uniq(pick("model_name")).map((v) => ({ value: v, label: v })) },
-      { key: "printerType",    label: "Type",      options: types.map((v) => ({ value: v, label: v })) },
-      { key: "printer_type",   label: "Type",      options: types.map((v) => ({ value: v, label: v })) },
-      { key: "category",       label: "Type",      options: uniq(pick("category")).map((v) => ({ value: v, label: v })) },
-      { key: "in_bms",         label: "In BMS",    options: inBmsNoDataOptions },
-      { key: "bms_status",     label: "BMS Status", options: d.some((r) => "bms_status" in r && "in_xerox" in r) ? [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] : [] },
-      { key: "in_xerox",       label: "In Xerox",   options: d.some((r) => "in_xerox" in r) ? boolOpts : [] },
-      { key: "in_bms",         label: "In BMS",     options: d.some((r) => "in_xerox" in r && "in_bms" in r) ? boolOpts : [] },
-    ].filter((f) => f.options.length > 0)
-     .filter((f, i, arr) => arr.findIndex((x) => x.label === f.label) === i);
+    const isBmsMachines = d.some((r) => "in_xerox" in r && "in_bms" in r);
+
+    // Build candidate filters; dedup by label keeping last match so report-specific
+    // keys (e.g. "store" for bms-machines) override generic fallbacks
+    const candidates = [
+      { key: "companyGroup",  label: "Group",      options: groups.map((v) => ({ value: v, label: v })) },
+      { key: "company_group", label: "Group",      options: groups.map((v) => ({ value: v, label: v })) },
+      { key: "store",         label: "Store",      options: uniq([...pick("store"), ...pick("company_name")]).map((v) => ({ value: v, label: v })) },
+      { key: "model",         label: "Model",      options: uniq([...pick("model"), ...pick("model_name")]).map((v) => ({ value: v, label: v })) },
+      { key: "printerType",   label: "Type",       options: types.map((v) => ({ value: v, label: v })) },
+      { key: "printer_type",  label: "Type",       options: types.map((v) => ({ value: v, label: v })) },
+      { key: "category",      label: "Type",       options: uniq(pick("category")).map((v) => ({ value: v, label: v })) },
+      { key: "in_bms",        label: "In BMS",     options: inBmsNoDataOptions },
+      { key: "bms_status",    label: "BMS Status", options: isBmsMachines ? [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] : [] },
+      { key: "in_xerox",      label: "In Xerox",        options: isBmsMachines ? boolOpts : [] },
+      { key: "in_bms",        label: "In BMS",          options: isBmsMachines ? boolOpts : [] },
+      { key: "has_readings",  label: "Xerox Readings",  options: isBmsMachines ? boolOpts : [] },
+    ].filter((f) => f.options.length > 0);
+
+    // Dedup by label — last entry per label wins (more specific beats generic)
+    const seen = new Map<string, typeof candidates[number]>();
+    for (const f of candidates) seen.set(f.label, f);
+    return Array.from(seen.values());
   }, [data]);
 
   // ── Saved view actions ──
@@ -881,6 +901,7 @@ export default function XeroxReportingPage() {
               hideViewsToolbar
               externalColumnVisibility={columnVisibility}
               onExternalColumnVisibilityChange={(v) => setColumnVisibility(v)}
+              onFilteredDataChange={setFilteredData}
             />
           )}
         </div>

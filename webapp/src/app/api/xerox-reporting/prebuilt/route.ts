@@ -337,6 +337,7 @@ export async function GET(request: NextRequest) {
         printer_type: string | null;
         in_xerox: boolean;
         in_bms: boolean;
+        has_readings: boolean;
       }>(
         `SELECT
           COALESCE(pd.serial_number, psm.serial_number) AS serial_number,
@@ -345,7 +346,10 @@ export async function GET(request: NextRequest) {
           pd.model,
           COALESCE(psm.printer_type, 'Unknown') AS printer_type,
           (pd.serial_number IS NOT NULL) AS in_xerox,
-          (psm.serial_number IS NOT NULL) AS in_bms
+          (psm.serial_number IS NOT NULL) AS in_bms,
+          EXISTS (
+            SELECT 1 FROM xerox.meter_readings_normalised mr WHERE mr.printer_id = pd.printer_id
+          ) AS has_readings
         FROM xerox.printer_dimensions pd
         FULL OUTER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
         ORDER BY
