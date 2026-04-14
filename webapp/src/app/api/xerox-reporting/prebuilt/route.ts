@@ -229,9 +229,17 @@ export async function GET(request: NextRequest) {
         printer_type: string;
         report_date: string;
         daily_volume: number | null;
-        running_balance: number | null;
+        balance: number | null;
       }>(
-        `WITH daily_vols AS (
+        `WITH daily_balance AS (
+          SELECT
+            mr.printer_id,
+            mr.report_date,
+            MAX(CASE WHEN mr.meter_type = 'total_impressions' THEN mr.reading END) AS balance
+          FROM xerox.meter_readings_normalised mr
+          GROUP BY mr.printer_id, mr.report_date
+        ),
+        daily_vols AS (
           SELECT
             mv.printer_id,
             mv.date AS report_date,
@@ -245,16 +253,14 @@ export async function GET(request: NextRequest) {
           pd.serial_number,
           pd.model,
           COALESCE(psm.printer_type, 'Unknown') AS printer_type,
-          dv.report_date::text,
+          db.report_date::text,
           dv.daily_volume::bigint AS daily_volume,
-          SUM(dv.daily_volume) OVER (
-            PARTITION BY dv.printer_id
-            ORDER BY dv.report_date
-          )::bigint AS running_balance
-        FROM daily_vols dv
-        JOIN xerox.printer_dimensions pd ON pd.printer_id = dv.printer_id
+          db.balance::bigint AS balance
+        FROM daily_balance db
+        JOIN xerox.printer_dimensions pd ON pd.printer_id = db.printer_id
         INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
-        ORDER BY dv.report_date DESC, psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`
+        LEFT JOIN daily_vols dv ON dv.printer_id = db.printer_id AND dv.report_date = db.report_date
+        ORDER BY db.report_date DESC, psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`
       );
 
       return NextResponse.json({ data: result.rows, rowCount: result.rows.length });

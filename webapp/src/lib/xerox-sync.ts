@@ -46,7 +46,25 @@ export async function syncXeroxStoreMap(): Promise<{ upserted: number; duration:
 
   const client = await xeroxPool.connect();
   try {
-    const batches = chunkArray(machines, 500);
+    // Only sync BMS machines whose serial exists in Xerox portal (printer_dimensions).
+    // This filters out non-Xerox machines (Canon, Ricoh, etc.) that are in BMS
+    // but have never appeared in a Xerox email report.
+    const xeroxSerialsResult = await client.query<{ serial_number: string }>(
+      `SELECT serial_number FROM xerox.printer_dimensions`
+    );
+    const xeroxSerials = new Set(
+      xeroxSerialsResult.rows.map((r) => r.serial_number.trim().toUpperCase())
+    );
+
+    const xeroxMachines = machines.filter((m) =>
+      xeroxSerials.has(m.serialNumber.trim().toUpperCase())
+    );
+
+    if (xeroxMachines.length === 0) {
+      return { upserted: 0, duration: Date.now() - start };
+    }
+
+    const batches = chunkArray(xeroxMachines, 500);
     let totalUpserted = 0;
 
     for (const batch of batches) {

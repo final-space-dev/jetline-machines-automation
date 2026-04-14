@@ -270,7 +270,7 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
       { accessorKey: "printer_type",     header: "Type",     cell: ({ getValue }) => { const v = getValue<string>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
       { accessorKey: "report_date",      header: "Date",     enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
       { accessorKey: "daily_volume",     header: "Volume",   enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
-      { accessorKey: "running_balance",  header: "Balance",  enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
+      { accessorKey: "balance",           header: "Balance",  enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
     ];
   }
 
