@@ -221,49 +221,131 @@ export async function GET(request: NextRequest) {
     }
 
     if (report === "daily") {
-      const result = await client.query<{
+      // Get the 7 most recent distinct report dates across all machines
+      const datesResult = await client.query<{ report_date: string }>(
+        `SELECT DISTINCT report_date::text
+         FROM xerox.meter_readings_normalised
+         ORDER BY report_date DESC
+         LIMIT 7`
+      );
+      const dates = datesResult.rows.map((r) => r.report_date); // newest first
+
+      if (dates.length === 0) {
+        return NextResponse.json({ data: [], dates: [], rowCount: 0 });
+      }
+
+      // All machines in store map + their per-day volumes for the 7-day window
+      // + their actual latest reading (regardless of window)
+      const rawResult = await client.query<{
+        printer_id: number;
+        serial_number: string;
         store: string | null;
         company_group: string | null;
-        serial_number: string;
         model: string;
         printer_type: string;
-        report_date: string;
-        daily_volume: number | null;
-        balance: number | null;
+        report_date: string | null;
+        daily_volume: string | null;
+        latest_balance: string | null;
       }>(
-        `WITH daily_balance AS (
+        `WITH all_machines AS (
           SELECT
-            mr.printer_id,
-            mr.report_date,
-            MAX(CASE WHEN mr.meter_type = 'total_impressions' THEN mr.reading END) AS balance
-          FROM xerox.meter_readings_normalised mr
-          GROUP BY mr.printer_id, mr.report_date
+            pd.printer_id,
+            pd.serial_number,
+            psm.store,
+            psm.company_group,
+            pd.model,
+            COALESCE(psm.printer_type, 'Unknown') AS printer_type
+          FROM xerox.printer_dimensions pd
+          INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+        ),
+        -- For each printer+date in the window, get the total_impressions reading
+        readings_in_window AS (
+          SELECT
+            printer_id,
+            report_date,
+            reading
+          FROM xerox.meter_readings_normalised
+          WHERE meter_type = 'total_impressions'
+            AND reading IS NOT NULL
+            AND report_date = ANY($1::date[])
+        ),
+        -- For each printer+date, get the previous reading (closest before that date)
+        prev_readings AS (
+          SELECT
+            r.printer_id,
+            r.report_date,
+            r.reading AS curr_reading,
+            (
+              SELECT prev.reading
+              FROM xerox.meter_readings_normalised prev
+              WHERE prev.printer_id = r.printer_id
+                AND prev.meter_type = 'total_impressions'
+                AND prev.reading IS NOT NULL
+                AND prev.report_date < r.report_date
+              ORDER BY prev.report_date DESC
+              LIMIT 1
+            ) AS prev_reading
+          FROM readings_in_window r
         ),
         daily_vols AS (
           SELECT
-            mv.printer_id,
-            mv.date AS report_date,
-            SUM(mv.volume) AS daily_volume
-          FROM xerox.meter_volumes mv
-          GROUP BY mv.printer_id, mv.date
+            printer_id,
+            report_date::text AS report_date,
+            CASE
+              WHEN prev_reading IS NOT NULL AND curr_reading >= prev_reading
+              THEN (curr_reading - prev_reading)::bigint
+              ELSE NULL
+            END AS daily_volume
+          FROM prev_readings
+        ),
+        latest_bal AS (
+          SELECT DISTINCT ON (printer_id)
+            printer_id,
+            reading::bigint AS latest_balance
+          FROM xerox.meter_readings_normalised
+          WHERE meter_type = 'total_impressions'
+            AND reading IS NOT NULL
+          ORDER BY printer_id, report_date DESC
         )
         SELECT
-          psm.store,
-          psm.company_group,
-          pd.serial_number,
-          pd.model,
-          COALESCE(psm.printer_type, 'Unknown') AS printer_type,
-          db.report_date::text,
-          dv.daily_volume::bigint AS daily_volume,
-          db.balance::bigint AS balance
-        FROM daily_balance db
-        JOIN xerox.printer_dimensions pd ON pd.printer_id = db.printer_id
-        INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
-        LEFT JOIN daily_vols dv ON dv.printer_id = db.printer_id AND dv.report_date = db.report_date
-        ORDER BY db.report_date DESC, psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`
+          am.printer_id,
+          am.serial_number,
+          am.store,
+          am.company_group,
+          am.model,
+          am.printer_type,
+          dv.report_date,
+          dv.daily_volume::text,
+          lb.latest_balance::text
+        FROM all_machines am
+        LEFT JOIN daily_vols dv ON dv.printer_id = am.printer_id
+        LEFT JOIN latest_bal lb ON lb.printer_id = am.printer_id
+        ORDER BY am.company_group NULLS LAST, am.store NULLS LAST, am.serial_number, dv.report_date`,
+        [dates]
       );
 
-      return NextResponse.json({ data: result.rows, rowCount: result.rows.length });
+      // Pivot: one row per machine, with vol_YYYY-MM-DD columns + latest_balance
+      const machineMap = new Map<number, Record<string, string | number | null>>();
+      for (const row of rawResult.rows) {
+        if (!machineMap.has(row.printer_id)) {
+          machineMap.set(row.printer_id, {
+            serial_number: row.serial_number,
+            store: row.store,
+            company_group: row.company_group,
+            model: row.model,
+            printer_type: row.printer_type,
+            latest_balance: row.latest_balance !== null ? Number(row.latest_balance) : null,
+          });
+        }
+        if (row.report_date !== null) {
+          const machine = machineMap.get(row.printer_id)!;
+          machine[`vol_${row.report_date}`] = row.daily_volume !== null ? Number(row.daily_volume) : null;
+        }
+      }
+
+      const data = Array.from(machineMap.values());
+
+      return NextResponse.json({ data, dates, rowCount: data.length });
     }
 
     if (report === "reading-frequency") {

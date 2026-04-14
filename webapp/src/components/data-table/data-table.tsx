@@ -483,19 +483,33 @@ export function DataTable<TData, TValue>({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowSelection, table]);
 
-  const handleExportCSV = () => {
-    const visibleColumns = table.getAllColumns().filter((col) => col.getIsVisible());
-    const headers = visibleColumns.map((col) => col.id);
-    const rows = table.getFilteredRowModel().rows.map((row) =>
+  const getExportData = () => {
+    // Use sorted+filtered rows (respects current sort order)
+    const sortedRows = table.getSortedRowModel().rows;
+    // Use visible leaf columns in rendered order (matches what the user sees)
+    const visibleColumns = table.getVisibleLeafColumns();
+    const headers = visibleColumns.map((col) => {
+      const h = col.columnDef.header;
+      if (typeof h === "string") return h;
+      return col.id; // fallback for function headers (date cols etc.)
+    });
+    const rows = sortedRows.map((row) =>
       visibleColumns.map((col) => {
         const value = row.getValue(col.id);
         if (value === null || value === undefined) return "";
         if (value instanceof Date) return value.toISOString();
-        return String(value);
+        return value;
       })
     );
+    return { headers, rows };
+  };
 
-    const csv = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
+  const handleExportCSV = () => {
+    const { headers, rows } = getExportData();
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${String(cell)}"`).join(",")),
+    ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -506,17 +520,7 @@ export function DataTable<TData, TValue>({
   };
 
   const handleExportExcel = () => {
-    const visibleColumns = table.getAllColumns().filter((col) => col.getIsVisible());
-    const headers = visibleColumns.map((col) => col.id);
-    const rows = table.getFilteredRowModel().rows.map((row) =>
-      visibleColumns.map((col) => {
-        const value = row.getValue(col.id);
-        if (value === null || value === undefined) return "";
-        if (value instanceof Date) return value;
-        return value;
-      })
-    );
-
+    const { headers, rows } = getExportData();
     const wsData = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
@@ -737,7 +741,7 @@ export function DataTable<TData, TValue>({
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     {header.isPlaceholder ? null : (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 whitespace-nowrap">
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {header.column.getIsSorted() && (
                           <span className="text-muted-foreground text-xs">

@@ -262,16 +262,71 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
   }
 
   if (report === "daily") {
-    return [
-      { accessorKey: "store",            header: "Store",    cell: ({ getValue }) => <span className={C.bold}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "company_group",    header: "Group",    cell: ({ getValue }) => <span className={C.text}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "serial_number",    header: "Serial",   cell: ({ getValue }) => <span className={C.mono}>{getValue<string>() || "—"}</span> },
-      { accessorKey: "model",            header: "Model",    cell: ({ getValue }) => <span className={C.text}>{getValue<string>() || "—"}</span> },
-      { accessorKey: "printer_type",     header: "Type",     cell: ({ getValue }) => { const v = getValue<string>(); return <span className={cn(C.text, v === "Colour" ? "text-purple-700" : "text-muted-foreground")}>{v || "—"}</span>; } },
-      { accessorKey: "report_date",      header: "Date",     enableSorting: true, cell: ({ getValue }) => <span className={C.mono}>{getValue<string | null>() || "—"}</span> },
-      { accessorKey: "daily_volume",     header: "Volume",   enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
-      { accessorKey: "balance",           header: "Balance",  enableSorting: true, meta: { align: "right" }, cell: ({ getValue }) => <span className={C.num}>{fmt(getValue<number | null>())}</span> },
-    ];
+    // dates[] is newest-first; we want oldest-first for left-to-right column order
+    const orderedDates = [...(months ?? [])].reverse();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dateCols: ColumnDef<any>[] = orderedDates.map((d) => {
+      const label = (() => {
+        try {
+          const [y, mo, day] = d.split("-");
+          return new Date(Number(y), Number(mo) - 1, Number(day)).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+        } catch { return d; }
+      })();
+      return {
+        accessorKey: `vol_${d}`,
+        header: label,
+        enableSorting: true,
+        meta: { align: "right" },
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as number | null;
+          return <span className={C.num}>{v != null ? fmt(v) : <span className={C.muted}>—</span>}</span>;
+        },
+      };
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const totalCol: ColumnDef<any> = {
+      id: "period_total",
+      header: "7-Day Total",
+      enableSorting: true,
+      sortingFn: (a, b, colId) => {
+        const av = a.getValue(colId) as number | null;
+        const bv = b.getValue(colId) as number | null;
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        return av - bv;
+      },
+      meta: { align: "right" },
+      accessorFn: (row: Record<string, unknown>) => {
+        let sum = 0;
+        let hasAny = false;
+        for (const d of orderedDates) {
+          const v = row[`vol_${d}`];
+          if (v != null) { sum += Number(v); hasAny = true; }
+        }
+        return hasAny ? sum : null;
+      },
+      cell: ({ getValue }: { getValue: () => unknown }) => {
+        const v = getValue() as number | null;
+        return <span className={cn(C.num, "font-medium")}>{v != null ? fmt(v) : <span className={C.muted}>—</span>}</span>;
+      },
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const balanceCol: ColumnDef<any> = {
+      accessorKey: "latest_balance",
+      header: "Last Reading",
+      enableSorting: true,
+      meta: { align: "right" },
+      cell: ({ getValue }: { getValue: () => unknown }) => {
+        const v = getValue() as number | null;
+        return <span className={cn(C.num, "font-semibold")}>{v != null ? fmt(v) : <span className={C.muted}>—</span>}</span>;
+      },
+    };
+
+    return [...identity, ...dateCols, totalCol, balanceCol];
   }
 
   if (report === "bms-machines") {
@@ -474,9 +529,10 @@ export default function XeroxReportingPage() {
         throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
       }
       const json = await res.json();
-      setData((json as { data?: unknown[]; months?: string[]; totalReportDays?: number }).data ?? []);
-      setMonths((json as { data?: unknown[]; months?: string[] }).months ?? []);
-      setTotalReportDays((json as { totalReportDays?: number }).totalReportDays ?? null);
+      const j = json as { data?: unknown[]; months?: string[]; dates?: string[]; totalReportDays?: number };
+      setData(j.data ?? []);
+      setMonths(j.months ?? j.dates ?? []);
+      setTotalReportDays(j.totalReportDays ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setData([]);
