@@ -246,9 +246,11 @@ export async function GET(request: NextRequest) {
         report_date: string | null;
         daily_volume: string | null;
         latest_balance: string | null;
+        latest_reading_date: string | null;
       }>(
         `WITH all_machines AS (
-          SELECT
+          -- Deduplicate on serial_number: keep the printer_id with the most recent reading
+          SELECT DISTINCT ON (pd.serial_number)
             pd.printer_id,
             pd.serial_number,
             psm.store,
@@ -257,35 +259,44 @@ export async function GET(request: NextRequest) {
             COALESCE(psm.printer_type, 'Unknown') AS printer_type
           FROM xerox.printer_dimensions pd
           INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+          ORDER BY pd.serial_number, (
+            SELECT MAX(report_date) FROM xerox.meter_readings_normalised
+            WHERE printer_id = pd.printer_id
+          ) DESC NULLS LAST
         ),
-        -- For each printer+date in the window, get the total_impressions reading
-        readings_in_window AS (
+        -- True total per printer per date = sum of the four real sub-meters
+        -- (Xerox total_impressions excludes A3, so we ignore it)
+        true_total_in_window AS (
           SELECT
             printer_id,
             report_date,
-            reading
+            SUM(reading) AS reading
           FROM xerox.meter_readings_normalised
-          WHERE meter_type = 'total_impressions'
+          WHERE meter_type IN ('black_impressions', 'color_impressions', 'black_large_impressions', 'color_large_impressions')
             AND reading IS NOT NULL
             AND report_date = ANY($1::date[])
+          GROUP BY printer_id, report_date
         ),
-        -- For each printer+date, get the previous reading (closest before that date)
+        -- Previous true total per printer (closest date before each window date)
         prev_readings AS (
           SELECT
             r.printer_id,
             r.report_date,
             r.reading AS curr_reading,
             (
-              SELECT prev.reading
+              SELECT SUM(prev.reading)
               FROM xerox.meter_readings_normalised prev
               WHERE prev.printer_id = r.printer_id
-                AND prev.meter_type = 'total_impressions'
+                AND prev.meter_type IN ('black_impressions', 'color_impressions', 'black_large_impressions', 'color_large_impressions')
                 AND prev.reading IS NOT NULL
-                AND prev.report_date < r.report_date
-              ORDER BY prev.report_date DESC
-              LIMIT 1
+                AND prev.report_date = (
+                  SELECT MAX(p2.report_date)
+                  FROM xerox.meter_readings_normalised p2
+                  WHERE p2.printer_id = r.printer_id
+                    AND p2.report_date < r.report_date
+                )
             ) AS prev_reading
-          FROM readings_in_window r
+          FROM true_total_in_window r
         ),
         daily_vols AS (
           SELECT
@@ -301,10 +312,15 @@ export async function GET(request: NextRequest) {
         latest_bal AS (
           SELECT DISTINCT ON (printer_id)
             printer_id,
-            reading::bigint AS latest_balance
-          FROM xerox.meter_readings_normalised
-          WHERE meter_type = 'total_impressions'
-            AND reading IS NOT NULL
+            total::bigint AS latest_balance,
+            report_date::text AS latest_reading_date
+          FROM (
+            SELECT printer_id, report_date, SUM(reading) AS total
+            FROM xerox.meter_readings_normalised
+            WHERE meter_type IN ('black_impressions', 'color_impressions', 'black_large_impressions', 'color_large_impressions')
+              AND reading IS NOT NULL
+            GROUP BY printer_id, report_date
+          ) t
           ORDER BY printer_id, report_date DESC
         )
         SELECT
@@ -316,7 +332,8 @@ export async function GET(request: NextRequest) {
           am.printer_type,
           dv.report_date,
           dv.daily_volume::text,
-          lb.latest_balance::text
+          lb.latest_balance::text,
+          lb.latest_reading_date
         FROM all_machines am
         LEFT JOIN daily_vols dv ON dv.printer_id = am.printer_id
         LEFT JOIN latest_bal lb ON lb.printer_id = am.printer_id
@@ -335,6 +352,7 @@ export async function GET(request: NextRequest) {
             model: row.model,
             printer_type: row.printer_type,
             latest_balance: row.latest_balance !== null ? Number(row.latest_balance) : null,
+            latest_reading_date: row.latest_reading_date ?? null,
           });
         }
         if (row.report_date !== null) {
@@ -343,7 +361,16 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      const data = Array.from(machineMap.values());
+      // Pre-compute period_total so the frontend can sort it as a plain number
+      const data = Array.from(machineMap.values()).map((m) => {
+        let sum = 0;
+        let hasAny = false;
+        for (const d of dates) {
+          const v = m[`vol_${d}`];
+          if (v != null) { sum += Number(v); hasAny = true; }
+        }
+        return { ...m, period_total: hasAny ? sum : null };
+      });
 
       return NextResponse.json({ data, dates, rowCount: data.length });
     }
