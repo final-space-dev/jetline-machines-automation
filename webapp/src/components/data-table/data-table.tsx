@@ -435,7 +435,7 @@ export function DataTable<TData, TValue>({
     ...(!noPagination && { getPaginationRowModel: getPaginationRowModel() }),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    isMultiSortEvent: () => true,
+    isMultiSortEvent: (e) => (e as MouseEvent).shiftKey,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,

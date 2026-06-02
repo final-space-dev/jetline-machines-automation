@@ -22,18 +22,11 @@ import {
 
 // ─── Report types ─────────────────────────────────────────────────────────────
 
-type ReportType = "live" | "not-transmitting" | "machine-age" | "last-balance" | "monthly-volume" | "no-data" | "daily" | "reading-frequency" | "bms-machines";
+type ReportType = "live" | "not-transmitting" | "machine-age" | "last-balance" | "monthly-volume" | "no-data" | "daily" | "reading-frequency" | "bms-machines" | "audit";
 
 const REPORT_OPTIONS: { id: ReportType; label: string; description: string }[] = [
-  { id: "live",             label: "Live View",                description: "All printers with volumes over selected date range" },
-  { id: "not-transmitting", label: "Not Transmitting",         description: "Machines with no data in the last 7 days" },
-  { id: "machine-age",      label: "Machine Age",              description: "All machines sorted oldest to newest" },
-  { id: "last-balance",     label: "Last Balance per Machine", description: "Latest cumulative reading per machine by store and model" },
-  { id: "monthly-volume",   label: "Monthly Volume",           description: "Volume per machine per month going back as far as available" },
-  { id: "no-data",          label: "No Data",                  description: "Machines registered in Xerox but never sent any readings" },
-  { id: "daily",             label: "Daily Report",             description: "Day-by-day volume movement with anomaly detection" },
-  { id: "reading-frequency", label: "Reading Frequency",        description: "Unique readings per machine vs total reports — shows which machines are stale or disconnected" },
-  { id: "bms-machines",      label: "BMS Machines",             description: "All Xerox machines in BMS — flagged by whether Xerox is actively billing or reporting on them" },
+  { id: "daily", label: "Daily Report",  description: "Day-by-day volume movement per machine with last reading" },
+  { id: "audit", label: "Audit Report",  description: "Machines with reading dates more than 3 days behind — send to technical team on Fridays" },
 ];
 
 // ─── Row types ────────────────────────────────────────────────────────────────
@@ -265,6 +258,24 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
     // dates[] is newest-first; we want oldest-first for left-to-right column order
     const orderedDates = [...(months ?? [])].reverse();
 
+    // Reusable sort functions — nulls always go to bottom regardless of direction
+    const numSort = (a: any, b: any, colId: string): number => {
+      const av = a.getValue(colId) as number | null;
+      const bv = b.getValue(colId) as number | null;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return av - bv;
+    };
+    const strSort = (a: any, b: any, colId: string): number => {
+      const av = (a.getValue(colId) as string | null) ?? "";
+      const bv = (b.getValue(colId) as string | null) ?? "";
+      if (!av && !bv) return 0;
+      if (!av) return 1;
+      if (!bv) return -1;
+      return av.localeCompare(bv);
+    };
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dateCols: ColumnDef<any>[] = orderedDates.map((d) => {
       const label = (() => {
@@ -277,6 +288,7 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
         accessorKey: `vol_${d}`,
         header: label,
         enableSorting: true,
+        sortingFn: numSort,
         meta: { align: "right" },
         cell: ({ getValue }: { getValue: () => unknown }) => {
           const v = getValue() as number | null;
@@ -287,27 +299,11 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const totalCol: ColumnDef<any> = {
-      id: "period_total",
+      accessorKey: "period_total",
       header: "7-Day Total",
       enableSorting: true,
-      sortingFn: (a, b, colId) => {
-        const av = a.getValue(colId) as number | null;
-        const bv = b.getValue(colId) as number | null;
-        if (av === null && bv === null) return 0;
-        if (av === null) return 1;
-        if (bv === null) return -1;
-        return av - bv;
-      },
+      sortingFn: numSort,
       meta: { align: "right" },
-      accessorFn: (row: Record<string, unknown>) => {
-        let sum = 0;
-        let hasAny = false;
-        for (const d of orderedDates) {
-          const v = row[`vol_${d}`];
-          if (v != null) { sum += Number(v); hasAny = true; }
-        }
-        return hasAny ? sum : null;
-      },
       cell: ({ getValue }: { getValue: () => unknown }) => {
         const v = getValue() as number | null;
         return <span className={cn(C.num, "font-medium")}>{v != null ? fmt(v) : <span className={C.muted}>—</span>}</span>;
@@ -319,6 +315,7 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
       accessorKey: "latest_balance",
       header: "Last Reading",
       enableSorting: true,
+      sortingFn: numSort,
       meta: { align: "right" },
       cell: ({ getValue }: { getValue: () => unknown }) => {
         const v = getValue() as number | null;
@@ -326,7 +323,89 @@ function buildPrebuiltColumns(report: ReportType, months?: string[]): ColumnDef<
       },
     };
 
-    return [...identity, ...dateCols, totalCol, balanceCol];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const readingDateCol: ColumnDef<any> = {
+      accessorKey: "latest_reading_date",
+      header: "Reading Date",
+      enableSorting: true,
+      sortingFn: strSort,
+      cell: ({ getValue }: { getValue: () => unknown }) => {
+        const v = getValue() as string | null;
+        return <span className={C.mono}>{v || <span className={C.muted}>—</span>}</span>;
+      },
+    };
+
+    return [...identity, ...dateCols, totalCol, balanceCol, readingDateCol];
+  }
+
+  if (report === "audit") {
+    const numSort = (a: any, b: any, colId: string): number => {
+      const av = a.getValue(colId) as number | null;
+      const bv = b.getValue(colId) as number | null;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return av - bv;
+    };
+    return [
+      ...identity,
+      {
+        accessorKey: "status",
+        header: "Status",
+        enableSorting: true,
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as string;
+          const map: Record<string, string> = {
+            "OK":             "text-green-700 bg-green-50 border-green-200",
+            "Outdated":       "text-orange-600 bg-orange-50 border-orange-200",
+            "Critical":       "text-amber-700 bg-amber-50 border-amber-200",
+            "Offline":        "text-red-700 bg-red-50 border-red-200",
+            "Never Reported": "text-gray-600 bg-gray-100 border-gray-200",
+          };
+          return (
+            <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full border", map[v] ?? "text-muted-foreground")}>
+              {v}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "days_behind",
+        header: "Days Behind",
+        enableSorting: true,
+        sortingFn: numSort,
+        meta: { align: "right" },
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as number | null;
+          if (v == null) return <span className="text-xs text-gray-400">—</span>;
+          if (v <= 3) return <span className={cn(C.num, "text-green-700")}>{v}d</span>;
+          const colour = v > 30 ? "text-red-700 font-semibold" : v > 14 ? "text-amber-700 font-medium" : "text-orange-600";
+          return <span className={cn(C.num, colour)}>{v}d</span>;
+        },
+      },
+      {
+        accessorKey: "latest_reading_date",
+        header: "Last Reading Date",
+        enableSorting: true,
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-xs text-gray-400">—</span>;
+          return <span className={C.mono}>{v}</span>;
+        },
+      },
+      {
+        accessorKey: "bms_active",
+        header: "BMS Active",
+        enableSorting: true,
+        cell: ({ getValue }: { getValue: () => unknown }) => {
+          const v = getValue() as boolean | null;
+          if (v === null || v === undefined) return <span className={C.muted}>—</span>;
+          return v
+            ? <span className="text-xs text-green-700 font-medium">Active</span>
+            : <span className="text-xs text-muted-foreground">Inactive</span>;
+        },
+      },
+    ];
   }
 
   if (report === "bms-machines") {
@@ -447,7 +526,7 @@ const PRESETS = [
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function XeroxReportingPage() {
-  const [activeReport, setActiveReport] = useState<ReportType>("live");
+  const [activeReport, setActiveReport] = useState<ReportType>("daily");
 
   const [range, setRange] = useState<DateRange>({ from: addDays(new Date(), -30), to: new Date() });
   const [appliedRange, setAppliedRange] = useState(range);
@@ -459,6 +538,7 @@ export default function XeroxReportingPage() {
   const [filteredData, setFilteredData] = useState<any[]>([]);
   const [months, setMonths] = useState<string[]>([]);
   const [totalReportDays, setTotalReportDays] = useState<number | null>(null);
+  const [auditSummary, setAuditSummary] = useState<{ total: number; ok: number; outdated: number; critical: number; offline: number; never_reported: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -529,10 +609,11 @@ export default function XeroxReportingPage() {
         throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
       }
       const json = await res.json();
-      const j = json as { data?: unknown[]; months?: string[]; dates?: string[]; totalReportDays?: number };
+      const j = json as { data?: unknown[]; months?: string[]; dates?: string[]; totalReportDays?: number; summary?: { total: number; ok: number; outdated: number; critical: number; offline: number; never_reported: number } };
       setData(j.data ?? []);
       setMonths(j.months ?? j.dates ?? []);
       setTotalReportDays(j.totalReportDays ?? null);
+      setAuditSummary(j.summary ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setData([]);
@@ -620,6 +701,7 @@ export default function XeroxReportingPage() {
       : [];
 
     const isBmsMachines = d.some((r) => "in_xerox" in r && "in_bms" in r);
+    const isAudit = d.some((r) => "status" in r && "days_behind" in r);
 
     // Build candidate filters; dedup by label keeping last match so report-specific
     // keys (e.g. "store" for bms-machines) override generic fallbacks
@@ -631,6 +713,7 @@ export default function XeroxReportingPage() {
       { key: "printerType",   label: "Type",       options: types.map((v) => ({ value: v, label: v })) },
       { key: "printer_type",  label: "Type",       options: types.map((v) => ({ value: v, label: v })) },
       { key: "category",      label: "Type",       options: uniq(pick("category")).map((v) => ({ value: v, label: v })) },
+      { key: "status",        label: "Status",     options: isAudit ? ["OK", "Outdated", "Critical", "Offline", "Never Reported"].map((v) => ({ value: v, label: v })) : [] },
       { key: "in_bms",        label: "In BMS",     options: inBmsNoDataOptions },
       { key: "bms_status",    label: "BMS Status", options: isBmsMachines ? [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] : [] },
       { key: "in_xerox",      label: "In Xerox",        options: isBmsMachines ? boolOpts : [] },
@@ -700,6 +783,8 @@ export default function XeroxReportingPage() {
     ? `${data.length} printers · ${formatRange(appliedFrom, appliedTo)}`
     : activeReport === "reading-frequency" && totalReportDays != null
     ? `${data.length} machines · ${totalReportDays} total report days received`
+    : activeReport === "audit" && auditSummary != null
+    ? `${auditSummary.total} total · ${auditSummary.ok} OK · ${auditSummary.outdated} outdated · ${auditSummary.critical} critical · ${auditSummary.offline} offline · ${auditSummary.never_reported} never reported`
     : `${data.length} rows`;
 
   // ── Column visibility panel helpers ──

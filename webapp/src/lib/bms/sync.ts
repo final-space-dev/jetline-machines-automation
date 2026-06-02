@@ -268,10 +268,7 @@ async function syncMachinesFromBMS(
         is_lifted = EXCLUDED.is_lifted,
         last_synced_at = EXCLUDED.last_synced_at,
         updated_at = EXCLUDED.updated_at
-      WHERE
-        -- Never let an INACTIVE record overwrite an ACTIVE one.
-        -- Active always wins; only update if incoming is active OR existing is not active.
-        EXCLUDED.status = 'ACTIVE' OR machines.status != 'ACTIVE'
+      WHERE TRUE
     `;
 
     try {
