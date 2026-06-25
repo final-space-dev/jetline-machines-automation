@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         FROM xerox.printer_dimensions pd
         INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
         LEFT JOIN xerox.meter_readings_normalised mr ON mr.printer_id = pd.printer_id
+        WHERE pd.manufacturer = 'Xerox'
         GROUP BY pd.printer_id, pd.serial_number, psm.store, psm.company_group, pd.model, pd.asset_status, psm.printer_type
         HAVING MAX(mr.report_date) IS NULL OR MAX(mr.report_date) < $1
         ORDER BY psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`,
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
         FROM xerox.printer_dimensions pd
         INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
         LEFT JOIN xerox.meter_readings_normalised mr ON mr.printer_id = pd.printer_id
+        WHERE pd.manufacturer = 'Xerox'
         GROUP BY pd.printer_id, pd.serial_number, psm.store, psm.company_group, pd.model, pd.asset_status, psm.original_install_date, psm.printer_type
         ORDER BY psm.original_install_date ASC NULLS LAST, psm.store NULLS LAST`
       );
@@ -105,6 +107,7 @@ export async function GET(request: NextRequest) {
         FROM xerox.printer_dimensions pd
         INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
         LEFT JOIN xerox.meter_readings_normalised mr ON mr.printer_id = pd.printer_id
+        WHERE pd.manufacturer = 'Xerox'
         GROUP BY pd.printer_id, pd.serial_number, psm.store, psm.company_group, pd.model, psm.printer_type
         ORDER BY psm.company_group NULLS LAST, psm.store NULLS LAST, pd.model, pd.serial_number`
       );
@@ -159,7 +162,8 @@ export async function GET(request: NextRequest) {
           psm.store,
           psm.company_group
          FROM xerox.printer_dimensions pd
-         INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number`
+         INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+         WHERE pd.manufacturer = 'Xerox'`
       );
 
       const data = dimsResult.rows.map((dim) => {
@@ -189,7 +193,7 @@ export async function GET(request: NextRequest) {
     if (report === "no-data") {
       // Get all BMS serial numbers for cross-reference
       const bmsSerials = await prisma.machine.findMany({ select: { serialNumber: true } });
-      const bmsSerialSet = new Set(bmsSerials.map((m) => m.serialNumber.trim().toUpperCase()));
+      const bmsSerialSet = new Set(bmsSerials.filter((m) => m.serialNumber != null).map((m) => m.serialNumber.trim().toUpperCase()));
 
       const result = await client.query<{
         serial_number: string;
@@ -206,7 +210,8 @@ export async function GET(request: NextRequest) {
           COALESCE(psm.printer_type, 'Unknown') AS printer_type
         FROM xerox.printer_dimensions pd
         LEFT JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
-        WHERE NOT EXISTS (
+        WHERE pd.manufacturer = 'Xerox'
+          AND NOT EXISTS (
           SELECT 1 FROM xerox.meter_readings_normalised mr WHERE mr.printer_id = pd.printer_id
         )
         ORDER BY psm.company_group NULLS LAST, psm.store NULLS LAST, pd.serial_number`
@@ -221,13 +226,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (report === "daily") {
-      // Only show BMS-active machines
-      const bmsActiveRows = await prisma.machine.findMany({
-        where: { bmsStatus: 1 },
-        select: { serialNumber: true },
-      });
-      const bmsActiveSerials = bmsActiveRows.map((m) => m.serialNumber.trim().toUpperCase());
-
       // Get the 7 most recent distinct report dates across all machines
       const datesResult = await client.query<{ report_date: string }>(
         `SELECT DISTINCT report_date::text
@@ -241,8 +239,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ data: [], dates: [], rowCount: 0 });
       }
 
-      // BMS-active machines in store map + their per-day volumes for the 7-day window
-      // + their actual latest reading (regardless of window)
+      // ALL machines Xerox knows about — mapped or not, BMS-active or not.
+      // LEFT JOIN store map so unmapped machines still appear (store/group will be null).
+      // Ops team can see and action new/unmapped machines from the report itself.
       const rawResult = await client.query<{
         printer_id: number;
         serial_number: string;
@@ -257,7 +256,6 @@ export async function GET(request: NextRequest) {
       }>(
         `WITH all_machines AS (
           -- Deduplicate on serial_number: keep the printer_id with the most recent reading
-          -- Only include BMS-active machines
           SELECT DISTINCT ON (pd.serial_number)
             pd.printer_id,
             pd.serial_number,
@@ -266,8 +264,9 @@ export async function GET(request: NextRequest) {
             pd.model,
             COALESCE(psm.printer_type, 'Unknown') AS printer_type
           FROM xerox.printer_dimensions pd
-          INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
-          WHERE UPPER(TRIM(pd.serial_number)) = ANY($2::text[])
+          LEFT JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+          WHERE pd.manufacturer = 'Xerox'
+            AND COALESCE(psm.reporting_enabled, true) = true
           ORDER BY pd.serial_number, (
             SELECT MAX(report_date) FROM xerox.meter_readings_normalised
             WHERE printer_id = pd.printer_id
@@ -347,7 +346,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN daily_vols dv ON dv.printer_id = am.printer_id
         LEFT JOIN latest_bal lb ON lb.printer_id = am.printer_id
         ORDER BY am.company_group NULLS LAST, am.store NULLS LAST, am.serial_number, dv.report_date`,
-        [dates, bmsActiveSerials]
+        [dates]
       );
 
       // Pivot: one row per machine, with vol_YYYY-MM-DD columns + latest_balance
@@ -451,7 +450,7 @@ export async function GET(request: NextRequest) {
       const bmsStatusRows = await prisma.machine.findMany({
         select: { serialNumber: true, bmsStatus: true, modelName: true },
       });
-      const bmsStatusMap = new Map(bmsStatusRows.map((m) => [m.serialNumber.trim().toUpperCase(), { bmsStatus: m.bmsStatus, modelName: m.modelName }]));
+      const bmsStatusMap = new Map(bmsStatusRows.filter((m) => m.serialNumber != null).map((m) => [m.serialNumber.trim().toUpperCase(), { bmsStatus: m.bmsStatus, modelName: m.modelName }]));
 
       const result = await client.query<{
         serial_number: string;
@@ -476,6 +475,7 @@ export async function GET(request: NextRequest) {
           ) AS has_readings
         FROM xerox.printer_dimensions pd
         FULL OUTER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+        WHERE pd.manufacturer = 'Xerox' OR pd.manufacturer IS NULL
         ORDER BY
           psm.company_group NULLS LAST,
           psm.store NULLS LAST,
@@ -498,9 +498,9 @@ export async function GET(request: NextRequest) {
       const bmsRows = await prisma.machine.findMany({
         select: { serialNumber: true, bmsStatus: true },
       });
-      const bmsMap = new Map(bmsRows.map((m) => [m.serialNumber.trim().toUpperCase(), m.bmsStatus]));
+      const bmsMap = new Map(bmsRows.filter((m) => m.serialNumber != null).map((m) => [m.serialNumber.trim().toUpperCase(), m.bmsStatus]));
       const bmsActiveSerials = bmsRows
-        .filter((m) => m.bmsStatus === 1)
+        .filter((m) => m.bmsStatus === 1 && m.serialNumber != null)
         .map((m) => m.serialNumber.trim().toUpperCase());
 
       const result = await client.query<{
@@ -521,7 +521,7 @@ export async function GET(request: NextRequest) {
           WHERE meter_type IN ('black_impressions', 'color_impressions', 'black_large_impressions', 'color_large_impressions', 'total_impressions')
           GROUP BY printer_id
         ),
-        -- BMS-active machines only, deduplicated on serial_number
+        -- All Xerox machines, deduplicated on serial_number, mapped or not
         all_machines AS (
           SELECT DISTINCT ON (pd.serial_number)
             pd.printer_id,
@@ -531,8 +531,9 @@ export async function GET(request: NextRequest) {
             pd.model,
             COALESCE(psm.printer_type, 'Unknown') AS printer_type
           FROM xerox.printer_dimensions pd
-          INNER JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
-          WHERE UPPER(TRIM(pd.serial_number)) = ANY($1::text[])
+          LEFT JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+          WHERE pd.manufacturer = 'Xerox'
+            AND COALESCE(psm.reporting_enabled, true) = true
           ORDER BY pd.serial_number, (
             SELECT MAX(report_date) FROM xerox.meter_readings_normalised
             WHERE printer_id = pd.printer_id
@@ -548,8 +549,7 @@ export async function GET(request: NextRequest) {
           l.days_behind
         FROM all_machines am
         LEFT JOIN latest l ON l.printer_id = am.printer_id
-        ORDER BY l.days_behind DESC NULLS FIRST, am.company_group NULLS LAST, am.store NULLS LAST, am.serial_number`,
-        [bmsActiveSerials]
+        ORDER BY l.days_behind DESC NULLS FIRST, am.company_group NULLS LAST, am.store NULLS LAST, am.serial_number`
       );
 
       const data = result.rows.map((r) => {

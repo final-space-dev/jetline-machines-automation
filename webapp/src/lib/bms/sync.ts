@@ -142,9 +142,13 @@ async function syncMachinesFromBMS(
   bmsRows: BMSMachineRow[],
 ): Promise<{ processed: number; errors: string[] }> {
   const errors: string[] = [];
+  // Only load active machines — inactive machines don't exist to us.
+  // If a serial produces Xerox readings but isn't active in BMS, fix the data in BMS.
+  const activeRows = bmsRows.filter((r) => Number(r.machinestatus) === 1);
+
   // Deduplicate by serial number (keep last occurrence to avoid ON CONFLICT within batch)
   const deduped = new Map<string, BMSMachineRow>();
-  for (const row of bmsRows) {
+  for (const row of activeRows) {
     if (row.serialnumber) deduped.set(row.serialnumber, row);
   }
   const validRows = Array.from(deduped.values());
@@ -279,6 +283,19 @@ async function syncMachinesFromBMS(
         `Machine bulk upsert batch ${i}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  // Remove machines for this company that are no longer active in BMS.
+  const activeSerials = validRows.map((r) => r.serialnumber).filter(Boolean) as string[];
+  if (activeSerials.length > 0) {
+    await prisma.machine.deleteMany({
+      where: {
+        companyId,
+        serialNumber: { notIn: activeSerials },
+      },
+    });
+  } else {
+    await prisma.machine.deleteMany({ where: { companyId } });
   }
 
   return { processed, errors };

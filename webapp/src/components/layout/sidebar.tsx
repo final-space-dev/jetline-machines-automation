@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   Menu,
   ScanLine,
+  GitMerge,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ type NavItem = { name: string; href: string; icon: typeof Printer };
 
 const mainNavigation: NavItem[] = [
   { name: "Xerox Reporting", href: "/xerox-reporting", icon: ScanLine },
+  { name: "Machine Mapping", href: "/machine-mapping", icon: GitMerge },
 ];
 
 const secondaryNavigation: NavItem[] = [
