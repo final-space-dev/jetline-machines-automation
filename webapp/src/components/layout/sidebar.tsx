@@ -11,8 +11,9 @@ import {
   Settings,
   ChevronLeft,
   Menu,
-  ScanLine,
   GitMerge,
+  LayoutDashboard,
+  BarChart3,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -23,8 +24,9 @@ interface SidebarProps {
 type NavItem = { name: string; href: string; icon: typeof Printer };
 
 const mainNavigation: NavItem[] = [
-  { name: "Xerox Reporting", href: "/xerox-reporting", icon: ScanLine },
-  { name: "Machine Mapping", href: "/machine-mapping", icon: GitMerge },
+  { name: "Operations",       href: "/operations",       icon: LayoutDashboard },
+  { name: "Machine Reports",  href: "/machine-reports",  icon: BarChart3 },
+  { name: "Machine Mapping",  href: "/machine-mapping",  icon: GitMerge },
 ];
 
 const secondaryNavigation: NavItem[] = [

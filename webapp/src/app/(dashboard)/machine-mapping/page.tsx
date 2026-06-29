@@ -33,14 +33,17 @@ interface XeroxMachine {
   printer_id: number;
   serial_number: string;
   model: string;
+  model_name: string | null;
   store: string | null;
   company_group: string | null;
   printer_type: string | null;
   reporting_enabled: boolean | null;
   latest_reading_date: string | null;
+  last_seen: string | null;
   bms_found: boolean;
   bms_active: boolean | null;
   bms_company: string | null;
+  xerox_status: "Present" | "Missing";
 }
 
 interface Company {
@@ -53,6 +56,7 @@ interface MappingForm {
   store: string;
   company_group: string;
   printer_type: string;
+  model_name: string;
 }
 
 type SortKey = "serial_number" | "model" | "store" | "company_group" | "latest_reading_date" | "bms_active";
@@ -66,7 +70,8 @@ type QuickFilter =
   | "bms_inactive"       // in BMS but inactive
   | "bms_mismatch"       // mapped to a store but BMS company name doesn't match
   | "off"                // reporting disabled
-  | "no_readings";       // never sent a reading
+  | "no_readings"        // never sent a reading
+  | "xerox_missing";     // not on latest Xerox file
 
 const PRINTER_TYPES = ["Colour", "Black and White", "Plan"];
 
@@ -84,6 +89,12 @@ function ReadingBadge({ dateStr }: { dateStr: string | null }) {
   if (d <= 3)    return <Badge className="bg-emerald-100 text-emerald-800 border-0 font-normal">{d}d ago</Badge>;
   if (d <= 14)   return <Badge className="bg-amber-100 text-amber-800 border-0 font-normal">{d}d ago</Badge>;
   return           <Badge className="bg-red-100 text-red-800 border-0 font-normal">{d}d ago</Badge>;
+}
+
+function XeroxStatusBadge({ m }: { m: XeroxMachine }) {
+  if (m.xerox_status === "Present")
+    return <Badge className="bg-emerald-100 text-emerald-800 border-0 font-normal">Present</Badge>;
+  return <Badge className="bg-red-100 text-red-800 border-0 font-normal">Missing</Badge>;
 }
 
 function BmsBadge({ m }: { m: XeroxMachine }) {
@@ -131,26 +142,28 @@ function sortMachines(machines: XeroxMachine[], key: SortKey, dir: SortDir): Xer
 // ─── Filter config ────────────────────────────────────────────────────────────
 
 const FILTER_LABELS: Record<QuickFilter, string> = {
-  all:          "All",
-  unmapped:     "Unmapped",
-  mapped:       "Mapped",
-  no_bms:       "Not in BMS",
-  bms_inactive: "BMS Inactive",
-  bms_mismatch: "BMS Mismatch",
-  off:          "Switched Off",
-  no_readings:  "No Readings",
+  all:           "All",
+  unmapped:      "Unmapped",
+  mapped:        "Mapped",
+  no_bms:        "Not in BMS",
+  bms_inactive:  "BMS Inactive",
+  bms_mismatch:  "BMS Mismatch",
+  off:           "Switched Off",
+  no_readings:   "No Readings",
+  xerox_missing: "Missing from Xerox",
 };
 
 function matchesFilter(m: XeroxMachine, f: QuickFilter): boolean {
   switch (f) {
-    case "all":          return true;
-    case "unmapped":     return !m.store && !m.company_group;
-    case "mapped":       return !!(m.store || m.company_group);
-    case "no_bms":       return !m.bms_found;
-    case "bms_inactive": return m.bms_found && m.bms_active === false;
-    case "bms_mismatch": return hasBmsMismatch(m);
-    case "off":          return m.reporting_enabled === false;
-    case "no_readings":  return !m.latest_reading_date;
+    case "all":           return true;
+    case "unmapped":      return !m.store && !m.company_group;
+    case "mapped":        return !!(m.store || m.company_group);
+    case "no_bms":        return !m.bms_found;
+    case "bms_inactive":  return m.bms_found && m.bms_active === false;
+    case "bms_mismatch":  return hasBmsMismatch(m);
+    case "off":           return m.reporting_enabled === false;
+    case "no_readings":   return !m.latest_reading_date;
+    case "xerox_missing": return m.xerox_status === "Missing";
   }
 }
 
@@ -170,7 +183,7 @@ export default function MachineMappingPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [selected, setSelected] = useState<XeroxMachine | null>(null);
-  const [form, setForm] = useState<MappingForm>({ store: "", company_group: "", printer_type: "" });
+  const [form, setForm] = useState<MappingForm>({ store: "", company_group: "", printer_type: "", model_name: "" });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -243,6 +256,7 @@ export default function MachineMappingPage() {
       store: m.store ?? "",
       company_group: m.company_group ?? "",
       printer_type: m.printer_type ?? "",
+      model_name: m.model_name ?? "",
     });
     setSaveError(null);
   }
@@ -260,6 +274,7 @@ export default function MachineMappingPage() {
           store: form.store || null,
           company_group: form.company_group || null,
           printer_type: form.printer_type || null,
+          model_name: form.model_name || null,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -290,16 +305,18 @@ export default function MachineMappingPage() {
     }
   }
 
-  const actionNeeded = filterCounts.unmapped + filterCounts.no_bms + filterCounts.bms_inactive + filterCounts.bms_mismatch;
+  const actionNeeded = filterCounts.unmapped + filterCounts.no_bms + filterCounts.bms_inactive + filterCounts.bms_mismatch + filterCounts.xerox_missing;
 
   function exportCSV() {
-    const headers = ["Serial", "Model", "Store", "Group", "Type", "BMS Status", "BMS Store", "Mapping", "Last Reading", "Reporting"];
+    const headers = ["Serial", "Model", "Model Name", "Store", "Group", "Type", "Xerox Status", "BMS Status", "BMS Store", "Mapping", "Last Reading", "Reporting"];
     const rows = filtered.map((m) => [
       m.serial_number ?? "",
       m.model ?? "",
+      m.model_name ?? "",
       m.store ?? "",
       m.company_group ?? "",
       m.printer_type ?? "",
+      m.xerox_status,
       !m.bms_found ? "Not in BMS" : m.bms_active ? "Active" : "Inactive",
       m.bms_company ?? "",
       m.store || m.company_group ? "Mapped" : "Unmapped",
@@ -367,7 +384,7 @@ export default function MachineMappingPage() {
               {(Object.keys(FILTER_LABELS) as QuickFilter[]).map((f) => {
                 const count = filterCounts[f];
                 const isActive = activeFilter === f;
-                const isWarning = (f === "unmapped" || f === "no_bms" || f === "bms_inactive" || f === "bms_mismatch") && count > 0 && !isActive;
+                const isWarning = (f === "unmapped" || f === "no_bms" || f === "bms_inactive" || f === "bms_mismatch" || f === "xerox_missing") && count > 0 && !isActive;
                 return (
                   <button
                     key={f}
@@ -428,6 +445,7 @@ export default function MachineMappingPage() {
                         Model <SortIcon col="model" />
                       </button>
                     </TableHead>
+                    <TableHead className="w-[100px] text-xs font-semibold">Model Name</TableHead>
                     <TableHead className="w-[150px]">
                       <button onClick={() => toggleSort("store")} className="flex items-center text-xs font-semibold">
                         Store <SortIcon col="store" />
@@ -439,6 +457,7 @@ export default function MachineMappingPage() {
                       </button>
                     </TableHead>
                     <TableHead className="w-[110px] text-xs font-semibold">Type</TableHead>
+                    <TableHead className="w-[110px] text-xs font-semibold">Xerox Status</TableHead>
                     <TableHead className="w-[120px]">
                       <button onClick={() => toggleSort("bms_active")} className="flex items-center text-xs font-semibold">
                         BMS Status <SortIcon col="bms_active" />
@@ -458,7 +477,7 @@ export default function MachineMappingPage() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={13} className="text-center py-12 text-muted-foreground text-sm">
                         No machines match the current filter.
                       </TableCell>
                     </TableRow>
@@ -473,6 +492,7 @@ export default function MachineMappingPage() {
                         >
                           <TableCell className="font-mono text-xs">{m.serial_number}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{m.model || "—"}</TableCell>
+                          <TableCell className="text-xs font-medium">{m.model_name || "—"}</TableCell>
                           <TableCell className="text-xs">
                             {m.store
                               ? <span className="font-medium">{m.store}</span>
@@ -485,6 +505,7 @@ export default function MachineMappingPage() {
                           <TableCell className="text-xs text-muted-foreground">
                             {m.printer_type || "—"}
                           </TableCell>
+                          <TableCell><XeroxStatusBadge m={m} /></TableCell>
                           <TableCell><BmsBadge m={m} /></TableCell>
                           <TableCell className="text-xs">
                             {m.bms_company
@@ -538,6 +559,7 @@ export default function MachineMappingPage() {
               <p className="text-xs font-mono text-muted-foreground">{selected?.serial_number}</p>
               {selected && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
+                  <XeroxStatusBadge m={selected} />
                   <BmsBadge m={selected} />
                   <MappingBadge m={selected} />
                   <ReadingBadge dateStr={selected.latest_reading_date} />
@@ -639,6 +661,20 @@ export default function MachineMappingPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  {/* Model Name */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Model Name</Label>
+                    <Input
+                      value={form.model_name}
+                      onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))}
+                      placeholder="e.g. B9125, Versant 180"
+                      className="h-8 text-xs"
+                    />
+                    {selected?.model && (
+                      <p className="text-[11px] text-muted-foreground">Xerox model: {selected.model}</p>
+                    )}
                   </div>
 
                   {saveError && (

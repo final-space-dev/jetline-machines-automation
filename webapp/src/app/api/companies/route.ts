@@ -23,13 +23,15 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, bmsSchema, region } = body;
+    const { name, bmsSchema, region, bmsHost, companyGroup } = body;
 
     const company = await prisma.company.create({
       data: {
         name,
         bmsSchema,
         region,
+        bmsHost: bmsHost ?? null,
+        companyGroup: companyGroup ?? null,
       },
     });
 
