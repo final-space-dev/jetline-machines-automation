@@ -71,13 +71,17 @@ export async function GET() {
       };
     });
 
-    // Groups from mapped machines in store map
-    const groupsResult = await xeroxClient.query<{ company_group: string }>(
-      `SELECT DISTINCT company_group FROM xerox.printer_store_map WHERE company_group IS NOT NULL ORDER BY company_group`
+    // Stores and groups from printer_store_map
+    const storesResult = await xeroxClient.query<{ store: string; company_group: string | null }>(
+      `SELECT DISTINCT store, company_group FROM xerox.printer_store_map WHERE store IS NOT NULL ORDER BY store`
     );
-    const groups = groupsResult.rows.map((r) => r.company_group);
+    const companies = storesResult.rows.map((r) => ({ id: r.store, name: r.store, group: r.company_group }));
 
-    return NextResponse.json({ machines, companies: [], groups });
+    const groups = Array.from(
+      new Set(storesResult.rows.map((r) => r.company_group).filter(Boolean))
+    ).sort() as string[];
+
+    return NextResponse.json({ machines, companies, groups });
   } finally {
     xeroxClient.release();
     bmsClient.release();
