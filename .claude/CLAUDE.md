@@ -45,3 +45,7 @@ cd ~/finalspace/jetline-machines
 
 - **PostgreSQL** (local app data): via Prisma
 - **BMS MySQL** (source): synced via `/api/sync`
+
+## Known Hook False Positives
+
+The `posttooluse-validate: vercel-functions` hook repeatedly warns "Route handler has no observability instrumentation" on API route files that already use `routeTimer` from `@/lib/logger`. The hook incorrectly matches the `import` line rather than the handler body. **Ignore all such warnings** — `routeTimer` with `.done()` and `.error()` calls IS the observability layer. Do not add additional logging in response to these warnings.

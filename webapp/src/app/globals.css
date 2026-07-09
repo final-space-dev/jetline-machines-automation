@@ -1,7 +1,49 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* ── Jetline UI Kit (ground truth) ────────────────────────────────────────────
+   Real kit CSS, imported in order. tokens.css defines the unprefixed tokens
+   (--red-500, --canvas, --ink-500, --sh-md, --r-xl …) plus a --jl-* back-compat
+   alias block, so legacy inline styles still resolve. Font is loaded via
+   next/font in layout.tsx (Plus Jakarta Sans) — do NOT re-add a font @import. */
+@import "../styles/jl/tokens.css";
+@import "../styles/jl/controls.css";
+@import "../styles/jl/surfaces.css";
+@import "../styles/jl/overlays.css";
+
+/* ── App-level token supplements ──────────────────────────────────────────────
+   The kit tokens.css owns all colour/shadow/radius tokens. Only app-specific
+   values that the kit does not define live here. color-scheme: only light MUST
+   stay — no dark mode anywhere. */
+:root {
+  color-scheme: only light;
+
+  /* Wire the kit font var onto the next/font family so both names resolve. */
+  --font: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --jl-font: var(--font);
+
+  /* Spacing scale kept under the legacy --jl-s* names used by inline styles. */
+  --jl-s1: 4px; --jl-s2: 8px; --jl-s3: 12px; --jl-s4: 16px; --jl-s5: 20px;
+  --jl-s6: 24px; --jl-s7: 32px; --jl-s8: 40px; --jl-s9: 48px; --jl-s10: 64px;
+
+  /* Mobile bottom-nav height (used to pad main content so nothing hides under it) */
+  --jl-bottom-nav-h: 60px;
+}
+
+
+/* JetlineUI surface utility — used by Equipment CRM components */
+.jl-surface {
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  border-radius: var(--r-lg);
+  font-family: var(--font);
+}
+.jl-page {
+  background: var(--canvas);
+  font-family: var(--font);
+  color: var(--ink-900);
+  min-height: 100%;
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -105,4 +147,179 @@
   /* Clean table defaults */
   table { @apply text-xs; }
   th { @apply font-medium text-muted-foreground text-xs; }
+}
+
+@keyframes jl-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Consistent keyboard focus ring for all JL interactive elements */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--jl-sh-focus, 0 0 0 3px rgba(230,18,31,0.25)) !important;
+}
+
+/* ── Phase 16 — Mobile Responsive helpers ─────────────────────────────────────
+   Breakpoints: mobile-first, md = 768px is the primary sidebar / bottom-nav
+   switch. Many pages use inline style={{}} with JL tokens, so responsive
+   overrides here use !important to win over inline base values. Desktop
+   behaviour is unchanged (rules only apply below the breakpoint). */
+
+/* Store grid: 1 col mobile → 2 (sm) → 3 (md) → 4-5 auto-fill (lg). The base
+   (desktop) grid uses auto-fill/minmax inline; we override columns below lg.
+   Blocks are ordered narrow→wide so the wider range wins in overlap. */
+@media (max-width: 639px) {
+  .jl-grid-stores { grid-template-columns: 1fr !important; }
+}
+@media (min-width: 640px) and (max-width: 767px) {
+  .jl-grid-stores { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .jl-grid-stores { grid-template-columns: repeat(3, 1fr) !important; }
+}
+
+/* KPI strip: 4 cols desktop → 2 cols mobile. */
+@media (max-width: 639px) {
+  .jl-grid-kpi { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Bottom nav bar (mobile only). Fixed to the bottom of the viewport. */
+.jl-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  height: var(--jl-bottom-nav-h);
+  display: none;
+  align-items: stretch;
+  background: var(--jl-surface);
+  border-top: 1.5px solid var(--jl-ink-100);
+  box-shadow: 0 -2px 10px rgba(16, 24, 40, 0.06);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  font-family: var(--jl-font);
+}
+@media (max-width: 767px) {
+  .jl-bottom-nav { display: flex; }
+  /* Give scrollable main content room so the fixed nav never covers the last row */
+  .jl-main-scroll { padding-bottom: calc(var(--jl-bottom-nav-h) + 12px) !important; }
+}
+
+.jl-bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--jl-font);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--jl-ink-500);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.jl-bottom-nav-btn[data-active="true"] {
+  color: var(--jl-red-500);
+}
+
+/* Generic show/hide helpers keyed to the md breakpoint. */
+@media (max-width: 767px) {
+  .jl-hide-mobile { display: none !important; }
+}
+@media (min-width: 768px) {
+  .jl-show-mobile { display: none !important; }
+}
+
+/* Sidebar: hidden below md, restored (flex) at md+. Overrides inline layout. */
+@media (max-width: 767px) {
+  .jl-sidebar { display: none !important; }
+}
+
+/* Card-stack for the equipment table on mobile. The <table> is hidden and a
+   card list is shown instead (both live in the DOM; CSS chooses which). */
+@media (max-width: 767px) {
+  .jl-table-desktop { display: none !important; }
+}
+@media (min-width: 768px) {
+  .jl-cards-mobile { display: none !important; }
+}
+
+/* Add-equipment form grids collapse to a single column on mobile. */
+@media (max-width: 767px) {
+  .jl-add-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+}
+
+/* Touch targets: bump interactive controls to min 44px on mobile. Condition /
+   status toggle buttons (36px base) grow to 48px; health bars from 8px to 12px. */
+@media (max-width: 767px) {
+  .jl-touch-toggle { height: 48px !important; min-height: 48px !important; }
+  .jl-touch-btn { min-height: 44px !important; }
+  .jl-health-bar { height: 12px !important; }
+  /* JlDate day cells → 44px tap targets on mobile */
+  .jl-date-cell { height: 44px !important; }
+  .jl-date-empty { height: 44px !important; }
+}
+
+/* Mobile page padding: the equipment pages use large inline horizontal
+   padding (32-40px). Tighten it below md so content isn't cramped. */
+@media (max-width: 767px) {
+  .jl-page-pad { padding-left: 16px !important; padding-right: 16px !important; padding-top: 20px !important; }
+}
+
+/* Hamburger overlay menu (mobile). Slides over the canvas from the left. */
+.jl-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+}
+.jl-mobile-drawer {
+  width: 80%;
+  max-width: 300px;
+  height: 100%;
+  background: var(--jl-surface);
+  box-shadow: var(--jl-sh-xl);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  font-family: var(--jl-font);
+}
+
+/* Command palette: full-screen on mobile (edge-to-edge, top-anchored). */
+@media (max-width: 767px) {
+  .jl-cmd-overlay { padding-top: 0 !important; align-items: stretch !important; }
+  .jl-cmd-panel {
+    max-width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  /* Let the results area grow to fill the screen on mobile */
+  .jl-cmd-panel > div:nth-child(2) { max-height: none !important; flex: 1 !important; }
+}
+
+@media print {
+  /* Hide chrome when printing equipment pages */
+  nav, aside, header, [data-sidebar], .sync-panel, .jl-bottom-nav { display: none !important; }
+  /* Remove sticky positioning so top bar doesn't float */
+  [style*="position: sticky"], [style*="position:sticky"] { position: static !important; }
+  /* Ensure surface cards have borders in print */
+  [style*="box-shadow"] { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+  body { background: white !important; }
+  a { color: inherit !important; text-decoration: none !important; }
 }

@@ -1,0 +1,141 @@
+/* ============================================================
+   JETLINE UI — Documents (quotes, orders, invoices)
+   Print-ready paper surfaces. Requires tokens.css
+   ============================================================ */
+
+/* ---- Paper sheet ---------------------------------------- */
+.jl-doc {
+  --doc-accent: var(--red-500);
+  --doc-accent-deep: var(--red-600);
+  --doc-accent-tint: var(--red-tint);
+  position: relative;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
+  overflow: hidden;
+  color: var(--ink-800);
+}
+/* a thin colour band signals doc type without a "line" */
+.jl-doc::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 6px;
+  background: linear-gradient(90deg, var(--doc-accent), var(--doc-accent-deep));
+}
+.jl-doc__inner { padding: var(--s-9) var(--s-9) var(--s-8); }
+
+/* type accents (set on .jl-doc) */
+.jl-doc--order  { --doc-accent: var(--blue-500);  --doc-accent-deep: var(--blue-700);  --doc-accent-tint: var(--blue-tint); }
+.jl-doc--invoice{ --doc-accent: var(--ink-800);   --doc-accent-deep: var(--ink-900);   --doc-accent-tint: var(--ink-50); }
+.jl-doc--paid   { --doc-accent: var(--green-500);  --doc-accent-deep: var(--green-700); --doc-accent-tint: var(--green-tint); }
+
+/* ---- Header / letterhead -------------------------------- */
+.jl-doc__head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-6); margin-bottom: var(--s-8); }
+.jl-doc__brand { display: flex; align-items: center; gap: 12px; }
+.jl-doc__brand .mark { width: 44px; height: 44px; border-radius: var(--r-md); background: linear-gradient(160deg, var(--red-400), var(--red-600)); display: grid; place-items: center; box-shadow: var(--sh-red); flex: none; }
+.jl-doc__brand .mark svg { width: 24px; height: 24px; }
+.jl-doc__brand b { font-size: 18px; font-weight: var(--fw-extra); letter-spacing: -0.02em; display: block; color: var(--ink-900); }
+.jl-doc__brand span { font-size: 12px; color: var(--ink-400); font-weight: var(--fw-semibold); }
+
+.jl-doc__type { text-align: right; }
+.jl-doc__type h1 {
+  font-size: 34px; font-weight: var(--fw-extra); letter-spacing: 0.04em; line-height: 1;
+  color: var(--doc-accent-deep); text-transform: uppercase;
+}
+.jl-doc__type .ref { margin-top: 8px; font-family: var(--mono); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--ink-500); }
+
+/* ---- Meta strip (dates / status) ------------------------ */
+.jl-doc__meta { display: flex; flex-wrap: wrap; gap: var(--s-6); padding: var(--s-4) var(--s-5); background: var(--surface-sunken); border-radius: var(--r-md); margin-bottom: var(--s-7); }
+.jl-doc__meta .m { display: flex; flex-direction: column; gap: 3px; }
+.jl-doc__meta .m .k { font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-400); white-space: nowrap; }
+.jl-doc__meta .m .v { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--ink-900); font-variant-numeric: tabular-nums; }
+.jl-doc__meta .m--right { margin-left: auto; align-items: flex-end; }
+
+/* ---- Parties (from / to) -------------------------------- */
+.jl-doc__parties { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-6); margin-bottom: var(--s-7); }
+.jl-party { background: var(--surface-sunken); border-radius: var(--r-lg); padding: var(--s-5); }
+.jl-party--accent { background: var(--doc-accent-tint); }
+.jl-party__label { font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-400); margin-bottom: var(--s-3); }
+.jl-party__name { font-size: var(--fs-h3); font-weight: var(--fw-bold); color: var(--ink-900); }
+.jl-party__lines { font-size: var(--fs-sm); color: var(--ink-500); line-height: 1.55; margin-top: 4px; }
+
+/* ---- Line items (lineless, banded) ---------------------- */
+.jl-lineitems { width: 100%; border-collapse: collapse; margin-bottom: var(--s-6); }
+.jl-lineitems thead th {
+  text-align: left; padding: var(--s-3) var(--s-4); background: var(--ink-900);
+  font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.04em; text-transform: uppercase; color: #fff;
+}
+.jl-lineitems thead th:first-child { border-radius: var(--r-sm) 0 0 var(--r-sm); }
+.jl-lineitems thead th:last-child { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+.jl-lineitems .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jl-lineitems tbody td { padding: var(--s-4); vertical-align: top; }
+.jl-lineitems tbody tr { background: var(--surface); }
+.jl-lineitems tbody tr:nth-child(even) { background: var(--surface-sunken); }
+.jl-lineitems .it-title { font-weight: var(--fw-bold); color: var(--ink-900); font-size: var(--fs-sm); }
+.jl-lineitems .it-desc { font-size: var(--fs-xs); color: var(--ink-400); margin-top: 3px; line-height: 1.45; }
+.jl-lineitems .it-amt { font-weight: var(--fw-bold); color: var(--ink-900); }
+
+/* ---- Totals --------------------------------------------- */
+.jl-doc__totals { display: flex; justify-content: flex-end; margin-bottom: var(--s-7); }
+.jl-totals { width: 320px; max-width: 100%; }
+.jl-totals .row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); padding: 9px 16px; font-size: var(--fs-sm); }
+.jl-totals .row .k { color: var(--ink-500); font-weight: var(--fw-medium); }
+.jl-totals .row .v { font-weight: var(--fw-bold); color: var(--ink-800); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jl-totals .row--discount .v { color: var(--green-700); }
+.jl-totals .grand {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: var(--s-2); padding: var(--s-4) var(--s-5);
+  background: var(--doc-accent-tint); border-radius: var(--r-md);
+}
+.jl-totals .grand .k { font-size: var(--fs-sm); font-weight: var(--fw-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--doc-accent-deep); }
+.jl-totals .grand .v { font-size: 26px; font-weight: var(--fw-extra); letter-spacing: var(--tracking-tight); color: var(--doc-accent-deep); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---- Notes / terms + signature -------------------------- */
+.jl-doc__cols { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--s-6); margin-bottom: var(--s-7); }
+.jl-doc__notes .jl-party__label { margin-bottom: var(--s-2); }
+.jl-doc__notes p { font-size: var(--fs-sm); color: var(--ink-500); line-height: 1.6; }
+.jl-sign { display: flex; flex-direction: column; justify-content: flex-end; }
+.jl-sign__rule { height: 44px; border-radius: var(--r-sm); background: var(--surface-sunken); box-shadow: var(--sh-inset); margin-bottom: 8px; }
+.jl-sign__cap { font-size: var(--fs-xs); color: var(--ink-400); font-weight: var(--fw-semibold); }
+
+/* ---- Footer band ---------------------------------------- */
+.jl-doc__foot {
+  display: flex; flex-wrap: wrap; gap: var(--s-4) var(--s-6); justify-content: space-between; align-items: center;
+  padding: var(--s-5) var(--s-9);
+  background: var(--ink-900); color: #fff;
+}
+.jl-doc__foot .pay { font-size: var(--fs-sm); }
+.jl-doc__foot .pay b { color: #fff; font-weight: var(--fw-bold); }
+.jl-doc__foot .pay span { color: var(--ink-300); }
+.jl-doc__foot .thanks { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: #fff; }
+
+/* ---- Status stamp (decorative) -------------------------- */
+.jl-stamp {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: var(--fw-extra); letter-spacing: var(--tracking-caps); text-transform: uppercase;
+  background: var(--doc-accent-tint); color: var(--doc-accent-deep);
+}
+.jl-stamp svg { width: 14px; height: 14px; }
+
+/* ---- Document toolbar (screen only) --------------------- */
+.jl-doc-toolbar { display: flex; gap: var(--s-3); justify-content: center; align-items: center; flex-wrap: wrap; margin-bottom: var(--s-6); }
+
+/* ============================================================
+   Print — isolate the .jl-doc, drop all chrome & shadows
+   ============================================================ */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body { background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .jl-doc, .jl-doc * { visibility: visible !important; }
+  .jl-doc {
+    position: absolute; left: 0; top: 0; width: 100%; max-width: none;
+    margin: 0; border-radius: 0; box-shadow: none;
+  }
+  .jl-doc-toolbar, .jl-no-print { display: none !important; }
+  .jl-doc__foot { background: var(--ink-900) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .jl-lineitems thead th { background: var(--ink-900) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}

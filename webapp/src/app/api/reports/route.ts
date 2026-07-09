@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
+import { bmsPool } from "@/lib/bms-pool";
 
 // xerox.meter_readings_normalised: printer_id, report_date, meter_type, reading
 // Volume = sum of 4 sub-meters (NOT total_impressions which excludes A3)
@@ -25,6 +26,18 @@ const MACHINE_CTE = `
 `;
 
 const REAL_METERS = `('black_impressions','color_impressions','black_large_impressions','color_large_impressions')`;
+
+async function getBmsInstallDates(): Promise<Map<string, string>> {
+  const bmsClient = await bmsPool.connect();
+  try {
+    const r = await bmsClient.query<{ serial_number: string; installed_date: string }>(
+      `SELECT serial_number, installed_date::text FROM machines.machines WHERE installed_date IS NOT NULL`
+    );
+    return new Map(r.rows.map((row) => [row.serial_number.trim().toUpperCase(), row.installed_date]));
+  } finally {
+    bmsClient.release();
+  }
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -130,14 +143,23 @@ export async function GET(request: NextRequest) {
           COALESCE(ms.max_monthly_vol, 0)::bigint  AS max_monthly_vol,
           ms.min_month,
           ms.max_month,
-          COALESCE(lb.balances, '{}'::json)        AS latest_balances
+          COALESCE(lb.balances, '{}'::json)        AS latest_balances,
+        mf.age,
+        mf.condition_notes,
+        mf.replace_flag
         FROM machines m
         LEFT JOIN daily_stats ds ON ds.printer_id = m.printer_id
         LEFT JOIN monthly_stats ms ON ms.printer_id = m.printer_id
         LEFT JOIN latest_balances lb ON lb.printer_id = m.printer_id
+        LEFT JOIN xerox.machine_feedback mf ON UPPER(TRIM(mf.serial_number)) = UPPER(TRIM(m.serial_number))
         ORDER BY m.store NULLS LAST, m.serial_number
       `);
-      return NextResponse.json({ tab, rows: result.rows });
+      const installDates = await getBmsInstallDates();
+      const rows = result.rows.map((r) => ({
+        ...r,
+        bms_installed_date: installDates.get(r.serial_number.trim().toUpperCase()) ?? null,
+      }));
+      return NextResponse.json({ tab, rows });
     }
 
     // ── MTD: daily volumes from 1st of month to today ────────────────────────
@@ -265,6 +287,33 @@ export async function GET(request: NextRequest) {
         ORDER BY m.store NULLS LAST, m.serial_number
       `);
       return NextResponse.json({ tab, rows: result.rows, months });
+    }
+
+    // ── STATUS: machine feedback list (all machines with feedback data) ────────
+    if (tab === "status") {
+      const result = await client.query(`
+        SELECT
+          COALESCE(psm.store, mf.serial_number)   AS store,
+          COALESCE(psm.model_name, pd.model)       AS model_name,
+          mf.serial_number,
+          mf.age,
+          mf.condition_notes,
+          mf.replace_flag,
+          psm.company_group,
+          psm.printer_type,
+          psm.reporting_enabled
+        FROM xerox.machine_feedback mf
+        LEFT JOIN xerox.printer_dimensions pd ON UPPER(TRIM(pd.serial_number)) = UPPER(TRIM(mf.serial_number))
+          AND pd.manufacturer = 'Xerox'
+        LEFT JOIN xerox.printer_store_map psm ON UPPER(TRIM(psm.serial_number)) = UPPER(TRIM(mf.serial_number))
+        ORDER BY psm.store NULLS LAST, mf.serial_number
+      `);
+      const installDates = await getBmsInstallDates();
+      const rows = result.rows.map((r) => ({
+        ...r,
+        bms_installed_date: installDates.get(r.serial_number.trim().toUpperCase()) ?? null,
+      }));
+      return NextResponse.json({ tab, rows });
     }
 
     return NextResponse.json({ error: "Invalid tab" }, { status: 400 });

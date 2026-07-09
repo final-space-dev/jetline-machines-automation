@@ -108,8 +108,8 @@ export async function GET() {
 
     // ── Xerox pipeline status ─────────────────────────────────────────────────
     const pipelineResult = await xeroxClient.query<{ last_ingested: string | null }>(`
-      SELECT MAX(last_seen)::text AS last_ingested
-      FROM xerox.printer_dimensions WHERE manufacturer = 'Xerox'
+      SELECT MAX(loaded_at)::text AS last_ingested
+      FROM xerox.load_history
     `);
     const lastIngested = pipelineResult.rows[0]?.last_ingested ?? null;
 

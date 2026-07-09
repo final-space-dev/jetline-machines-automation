@@ -31,6 +31,18 @@ interface SummaryRow extends BaseRow {
   min_month: string | null;
   max_month: string | null;
   latest_balances: { black_impressions?: number; color_impressions?: number };
+  age: string | null;
+  condition_notes: string | null;
+  replace_flag: "YES" | "NO" | "MAYBE" | null;
+  bms_installed_date: string | null;
+}
+
+interface StatusRow extends BaseRow {
+  age: string | null;
+  condition_notes: string | null;
+  replace_flag: "YES" | "NO" | "MAYBE" | null;
+  reporting_enabled: boolean | null;
+  bms_installed_date: string | null;
 }
 
 interface MtdRow extends BaseRow {
@@ -43,7 +55,7 @@ interface MonthlyRow extends BaseRow {
   period_total: number;
 }
 
-type TabType = "summary" | "mtd" | "monthly" | "ytd";
+type TabType = "summary" | "mtd" | "monthly" | "ytd" | "status";
 
 interface SortState { col: string; dir: "asc" | "desc" }
 
@@ -63,6 +75,22 @@ function fmtMonth(yyyymm: string): string {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-ZA", { day: "2-digit", month: "short" });
+}
+
+function fmtInstallDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function bmsAge(iso: string | null): string {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  const months = Math.floor(ms / (1000 * 60 * 60 * 24 * 30.44));
+  if (months < 1) return "< 1m";
+  if (months < 12) return `${months}m`;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return m > 0 ? `${y}y ${m}m` : `${y}y`;
 }
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
@@ -212,14 +240,16 @@ function SummaryTab({ rows, filters, setFilters }: {
         <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
         <Button variant="outline" size="sm" onClick={() =>
           exportCsv("summary.csv",
-            ["Serial","Model","Store","Group","Type","Max Daily","Avg Daily","Active Days","Last Reading","B&W Reading","Colour Reading","Total Reading"],
+            ["Serial","Model","Store","Group","Type","Max Daily","Avg Daily","Active Days","Last Reading","B&W Reading","Colour Reading","Total Reading","BMS Install Date","BMS Age","Age","Condition","Replace"],
             visible.map((r) => {
               const bw = r.latest_balances?.black_impressions ?? null;
               const col = r.latest_balances?.color_impressions ?? null;
               return [r.serial_number,r.model_name,r.store??"",r.company_group??"",r.printer_type??"",
                 String(r.max_daily_vol),String(r.avg_daily_vol),String(r.reading_days),r.last_reading??"",
                 String(bw??""),String(col??""),
-                bw!=null||col!=null ? String((bw??0)+(col??0)) : ""];
+                bw!=null||col!=null ? String((bw??0)+(col??0)) : "",
+                r.bms_installed_date??"",bmsAge(r.bms_installed_date),
+                r.age??"",r.condition_notes??"",r.replace_flag??""];
             })
           )
         }>Export CSV</Button>
@@ -240,11 +270,16 @@ function SummaryTab({ rows, filters, setFilters }: {
               {th("latest_balances.black_impressions","B&W Reading","text-right")}
               {th("latest_balances.color_impressions","Colour Reading","text-right")}
               {th("bw_total_reading","Total Reading","text-right")}
+              {th("bms_installed_date","BMS Install Date")}
+              {th("bms_installed_date","BMS Age")}
+              {th("age","Age")}
+              {th("condition_notes","Condition")}
+              {th("replace_flag","Replace")}
             </TableRow>
           </TableHeader>
           <TableBody>
             {visible.length === 0 ? (
-              <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
+              <TableRow><TableCell colSpan={17} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
             ) : visible.map((r) => (
               <TableRow key={r.serial_number}>
                 <TableCell className="font-mono text-xs">{r.serial_number}</TableCell>
@@ -262,6 +297,11 @@ function SummaryTab({ rows, filters, setFilters }: {
                   {(r.latest_balances?.black_impressions != null || r.latest_balances?.color_impressions != null)
                     ? fmt(r.bw_total_reading) : "—"}
                 </TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{bmsAge(r.bms_installed_date)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{r.age ?? "—"}</TableCell>
+                <TableCell className="text-xs max-w-[280px] truncate" title={r.condition_notes ?? ""}>{r.condition_notes ?? "—"}</TableCell>
+                <TableCell className="whitespace-nowrap"><ReplaceBadge flag={r.replace_flag} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -449,6 +489,87 @@ function MonthColumnsTab({ rows, months, filters, setFilters, exportName }: {
   );
 }
 
+// ── Status tab ────────────────────────────────────────────────────────────────
+
+function ReplaceBadge({ flag }: { flag: "YES" | "NO" | "MAYBE" | null }) {
+  if (!flag) return <span className="text-muted-foreground">—</span>;
+  const cls = flag === "YES"
+    ? "bg-red-100 text-red-700"
+    : flag === "MAYBE"
+    ? "bg-yellow-100 text-yellow-700"
+    : "bg-green-100 text-green-700";
+  return <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${cls}`}>{flag}</span>;
+}
+
+function StatusTab({ rows, filters, setFilters }: {
+  rows: StatusRow[]; filters: Filters; setFilters: (f: Filters) => void;
+}) {
+  const [sort, setSort] = useState<SortState>({ col: "store", dir: "asc" });
+  const toggle = (col: string) =>
+    setSort((s) => ({ col, dir: s.col === col && s.dir === "asc" ? "desc" : "asc" }));
+
+  const visible = useSorted(useFiltered(rows, filters), sort);
+
+  const th = (col: string, label: string, cls?: string) =>
+    <Th col={col} sort={sort} onSort={toggle} className={cls}>{label}</Th>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
+        <Button variant="outline" size="sm" onClick={() =>
+          exportCsv("machine-status.csv",
+            ["Store","Model","Serial","Group","Type","BMS Install Date","BMS Age","Age","Condition","Replace"],
+            visible.map((r) => [
+              r.store ?? "", r.model_name, r.serial_number,
+              r.company_group ?? "", r.printer_type ?? "",
+              r.bms_installed_date ?? "", bmsAge(r.bms_installed_date),
+              r.age ?? "", r.condition_notes ?? "", r.replace_flag ?? "",
+            ])
+          )
+        }>Export CSV</Button>
+      </div>
+      <div className="rounded-md border overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {th("store","Store")}
+              {th("model_name","Model")}
+              {th("serial_number","Serial")}
+              {th("company_group","Group")}
+              {th("printer_type","Type")}
+              {th("bms_installed_date","BMS Install Date")}
+              {th("bms_installed_date","BMS Age")}
+              {th("age","Age")}
+              {th("condition_notes","Condition")}
+              {th("replace_flag","Replace")}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visible.length === 0 ? (
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
+            ) : visible.map((r) => (
+              <TableRow key={r.serial_number}>
+                <TableCell className="text-xs">{r.store ?? "—"}</TableCell>
+                <TableCell className="text-xs">{r.model_name}</TableCell>
+                <TableCell className="font-mono text-xs">{r.serial_number}</TableCell>
+                <TableCell className="text-xs">{r.company_group ?? "—"}</TableCell>
+                <TableCell className="text-xs">{r.printer_type ?? "—"}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{bmsAge(r.bms_installed_date)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{r.age ?? "—"}</TableCell>
+                <TableCell className="text-xs max-w-[320px] truncate" title={r.condition_notes ?? ""}>{r.condition_notes ?? "—"}</TableCell>
+                <TableCell className="whitespace-nowrap"><ReplaceBadge flag={r.replace_flag} /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <p className="text-xs text-muted-foreground">{visible.length} machines · {visible.filter(r => r.replace_flag === "YES").length} flagged for replacement</p>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const TABS: { key: TabType; label: string }[] = [
@@ -456,11 +577,12 @@ const TABS: { key: TabType; label: string }[] = [
   { key: "mtd",     label: "Month to Date" },
   { key: "monthly", label: "Monthly (6m)" },
   { key: "ytd",     label: "Year to Date" },
+  { key: "status",  label: "Machine Status" },
 ];
 
 interface ApiPayload {
   tab: TabType;
-  rows: (SummaryRow | MtdRow | MonthlyRow)[];
+  rows: (SummaryRow | MtdRow | MonthlyRow | StatusRow)[];
   dates?: string[];
   months?: string[];
 }
@@ -524,6 +646,7 @@ export default function MachineReportsPage() {
             {activeTab === "mtd" && <MtdTab rows={current.rows as MtdRow[]} dates={current.dates??[]} filters={filters} setFilters={setFilters} />}
             {activeTab === "monthly" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="monthly" />}
             {activeTab === "ytd" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="ytd" />}
+            {activeTab === "status" && <StatusTab rows={current.rows as StatusRow[]} filters={filters} setFilters={setFilters} />}
           </>
         )}
       </div>

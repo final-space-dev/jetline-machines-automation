@@ -1,0 +1,206 @@
+/* ============================================================
+   JETLINE UI — Controls (buttons, toggles, inputs, choices)
+   Requires tokens.css
+   ============================================================ */
+
+/* ---- Icon chip (the signature element) ------------------ */
+.jl-chip {
+  display: inline-grid; place-items: center;
+  width: 44px; height: 44px;
+  border-radius: var(--r-md);
+  background: var(--red-tint);
+  color: var(--red-500);
+  flex: none;
+  transition: background var(--t-base) var(--ease), color var(--t-base), transform var(--t-base) var(--ease);
+}
+.jl-chip svg { width: 22px; height: 22px; }
+.jl-chip--sm { width: 34px; height: 34px; border-radius: var(--r-sm); }
+.jl-chip--sm svg { width: 18px; height: 18px; }
+.jl-chip--lg { width: 54px; height: 54px; border-radius: var(--r-lg); }
+.jl-chip--lg svg { width: 28px; height: 28px; }
+.jl-chip--solid { background: var(--red-500); color: #fff; box-shadow: var(--sh-red); }
+.jl-chip--green { background: var(--green-tint); color: var(--green-700); }
+.jl-chip--blue  { background: var(--blue-tint);  color: var(--blue-700); }
+.jl-chip--amber { background: var(--amber-tint); color: var(--amber-700); }
+.jl-chip--neutral { background: var(--ink-50); color: var(--ink-600); }
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.jl-btn {
+  --btn-bg: var(--surface);
+  --btn-fg: var(--ink-800);
+  --btn-shadow: var(--sh-sm);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  height: 42px; padding: 0 var(--s-5);
+  border-radius: var(--r-md);
+  background: var(--btn-bg); color: var(--btn-fg);
+  font-size: var(--fs-sm); font-weight: var(--fw-bold); letter-spacing: -0.01em;
+  white-space: nowrap;
+  box-shadow: var(--btn-shadow);
+  transition: transform var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease), background var(--t-fast), filter var(--t-fast);
+  user-select: none;
+}
+.jl-btn svg { width: 17px; height: 17px; }
+.jl-btn:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
+.jl-btn:active { transform: translateY(0); box-shadow: var(--sh-xs); transition-duration: .06s; }
+.jl-btn:focus-visible { outline: none; box-shadow: var(--btn-shadow), var(--sh-focus); }
+
+.jl-btn--primary { --btn-bg: linear-gradient(160deg, var(--red-400), var(--red-500) 55%, var(--red-600)); --btn-fg: #fff; --btn-shadow: var(--sh-red); }
+.jl-btn--primary:hover { box-shadow: 0 14px 30px var(--red-glow); }
+.jl-btn--primary:focus-visible { box-shadow: var(--sh-red), var(--sh-focus); }
+
+.jl-btn--secondary { --btn-bg: var(--surface); --btn-fg: var(--ink-800); }
+
+.jl-btn--soft { --btn-bg: var(--red-tint); --btn-fg: var(--red-600); --btn-shadow: none; }
+.jl-btn--soft:hover { background: var(--red-100); box-shadow: var(--sh-sm); }
+
+.jl-btn--ghost { --btn-bg: transparent; --btn-fg: var(--ink-600); --btn-shadow: none; }
+.jl-btn--ghost:hover { background: var(--ink-50); box-shadow: none; color: var(--ink-900); }
+
+.jl-btn--dark { --btn-bg: var(--ink-900); --btn-fg: #fff; }
+
+.jl-btn--sm { height: 34px; padding: 0 var(--s-3); font-size: var(--fs-xs); border-radius: var(--r-sm); }
+.jl-btn--lg { height: 50px; padding: 0 var(--s-6); font-size: var(--fs-body); border-radius: var(--r-lg); }
+.jl-btn--block { display: flex; width: 100%; }
+.jl-btn--icon { width: 42px; padding: 0; }
+.jl-btn--icon.jl-btn--sm { width: 34px; }
+
+.jl-btn:disabled, .jl-btn[aria-disabled="true"] { opacity: .5; pointer-events: none; box-shadow: none; transform: none; }
+
+.jl-btn[data-loading] { color: transparent !important; position: relative; pointer-events: none; }
+.jl-btn[data-loading]::after {
+  content: ""; position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid currentColor; border-top-color: transparent; color: #fff;
+  animation: jl-spin .6s linear infinite;
+}
+.jl-btn--secondary[data-loading]::after, .jl-btn--ghost[data-loading]::after, .jl-btn--soft[data-loading]::after { color: var(--ink-500); }
+@keyframes jl-spin { to { transform: rotate(360deg); } }
+
+/* Button group (segmented) */
+.jl-segment {
+  display: inline-flex; padding: 4px; gap: 2px;
+  background: var(--ink-50); border-radius: var(--r-md);
+}
+.jl-segment button {
+  height: 34px; padding: 0 var(--s-4); border-radius: var(--r-sm);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--ink-500);
+  transition: all var(--t-fast) var(--ease);
+}
+.jl-segment button:hover { color: var(--ink-800); }
+.jl-segment button[aria-selected="true"] { background: var(--surface); color: var(--ink-900); box-shadow: var(--sh-sm); }
+
+/* ============================================================
+   Toggle / Switch (Apple-style)
+   ============================================================ */
+.jl-switch { position: relative; display: inline-flex; align-items: center; gap: var(--s-3); cursor: pointer; user-select: none; }
+.jl-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.jl-switch .track {
+  width: 46px; height: 28px; border-radius: var(--r-pill);
+  background: var(--ink-200); box-shadow: var(--sh-inset);
+  transition: background var(--t-base) var(--ease);
+  flex: none;
+}
+.jl-switch .thumb {
+  position: absolute; left: 3px; top: 3px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 5px rgba(16,24,40,.25);
+  transition: transform var(--t-base) var(--ease-out);
+}
+.jl-switch input:checked ~ .track { background: var(--red-500); }
+.jl-switch input:checked ~ .thumb { transform: translateX(18px); }
+.jl-switch input:focus-visible ~ .track { box-shadow: var(--sh-inset), var(--sh-focus); }
+.jl-switch input:disabled ~ .track { opacity: .5; }
+.jl-switch .label { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+
+/* ============================================================
+   Checkbox + Radio
+   ============================================================ */
+.jl-check, .jl-radio { display: inline-flex; align-items: center; gap: var(--s-3); cursor: pointer; user-select: none; font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.jl-check input, .jl-radio input { position: absolute; opacity: 0; width: 0; height: 0; }
+.jl-check .box, .jl-radio .box {
+  width: 22px; height: 22px; flex: none;
+  background: var(--surface); box-shadow: var(--sh-sm), inset 0 0 0 1.5px var(--ink-200);
+  display: grid; place-items: center;
+  transition: all var(--t-fast) var(--ease);
+}
+.jl-check .box { border-radius: var(--r-xs); }
+.jl-radio .box { border-radius: 50%; }
+.jl-check .box svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 3; opacity: 0; transform: scale(.5); transition: all var(--t-fast) var(--ease); }
+.jl-radio .box::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #fff; transform: scale(0); transition: transform var(--t-fast) var(--ease); }
+.jl-check input:checked ~ .box, .jl-radio input:checked ~ .box { background: var(--red-500); box-shadow: var(--sh-sm), inset 0 0 0 1.5px var(--red-500); }
+.jl-check input:checked ~ .box svg { opacity: 1; transform: scale(1); }
+.jl-radio input:checked ~ .box::after { transform: scale(1); }
+.jl-check input:focus-visible ~ .box, .jl-radio input:focus-visible ~ .box { box-shadow: var(--sh-focus), inset 0 0 0 1.5px var(--red-400); }
+.jl-check input:disabled ~ .box, .jl-radio input:disabled ~ .box { opacity: .5; }
+
+/* ============================================================
+   Inputs / Textarea / Select
+   ============================================================ */
+.jl-field { display: flex; flex-direction: column; gap: var(--s-2); }
+.jl-field > label { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--ink-700); }
+.jl-field .hint { font-size: var(--fs-xs); color: var(--ink-400); }
+.jl-field .hint--error { color: var(--red-600); }
+
+/* Filled wells — zero borders, soft inset, red glow on focus. No lines, ever. */
+.jl-input, .jl-textarea, .jl-select {
+  width: 100%; height: 44px; padding: 0 var(--s-4);
+  background: var(--ink-50); color: var(--ink-900);
+  border: 0; border-radius: var(--r-md); outline: none;
+  box-shadow: var(--sh-inset);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  transition: box-shadow var(--t-base) var(--ease), background var(--t-fast);
+}
+.jl-input::placeholder, .jl-textarea::placeholder { color: var(--ink-400); font-weight: var(--fw-regular); }
+.jl-input:hover, .jl-textarea:hover, .jl-select:hover { background: var(--ink-100); }
+.jl-input:focus, .jl-textarea:focus, .jl-select:focus {
+  background: var(--surface);
+  box-shadow: var(--sh-inset), var(--sh-focus);
+}
+.jl-textarea { height: auto; min-height: 104px; padding: var(--s-3) var(--s-4); resize: vertical; line-height: 1.5; }
+.jl-input:disabled, .jl-textarea:disabled, .jl-select:disabled { opacity: .55; color: var(--ink-400); pointer-events: none; }
+
+.jl-input--error, .jl-input.is-error { background: var(--red-tint); box-shadow: var(--sh-inset); }
+.jl-input--error:focus, .jl-input.is-error:focus { background: var(--red-50); box-shadow: var(--sh-inset), var(--sh-focus); }
+
+/* Input with leading icon / addon */
+.jl-input-group { position: relative; display: flex; align-items: center; }
+.jl-input-group .lead { position: absolute; left: var(--s-4); color: var(--ink-400); pointer-events: none; display: grid; place-items: center; }
+.jl-input-group .lead svg { width: 18px; height: 18px; }
+.jl-input-group .jl-input { padding-left: 44px; }
+.jl-input-group .trail { position: absolute; right: 8px; }
+
+/* Select chevron */
+.jl-select-wrap { position: relative; }
+.jl-select { appearance: none; padding-right: 40px; cursor: pointer; }
+.jl-select-wrap::after {
+  content: ""; position: absolute; right: 16px; top: 50%; width: 9px; height: 9px;
+  border-right: 2px solid var(--ink-400); border-bottom: 2px solid var(--ink-400);
+  transform: translateY(-65%) rotate(45deg); pointer-events: none;
+}
+
+/* ============================================================
+   Range slider
+   ============================================================ */
+.jl-range { width: 100%; height: 28px; appearance: none; background: transparent; cursor: pointer; }
+.jl-range::-webkit-slider-runnable-track { height: 8px; border-radius: var(--r-pill); background: linear-gradient(var(--red-500), var(--red-500)) 0/var(--jl-fill,50%) 100% no-repeat, var(--ink-150, var(--ink-100)); box-shadow: var(--sh-inset); }
+.jl-range::-moz-range-track { height: 8px; border-radius: var(--r-pill); background: var(--ink-100); box-shadow: var(--sh-inset); }
+.jl-range::-moz-range-progress { height: 8px; border-radius: var(--r-pill); background: var(--red-500); }
+.jl-range::-webkit-slider-thumb { appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(16,24,40,.3); transition: transform var(--t-fast); }
+.jl-range::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(16,24,40,.3); }
+.jl-range:active::-webkit-slider-thumb { transform: scale(1.12); }
+.jl-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 2px 6px rgba(16,24,40,.3), var(--sh-focus); }
+
+/* ============================================================
+   Search box (pill)
+   ============================================================ */
+.jl-search { position: relative; display: flex; align-items: center; }
+.jl-search svg { position: absolute; left: var(--s-4); width: 18px; height: 18px; color: var(--ink-400); pointer-events: none; }
+.jl-search input {
+  width: 100%; height: 44px; padding: 0 var(--s-4) 0 44px;
+  background: var(--ink-50); border: 0; border-radius: var(--r-pill); outline: none;
+  box-shadow: var(--sh-inset);
+  font-size: var(--fs-sm); transition: box-shadow var(--t-base) var(--ease), background var(--t-fast);
+}
+.jl-search input:hover { background: var(--ink-100); }
+.jl-search input:focus { background: var(--surface); box-shadow: var(--sh-inset), var(--sh-focus); }

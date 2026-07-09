@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jetline — Quote QT-2041</title>
+<link rel="stylesheet" href="ui/tokens.css" />
+<link rel="stylesheet" href="ui/controls.css" />
+<link rel="stylesheet" href="ui/surfaces.css" />
+<link rel="stylesheet" href="ui/documents.css" />
+<style>
+  body { background: var(--canvas); padding: var(--s-8) var(--s-5) var(--s-10); }
+</style>
+</head>
+<body>
+
+  <!-- Toolbar (screen only) -->
+  <div class="jl-doc-toolbar jl-no-print">
+    <button class="jl-btn jl-btn--primary" onclick="window.print()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>
+      Download PDF
+    </button>
+    <span class="jl-sm jl-faint">Opens your browser's print dialog — choose “Save as PDF”.</span>
+  </div>
+
+  <!-- ============ QUOTE DOCUMENT ============ -->
+  <article class="jl-doc">
+    <div class="jl-doc__inner">
+
+      <!-- Header -->
+      <header class="jl-doc__head">
+        <div class="jl-doc__brand">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 8.5 12 4l9 4.5M3 8.5v7L12 20m-9-11.5L12 13m0 7 9-4.5v-7M12 13l9-4.5M12 13v7" stroke="#fff" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+          <span><b>Jetline Courier</b><span>Freight &amp; same-day logistics</span></span>
+        </div>
+        <div class="jl-doc__type">
+          <h1>Quote</h1>
+          <div class="ref">QT-2041</div>
+        </div>
+      </header>
+
+      <!-- Meta strip -->
+      <div class="jl-doc__meta">
+        <div class="m"><span class="k">Issued</span><span class="v">9 Jun 2026</span></div>
+        <div class="m"><span class="k">Valid until</span><span class="v">9 Jul 2026</span></div>
+        <div class="m"><span class="k">Prepared by</span><span class="v">A. Mehta</span></div>
+        <div class="m m--right"><span class="k">Status</span><span class="jl-stamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Valid 30 days</span></div>
+      </div>
+
+      <!-- Parties -->
+      <div class="jl-doc__parties">
+        <div class="jl-party">
+          <div class="jl-party__label">From</div>
+          <div class="jl-party__name">Jetline Courier Ltd.</div>
+          <div class="jl-party__lines">144 Harbour Way, Unit 7<br/>Bristol, BS1 5TF<br/>billing@jetline.co · +44 117 555 0142</div>
+        </div>
+        <div class="jl-party jl-party--accent">
+          <div class="jl-party__label">Prepared for</div>
+          <div class="jl-party__name">Northgate Supplies</div>
+          <div class="jl-party__lines">Attn: Jane Doe, Operations<br/>22 Mill Lane, Leeds, LS2 7QR<br/>jane.doe@northgate.co.uk</div>
+        </div>
+      </div>
+
+      <!-- Line items -->
+      <table class="jl-lineitems">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th class="num">Qty</th>
+            <th class="num">Rate</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="it-title">Same-day courier — priority</div><div class="it-desc">Bristol → Leeds, dedicated van, &lt; 6 hr delivery window</div></td>
+            <td class="num">4</td>
+            <td class="num">£185.00</td>
+            <td class="num it-amt">£740.00</td>
+          </tr>
+          <tr>
+            <td><div class="it-title">Pallet freight — standard</div><div class="it-desc">Full pallet, next-day, includes tail-lift unload</div></td>
+            <td class="num">6</td>
+            <td class="num">£62.50</td>
+            <td class="num it-amt">£375.00</td>
+          </tr>
+          <tr>
+            <td><div class="it-title">Goods-in-transit insurance</div><div class="it-desc">Declared value cover up to £25,000 per consignment</div></td>
+            <td class="num">10</td>
+            <td class="num">£8.00</td>
+            <td class="num it-amt">£80.00</td>
+          </tr>
+          <tr>
+            <td><div class="it-title">Saturday delivery surcharge</div><div class="it-desc">Weekend handling &amp; out-of-hours dispatch</div></td>
+            <td class="num">2</td>
+            <td class="num">£45.00</td>
+            <td class="num it-amt">£90.00</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Totals -->
+      <div class="jl-doc__totals">
+        <div class="jl-totals">
+          <div class="row"><span class="k">Subtotal</span><span class="v">£1,285.00</span></div>
+          <div class="row row--discount"><span class="k">Volume discount (10%)</span><span class="v">−£128.50</span></div>
+          <div class="row"><span class="k">VAT (20%)</span><span class="v">£231.30</span></div>
+          <div class="grand"><span class="k">Total</span><span class="v">£1,387.80</span></div>
+        </div>
+      </div>
+
+      <!-- Notes + signature -->
+      <div class="jl-doc__cols">
+        <div class="jl-doc__notes">
+          <div class="jl-party__label">Terms &amp; notes</div>
+          <p>Pricing held for 30 days from issue. Rates assume standard access at both addresses; waiting time beyond 30 minutes is charged at £18/hr. A signed copy or written confirmation converts this quote to a booking. Payment due net-14 from first delivery.</p>
+        </div>
+        <div class="jl-sign">
+          <div class="jl-sign__rule"></div>
+          <div class="jl-sign__cap">Authorised signature &amp; date</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer band -->
+    <footer class="jl-doc__foot">
+      <div class="pay"><b>Accept this quote:</b> <span>reply to this email or call +44 117 555 0142</span></div>
+      <div class="thanks">Thank you for choosing Jetline.</div>
+    </footer>
+  </article>
+
+  <script src="ui/jetline.js"></script>
+</body>
+</html>

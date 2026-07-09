@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jetline UI — Component Framework</title>
+<link rel="stylesheet" href="ui/tokens.css" />
+<link rel="stylesheet" href="ui/controls.css" />
+<link rel="stylesheet" href="ui/surfaces.css" />
+<link rel="stylesheet" href="ui/overlays.css" />
+<link rel="stylesheet" href="ui/documents.css" />
+<style>
+  /* ---- Page layout (doc chrome only — components come from the framework) ---- */
+  .layout { display: grid; grid-template-columns: 256px 1fr; min-height: 100vh; }
+
+  .sidebar { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; padding: var(--s-6) var(--s-5); background: var(--surface); box-shadow: var(--sh-sm); }
+  .sidebar__brand { display: flex; align-items: center; gap: 11px; margin-bottom: var(--s-6); }
+  .sidebar__brand .mark { width: 36px; height: 36px; border-radius: var(--r-sm); background: linear-gradient(160deg, var(--red-400), var(--red-600)); display: grid; place-items: center; box-shadow: var(--sh-red); }
+  .sidebar__brand .mark svg { width: 20px; height: 20px; }
+  .sidebar__brand b { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; display: block; }
+  .sidebar__brand span { font-size: 11.5px; color: var(--ink-400); font-weight: 600; }
+  .nav-group { margin-bottom: var(--s-5); }
+  .nav-group > p { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-300); padding: 0 12px; margin-bottom: 6px; }
+  .nav-group a { display: block; padding: 8px 12px; border-radius: var(--r-sm); font-size: 13.5px; font-weight: 600; color: var(--ink-500); transition: all .14s var(--ease); }
+  .nav-group a:hover { background: var(--ink-50); color: var(--ink-900); }
+  .nav-group a.active { background: var(--red-tint); color: var(--red-600); }
+
+  .main { padding: var(--s-9) var(--s-9) var(--s-10); max-width: 1080px; }
+  .page-head { margin-bottom: var(--s-9); }
+  .page-head .jl-badge { margin-bottom: var(--s-4); }
+  .page-head h1 { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+  .page-head p { font-size: 17px; color: var(--ink-500); margin-top: var(--s-3); max-width: 60ch; }
+
+  section.block { margin-bottom: var(--s-10); scroll-margin-top: var(--s-5); }
+  .block__head { margin-bottom: var(--s-5); }
+  .block__head h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .block__head p { font-size: 14.5px; color: var(--ink-500); margin-top: 4px; }
+
+  /* demo surface */
+  .demo { background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--sh-md); padding: var(--s-6); }
+  .demo + .demo { margin-top: var(--s-4); }
+  .demo-row { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center; }
+  .demo-grid { display: grid; gap: var(--s-4); }
+  .cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .demo-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300); margin-bottom: var(--s-3); }
+  .stack { display: flex; flex-direction: column; gap: var(--s-4); }
+
+  /* color swatches */
+  .swatch { border-radius: var(--r-md); box-shadow: var(--sh-sm); overflow: hidden; }
+  .swatch .chip { height: 64px; }
+  .swatch .meta { padding: 10px 12px; }
+  .swatch .meta b { font-size: 12.5px; font-weight: 700; display: block; }
+  .swatch .meta code { font-size: 11px; color: var(--ink-400); font-family: var(--mono); }
+
+  .type-spec { display: flex; align-items: baseline; gap: var(--s-4); padding: var(--s-3) 0; }
+  .type-spec code { font-size: 11px; color: var(--ink-400); font-family: var(--mono); white-space: nowrap; margin-left: auto; }
+
+  .token-row { display: flex; align-items: center; gap: var(--s-4); padding: 10px 0; }
+  .token-row code { font-family: var(--mono); font-size: 12px; color: var(--red-600); background: var(--red-tint); padding: 2px 8px; border-radius: 6px; }
+
+  /* menu reference (the original, restyled) */
+  .menu-grid { display: grid; grid-template-columns: 1.12fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: var(--s-4); }
+  .menu-grid .jl-card--hero { grid-row: 1 / 3; display: flex; flex-direction: column; justify-content: space-between; }
+
+  @media (max-width: 920px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; box-shadow: var(--sh-sm); }
+    .cols-3, .cols-4 { grid-template-columns: repeat(2, 1fr); }
+    .menu-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+    .menu-grid .jl-card--hero { grid-row: auto; grid-column: 1 / 3; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- ============== SIDEBAR ============== -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 8.5 12 4l9 4.5M3 8.5v7L12 20m-9-11.5L12 13m0 7 9-4.5v-7M12 13l9-4.5M12 13v7" stroke="#fff" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+      <span><b>Jetline UI</b><span>Component framework</span></span>
+    </div>
+    <nav class="nav-group">
+      <p>Foundations</p>
+      <a href="#colors">Color</a>
+      <a href="#type">Typography</a>
+      <a href="#tokens">Shadows &amp; radius</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Controls</p>
+      <a href="#buttons">Buttons</a>
+      <a href="#toggles">Toggles &amp; choices</a>
+      <a href="#inputs">Inputs &amp; forms</a>
+      <a href="#sliders">Sliders</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Data &amp; surfaces</p>
+      <a href="#kpis">KPI / stats</a>
+      <a href="#cards">Cards &amp; tiles</a>
+      <a href="#badges">Badges &amp; status</a>
+      <a href="#avatars">Avatars</a>
+      <a href="#table">Tables</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Navigation</p>
+      <a href="#tabs">Tabs &amp; segments</a>
+      <a href="#menus">Dropdowns &amp; menus</a>
+      <a href="#accordion">Accordion</a>
+      <a href="#steps">Steps / wizard</a>
+      <a href="#pagination">Pagination</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Feedback</p>
+      <a href="#alerts">Alerts</a>
+      <a href="#toasts">Toasts</a>
+      <a href="#modal">Modal</a>
+      <a href="#misc">Tooltip &amp; progress</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Documents</p>
+      <a href="#documents">Quote / order / invoice</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Patterns</p>
+      <a href="#menu">Action menu</a>
+    </nav>
+  </aside>
+
+  <!-- ============== MAIN ============== -->
+  <main class="main">
+    <header class="page-head">
+      <span class="jl-badge jl-badge--red">v1.0 · Design Framework</span>
+      <h1>Jetline UI</h1>
+      <p>A complete, shadow-driven component system built from the courier menu aesthetic — soft elevation, generous radius, a single confident red, and absolutely no hard lines. Drop in <code class="jl-mono">tokens.css</code> + the component sheets and build.</p>
+    </header>
+
+    <!-- ===== COLOR ===== -->
+    <section class="block" id="colors">
+      <div class="block__head"><h2>Color</h2><p>One brand red, a cool neutral ramp, and restrained semantics. Tints carry most of the UI; saturated red is reserved for primary actions.</p></div>
+      <div class="demo">
+        <div class="demo-label">Brand red</div>
+        <div class="demo-grid cols-4" id="reds"></div>
+      </div>
+      <div class="demo">
+        <div class="demo-label">Neutrals</div>
+        <div class="demo-grid cols-4" id="inks"></div>
+      </div>
+      <div class="demo">
+        <div class="demo-label">Semantic</div>
+        <div class="demo-grid cols-4" id="sems"></div>
+      </div>
+    </section>
+
+    <!-- ===== TYPE ===== -->
+    <section class="block" id="type">
+      <div class="block__head"><h2>Typography</h2><p>Plus Jakarta Sans across the board. Tight tracking on headings, comfortable line-height on body.</p></div>
+      <div class="demo">
+        <div class="type-spec"><span class="jl-display">Display</span><code>800 · 30px</code></div>
+        <hr class="jl-soft-divider" />
+        <div class="type-spec"><span class="jl-h1">Heading 1</span><code>800 · 24px</code></div>
+        <div class="type-spec"><span class="jl-h2">Heading 2</span><code>700 · 19px</code></div>
+        <div class="type-spec"><span class="jl-h3">Heading 3</span><code>700 · 16px</code></div>
+        <hr class="jl-soft-divider" />
+        <div class="type-spec"><span class="jl-body">Body — the quick brown fox jumps over the lazy dog.</span><code>400 · 15px</code></div>
+        <div class="type-spec"><span class="jl-sm jl-muted">Small / secondary text.</span><code>400 · 13.5px</code></div>
+        <div class="type-spec"><span class="jl-eyebrow">Eyebrow label</span><code>700 · 12px caps</code></div>
+      </div>
+    </section>
+
+    <!-- ===== TOKENS ===== -->
+    <section class="block" id="tokens">
+      <div class="block__head"><h2>Shadows &amp; radius</h2><p>Separation comes from elevation, never borders. Five shadow steps plus a red glow for primary surfaces.</p></div>
+      <div class="demo">
+        <div class="demo-grid cols-3">
+          <div class="jl-card" style="box-shadow:var(--sh-sm)"><b class="jl-sm">--sh-sm</b><div class="jl-xs jl-faint">resting controls</div></div>
+          <div class="jl-card" style="box-shadow:var(--sh-md)"><b class="jl-sm">--sh-md</b><div class="jl-xs jl-faint">cards</div></div>
+          <div class="jl-card" style="box-shadow:var(--sh-lg)"><b class="jl-sm">--sh-lg</b><div class="jl-xs jl-faint">hover / pop</div></div>
+          <div class="jl-card" style="box-shadow:var(--sh-xl)"><b class="jl-sm">--sh-xl</b><div class="jl-xs jl-faint">modals</div></div>
+          <div class="jl-card" style="box-shadow:var(--sh-red);background:var(--red-500);color:#fff"><b class="jl-sm">--sh-red</b><div class="jl-xs" style="color:rgba(255,255,255,.8)">primary glow</div></div>
+          <div class="jl-card demo-row" style="box-shadow:var(--sh-sm)">
+            <span style="width:34px;height:34px;border-radius:var(--r-xs);background:var(--red-tint)"></span>
+            <span style="width:34px;height:34px;border-radius:var(--r-md);background:var(--red-tint)"></span>
+            <span style="width:34px;height:34px;border-radius:var(--r-xl);background:var(--red-tint)"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BUTTONS ===== -->
+    <section class="block" id="buttons">
+      <div class="block__head"><h2>Buttons</h2><p>Primary lifts with a red glow. Secondary, soft, ghost and dark variants for hierarchy. All translate up on hover.</p></div>
+      <div class="demo stack">
+        <div class="demo-row">
+          <button class="jl-btn jl-btn--primary">Create shipment <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          <button class="jl-btn jl-btn--secondary">Secondary</button>
+          <button class="jl-btn jl-btn--soft">Soft</button>
+          <button class="jl-btn jl-btn--ghost">Ghost</button>
+          <button class="jl-btn jl-btn--dark">Dark</button>
+        </div>
+        <div class="demo-row">
+          <button class="jl-btn jl-btn--primary jl-btn--lg">Large</button>
+          <button class="jl-btn jl-btn--secondary">Default</button>
+          <button class="jl-btn jl-btn--secondary jl-btn--sm">Small</button>
+          <button class="jl-btn jl-btn--secondary jl-btn--icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button class="jl-btn jl-btn--primary" data-loading>Saving</button>
+          <button class="jl-btn jl-btn--secondary" disabled>Disabled</button>
+        </div>
+        <div class="jl-segment" id="seg">
+          <button aria-selected="true">Day</button>
+          <button>Week</button>
+          <button>Month</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TOGGLES & CHOICES ===== -->
+    <section class="block" id="toggles">
+      <div class="block__head"><h2>Toggles &amp; choices</h2><p>Apple-style switch, plus custom checkbox and radio that fill red when active.</p></div>
+      <div class="demo">
+        <div class="demo-grid cols-3">
+          <div class="stack">
+            <div class="demo-label">Switch</div>
+            <label class="jl-switch"><input type="checkbox" checked /><span class="track"></span><span class="thumb"></span><span class="label">Live tracking</span></label>
+            <label class="jl-switch"><input type="checkbox" /><span class="track"></span><span class="thumb"></span><span class="label">SMS alerts</span></label>
+            <label class="jl-switch"><input type="checkbox" disabled /><span class="track"></span><span class="thumb"></span><span class="label">Locked</span></label>
+          </div>
+          <div class="stack">
+            <div class="demo-label">Checkbox</div>
+            <label class="jl-check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span> Signature required</label>
+            <label class="jl-check"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span> Insure package</label>
+          </div>
+          <div class="stack">
+            <div class="demo-label">Radio</div>
+            <label class="jl-radio"><input type="radio" name="ship" checked /><span class="box"></span> Standard</label>
+            <label class="jl-radio"><input type="radio" name="ship" /><span class="box"></span> Express</label>
+            <label class="jl-radio"><input type="radio" name="ship" /><span class="box"></span> Overnight</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== INPUTS ===== -->
+    <section class="block" id="inputs">
+      <div class="block__head"><h2>Inputs &amp; forms</h2><p>Soft filled wells — zero borders, a gentle inset, and a red glow on focus. Addons, select, textarea, search, and error state included.</p></div>
+      <div class="demo">
+        <div class="demo-grid cols-2">
+          <div class="jl-field"><label>Recipient name</label><input class="jl-input" placeholder="Jane Doe" /></div>
+          <div class="jl-field"><label>Tracking number</label>
+            <div class="jl-input-group"><span class="lead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg></span><input class="jl-input" placeholder="JL-000000" /></div>
+          </div>
+          <div class="jl-field"><label>Service level</label>
+            <div class="jl-select-wrap"><select class="jl-select"><option>Standard</option><option>Express</option><option>Overnight</option></select></div>
+          </div>
+          <div class="jl-field"><label>Weight (kg)</label><input class="jl-input is-error" value="-2" /><span class="hint hint--error">Weight must be greater than zero.</span></div>
+          <div class="jl-field" style="grid-column:1/3"><label>Delivery notes</label><textarea class="jl-textarea" placeholder="Leave at the front desk…"></textarea></div>
+          <div class="jl-field" style="grid-column:1/3"><label>Search</label>
+            <div class="jl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg><input placeholder="Search shipments, addresses, invoices…" /></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SLIDERS ===== -->
+    <section class="block" id="sliders">
+      <div class="block__head"><h2>Sliders</h2><p>Track fills red as you drag; live value read-out.</p></div>
+      <div class="demo">
+        <div class="demo-row" style="gap:var(--s-5)">
+          <input class="jl-range" type="range" min="0" max="100" value="64" style="max-width:360px" />
+          <span class="jl-badge jl-badge--red" data-jl-output>64</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KPIs ===== -->
+    <section class="block" id="kpis">
+      <div class="block__head"><h2>KPI &amp; stats</h2><p>Compact metric cards with trend pills and a hover-reactive sparkline.</p></div>
+      <div class="demo-grid cols-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- ===== CARDS ===== -->
+    <section class="block" id="cards">
+      <div class="block__head"><h2>Cards &amp; tiles</h2><p>The core surface. Interactive tiles lift; the hero card carries the red glow for primary actions.</p></div>
+      <div class="demo-grid cols-3">
+        <div class="jl-card jl-card--interactive">
+          <div class="jl-card__head"><span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16" stroke-linecap="round"/></svg></span><span class="jl-badge">New</span></div>
+          <div class="jl-card__title">Standard card</div>
+          <div class="jl-card__sub">Lifts on hover with a deeper shadow.</div>
+        </div>
+        <div class="jl-card jl-card--hero jl-card--interactive">
+          <span class="jl-chip jl-chip--lg" style="background:rgba(255,255,255,.16);color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m7.5 4.27 9 5.15M21 8.5 12 13 3 8.5 12 4l9 4.5Zm0 0v7L12 20l-9-4.5v-7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+          <div><div class="jl-card__title" style="margin-top:var(--s-4)">Hero card</div><div class="jl-card__sub">For the primary action.</div></div>
+        </div>
+        <div class="jl-tile">
+          <span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 20V10m7 10V4m7 16v-7" stroke-linecap="round"/></svg></span>
+          <span class="jl-tile__label">Launcher tile</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BADGES ===== -->
+    <section class="block" id="badges">
+      <div class="block__head"><h2>Badges &amp; status</h2><p>Tinted pills, status dots, and removable tags.</p></div>
+      <div class="demo stack">
+        <div class="demo-row">
+          <span class="jl-badge">Default</span>
+          <span class="jl-badge jl-badge--red">In transit</span>
+          <span class="jl-badge jl-badge--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>Delivered</span>
+          <span class="jl-badge jl-badge--amber">Delayed</span>
+          <span class="jl-badge jl-badge--blue">Scheduled</span>
+          <span class="jl-badge jl-badge--solid">Priority</span>
+          <span class="jl-badge jl-badge--dark">Internal</span>
+        </div>
+        <div class="demo-row">
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--green"></span><span class="jl-sm">Active</span></span>
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--amber"></span><span class="jl-sm">Pending</span></span>
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--red"></span><span class="jl-sm">Failed</span></span>
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--gray"></span><span class="jl-sm">Archived</span></span>
+        </div>
+        <div class="demo-row">
+          <span class="jl-tag">Fragile <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+          <span class="jl-tag">Refrigerated <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== AVATARS ===== -->
+    <section class="block" id="avatars">
+      <div class="block__head"><h2>Avatars</h2><p>Initials by default, with presence dots and overlapping stacks.</p></div>
+      <div class="demo demo-row" style="gap:var(--s-6)">
+        <div class="jl-avatar jl-avatar--sm">JD</div>
+        <div class="jl-avatar">AM<span class="badge-dot jl-dot--green" style="box-shadow:0 0 0 2.5px #fff"></span></div>
+        <div class="jl-avatar jl-avatar--lg">RK</div>
+        <div class="jl-avatar-stack">
+          <span class="jl-avatar jl-avatar--sm">JD</span>
+          <span class="jl-avatar jl-avatar--sm" style="background:var(--blue-tint);color:var(--blue-700)">AM</span>
+          <span class="jl-avatar jl-avatar--sm" style="background:var(--green-tint);color:var(--green-700)">RK</span>
+          <span class="jl-avatar jl-avatar--sm jl-chip--neutral">+5</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TABLE ===== -->
+    <section class="block" id="table">
+      <div class="block__head"><h2>Tables</h2><p>No grid lines — soft zebra banding and a red-tint row hover do the work.</p></div>
+      <div class="jl-table-wrap">
+        <table class="jl-table">
+          <thead><tr><th>Shipment</th><th>Recipient</th><th>Status</th><th class="num">Weight</th><th class="num">Cost</th></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== TABS ===== -->
+    <section class="block" id="tabs">
+      <div class="block__head"><h2>Tabs &amp; segments</h2><p>Pill-style tabs with a fade-in panel transition.</p></div>
+      <div class="demo" data-jl-tabs>
+        <div class="jl-tabs" style="margin-bottom:var(--s-5)">
+          <button data-tab="a" aria-selected="true">Overview</button>
+          <button data-tab="b">Activity</button>
+          <button data-tab="c">Documents</button>
+        </div>
+        <div class="jl-tabpanel" data-tab="a" data-active><p class="jl-sm jl-muted">Shipment overview — origin, destination, and live ETA appear here.</p></div>
+        <div class="jl-tabpanel" data-tab="b"><p class="jl-sm jl-muted">A timeline of scans and handoffs.</p></div>
+        <div class="jl-tabpanel" data-tab="c"><p class="jl-sm jl-muted">Customs forms, invoices and the proof of delivery.</p></div>
+      </div>
+    </section>
+
+    <!-- ===== MENUS ===== -->
+    <section class="block" id="menus">
+      <div class="block__head"><h2>Dropdowns &amp; menus</h2><p>Elevated menus that scale in from the trigger; items tint red on hover.</p></div>
+      <div class="demo demo-row">
+        <div class="jl-dropdown">
+          <button class="jl-btn jl-btn--secondary" data-jl-toggle>Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="jl-menu">
+            <p class="jl-menu__label">Manage</p>
+            <button class="jl-menu__item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit shipment</button>
+            <button class="jl-menu__item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M16 6l-4-4-4 4M12 2v13" stroke-linecap="round" stroke-linejoin="round"/></svg> Share label</button>
+            <div class="jl-menu__sep"></div>
+            <button class="jl-menu__item jl-menu__item--danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 7h14M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" stroke-linecap="round" stroke-linejoin="round"/></svg> Cancel shipment</button>
+          </div>
+        </div>
+        <button class="jl-btn jl-btn--soft" onclick="Jetline.toast('Saved as draft','green')">Trigger a toast</button>
+      </div>
+    </section>
+
+    <!-- ===== ACCORDION ===== -->
+    <section class="block" id="accordion">
+      <div class="block__head"><h2>Accordion</h2><p>Smooth grid-row expand. Single-open mode optional.</p></div>
+      <div class="jl-accordion" data-jl-accordion data-single>
+        <div class="jl-acc" data-open>
+          <button class="jl-acc__head">How is delivery time calculated? <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="jl-acc__body"><div><p>ETA blends carrier speed, distance, and live traffic, refreshed at every scan.</p></div></div>
+        </div>
+        <div class="jl-acc">
+          <button class="jl-acc__head">Can I change the address mid-transit? <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="jl-acc__body"><div><p>Yes — until the package reaches the final delivery hub.</p></div></div>
+        </div>
+        <div class="jl-acc">
+          <button class="jl-acc__head">What does insurance cover? <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="jl-acc__body"><div><p>Declared value up to the selected tier against loss or damage in transit.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== STEPS ===== -->
+    <section class="block" id="steps">
+      <div class="block__head"><h2>Steps / wizard</h2><p>Connected progress nodes that fill as you advance.</p></div>
+      <div class="demo" data-jl-wizard>
+        <div class="jl-steps" style="margin-bottom:var(--s-6)">
+          <div class="jl-step" data-state="done"><span class="node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span><span class="jl-step__label">Details</span></div>
+          <div class="jl-step" data-state="active"><span class="node">2</span><span class="jl-step__label">Package</span></div>
+          <div class="jl-step"><span class="node">3</span><span class="jl-step__label">Service</span></div>
+          <div class="jl-step"><span class="node">4</span><span class="jl-step__label">Pay</span></div>
+        </div>
+        <div class="demo-row" style="justify-content:flex-end">
+          <button class="jl-btn jl-btn--ghost" data-jl-prev>Back</button>
+          <button class="jl-btn jl-btn--primary" data-jl-next>Continue</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PAGINATION ===== -->
+    <section class="block" id="pagination">
+      <div class="block__head"><h2>Pagination &amp; breadcrumb</h2></div>
+      <div class="demo stack">
+        <nav class="jl-breadcrumb"><a href="#">Dashboard</a><span class="sep">/</span><a href="#">Shipments</a><span class="sep">/</span><span class="current">JL-284910</span></nav>
+        <div class="jl-pagination">
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button>1</button>
+          <button aria-current="page">2</button>
+          <button>3</button>
+          <button>4</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ALERTS ===== -->
+    <section class="block" id="alerts">
+      <div class="block__head"><h2>Alerts</h2><p>Tinted, lineless banners for inline feedback.</p></div>
+      <div class="demo stack">
+        <div class="jl-alert jl-alert--green"><span class="jl-chip jl-chip--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span><div class="jl-alert__body"><div class="jl-alert__title">Shipment booked</div><div class="jl-alert__text">Label JL-284910 is ready to print.</div></div></div>
+        <div class="jl-alert jl-alert--amber"><span class="jl-chip jl-chip--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></span><div class="jl-alert__body"><div class="jl-alert__title">Possible delay</div><div class="jl-alert__text">Weather may affect the Denver hub today.</div></div></div>
+        <div class="jl-alert jl-alert--red"><span class="jl-chip jl-chip--solid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div class="jl-alert__body"><div class="jl-alert__title">Payment failed</div><div class="jl-alert__text">Update the card on file to continue.</div></div><button class="jl-btn jl-btn--soft jl-btn--sm">Fix</button></div>
+      </div>
+    </section>
+
+    <!-- ===== TOASTS ===== -->
+    <section class="block" id="toasts">
+      <div class="block__head"><h2>Toasts</h2><p>Dark, transient confirmations. Call <code class="jl-mono">Jetline.toast(msg, kind)</code>.</p></div>
+      <div class="demo demo-row">
+        <button class="jl-btn jl-btn--secondary" onclick="Jetline.toast('Shipment created','green')">Success</button>
+        <button class="jl-btn jl-btn--secondary" onclick="Jetline.toast('Could not connect','red')">Error</button>
+        <button class="jl-btn jl-btn--secondary" onclick="Jetline.toast('Syncing addresses…','info')">Info</button>
+      </div>
+    </section>
+
+    <!-- ===== MODAL ===== -->
+    <section class="block" id="modal">
+      <div class="block__head"><h2>Modal</h2><p>Blurred backdrop, spring-in dialog. Esc or backdrop click to dismiss.</p></div>
+      <div class="demo"><button class="jl-btn jl-btn--primary" data-jl-open="demoModal">Open dialog</button></div>
+    </section>
+
+    <!-- ===== MISC ===== -->
+    <section class="block" id="misc">
+      <div class="block__head"><h2>Tooltip, progress &amp; loaders</h2></div>
+      <div class="demo demo-row" style="gap:var(--s-7)">
+        <span class="jl-tip"><button class="jl-btn jl-btn--secondary jl-btn--icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4m0-4h.01" stroke-linecap="round"/></svg></button><span class="jl-tip__bubble">More info</span></span>
+        <div style="flex:1;max-width:320px"><div class="jl-progress"><div class="jl-progress__bar" style="width:68%"></div></div></div>
+        <div class="jl-spinner"></div>
+        <div style="flex:1;min-width:160px"><div class="jl-skeleton" style="height:12px;width:80%;margin-bottom:8px"></div><div class="jl-skeleton" style="height:12px;width:55%"></div></div>
+      </div>
+    </section>
+
+    <!-- ===== DOCUMENTS ===== -->
+    <section class="block" id="documents">
+      <div class="block__head"><h2>Documents</h2><p>Print-ready paper for quotes, orders and invoices — same shadow-driven, lineless style. A coloured top band signals the type; everything is tuned for clean PDF export via the browser print dialog.</p></div>
+      <div class="demo demo-row" style="margin-bottom:var(--s-5)">
+        <a class="jl-btn jl-btn--primary" href="Jetline Quote.html">Open full quote
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
+        </a>
+        <span class="jl-badge jl-badge--red">Quote</span>
+        <span class="jl-badge jl-badge--blue">Order</span>
+        <span class="jl-badge jl-badge--dark">Invoice</span>
+        <span class="jl-badge jl-badge--green">Paid</span>
+      </div>
+
+      <!-- Inline quote preview -->
+      <article class="jl-doc">
+        <div class="jl-doc__inner">
+          <header class="jl-doc__head">
+            <div class="jl-doc__brand">
+              <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 8.5 12 4l9 4.5M3 8.5v7L12 20m-9-11.5L12 13m0 7 9-4.5v-7M12 13l9-4.5M12 13v7" stroke="#fff" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+              <span><b>Jetline Courier</b><span>Freight &amp; same-day logistics</span></span>
+            </div>
+            <div class="jl-doc__type"><h1>Quote</h1><div class="ref">QT-2041</div></div>
+          </header>
+          <div class="jl-doc__meta">
+            <div class="m"><span class="k">Issued</span><span class="v">9 Jun 2026</span></div>
+            <div class="m"><span class="k">Valid until</span><span class="v">9 Jul 2026</span></div>
+            <div class="m"><span class="k">Prepared by</span><span class="v">A. Mehta</span></div>
+            <div class="m m--right"><span class="k">Status</span><span class="jl-stamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Valid 30 days</span></div>
+          </div>
+          <div class="jl-doc__parties">
+            <div class="jl-party"><div class="jl-party__label">From</div><div class="jl-party__name">Jetline Courier Ltd.</div><div class="jl-party__lines">144 Harbour Way, Unit 7<br/>Bristol, BS1 5TF</div></div>
+            <div class="jl-party jl-party--accent"><div class="jl-party__label">Prepared for</div><div class="jl-party__name">Northgate Supplies</div><div class="jl-party__lines">Attn: Jane Doe, Operations<br/>22 Mill Lane, Leeds, LS2 7QR</div></div>
+          </div>
+          <table class="jl-lineitems">
+            <thead><tr><th>Service</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+            <tbody>
+              <tr><td><div class="it-title">Same-day courier — priority</div><div class="it-desc">Bristol → Leeds, dedicated van</div></td><td class="num">4</td><td class="num">£185.00</td><td class="num it-amt">£740.00</td></tr>
+              <tr><td><div class="it-title">Pallet freight — standard</div><div class="it-desc">Next-day, includes tail-lift unload</div></td><td class="num">6</td><td class="num">£62.50</td><td class="num it-amt">£375.00</td></tr>
+              <tr><td><div class="it-title">Goods-in-transit insurance</div><div class="it-desc">Cover up to £25,000 per consignment</div></td><td class="num">10</td><td class="num">£8.00</td><td class="num it-amt">£80.00</td></tr>
+            </tbody>
+          </table>
+          <div class="jl-doc__totals">
+            <div class="jl-totals">
+              <div class="row"><span class="k">Subtotal</span><span class="v">£1,195.00</span></div>
+              <div class="row row--discount"><span class="k">Volume discount (10%)</span><span class="v">−£119.50</span></div>
+              <div class="row"><span class="k">VAT (20%)</span><span class="v">£215.10</span></div>
+              <div class="grand"><span class="k">Total</span><span class="v">£1,290.60</span></div>
+            </div>
+          </div>
+        </div>
+        <footer class="jl-doc__foot">
+          <div class="pay"><b>Accept this quote:</b> <span>reply to this email or call +44 117 555 0142</span></div>
+          <div class="thanks">Thank you for choosing Jetline.</div>
+        </footer>
+      </article>
+    </section>
+
+    <!-- ===== PATTERN: MENU ===== -->
+    <section class="block" id="menu">
+      <div class="block__head"><h2>Pattern — Action menu</h2><p>The original launcher, rebuilt from framework primitives. This is what the whole system grew from.</p></div>
+      <div class="demo" style="background:var(--canvas);box-shadow:var(--sh-inset)">
+        <div class="menu-grid">
+          <button class="jl-card jl-card--hero jl-card--interactive">
+            <span class="jl-chip jl-chip--lg" style="background:rgba(255,255,255,.16);color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m7.5 4.27 9 5.15M21 8.5 12 13 3 8.5 12 4l9 4.5Zm0 0v7L12 20l-9-4.5v-7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+            <div><div class="jl-eyebrow" style="color:rgba(255,255,255,.8)">Most used</div><div class="jl-card__title" style="font-size:22px;margin-top:6px">Create Shipment</div></div>
+          </button>
+          <button class="jl-tile"><span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg></span><span class="jl-tile__label">Track Shipment</span></button>
+          <button class="jl-tile"><span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="2.2"/><path d="M8.8 16c.4-1.8 1.7-2.6 3.2-2.6s2.8.8 3.2 2.6" stroke-linecap="round"/></svg></span><span class="jl-tile__label">Address Book</span></button>
+          <button class="jl-tile"><span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 20V10m7 10V4m7 16v-7" stroke-linecap="round"/></svg></span><span class="jl-tile__label">Reporting</span></button>
+          <button class="jl-tile"><span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 4h6v6m0-6-8 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="jl-tile__label">Submit Claim</span></button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Modal markup -->
+<div class="jl-overlay" id="demoModal">
+  <div class="jl-modal" role="dialog" aria-modal="true">
+    <span class="jl-chip jl-chip--solid" style="margin-bottom:var(--s-4)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 7h14M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <div class="jl-modal__title">Cancel this shipment?</div>
+    <p class="jl-modal__text">JL-284910 will be voided and any prepaid label refunded. This can't be undone.</p>
+    <div class="jl-modal__foot">
+      <button class="jl-btn jl-btn--ghost" data-jl-close>Keep it</button>
+      <button class="jl-btn jl-btn--primary" data-jl-close onclick="Jetline.toast('Shipment cancelled','red')">Cancel shipment</button>
+    </div>
+  </div>
+</div>
+
+<script src="ui/jetline.js"></script>
+<script>
+  // ---- Populate data-driven demos (colors, KPIs, table) ----
+  function swatch(name, varname, dark) {
+    return '<div class="swatch"><div class="chip" style="background:var(' + varname + ')"></div><div class="meta"><b>' + name + '</b><code>' + varname + '</code></div></div>';
+  }
+  document.getElementById('reds').innerHTML =
+    swatch('Red 500','--red-500') + swatch('Red 600','--red-600') + swatch('Red 100','--red-100') + swatch('Red tint','--red-tint');
+  document.getElementById('inks').innerHTML =
+    swatch('Ink 900','--ink-900') + swatch('Ink 500','--ink-500') + swatch('Ink 100','--ink-100') + swatch('Canvas','--canvas');
+  document.getElementById('sems').innerHTML =
+    swatch('Green','--green-500') + swatch('Amber','--amber-500') + swatch('Blue','--blue-500') + swatch('Red','--red-500');
+
+  var kpis = [
+    { l:'Active shipments', v:'1,284', t:'up', d:'+12%' },
+    { l:'On-time rate', v:'97.4%', t:'up', d:'+1.8%' },
+    { l:'Avg. transit', v:'2.1d', t:'down', d:'−0.3d' },
+    { l:'Open claims', v:'18', t:'flat', d:'0%' }
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(function (k) {
+    var bars = Array.from({length:7}, function(){ return '<span style="height:'+(30+Math.random()*60)+'%"></span>'; }).join('');
+    var ti = k.t==='up' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 17 6-6 4 4 6-6"/></svg>'
+           : k.t==='down' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 7 6 6 4-4 6 6"/></svg>' : '';
+    return '<div class="jl-kpi"><div class="jl-kpi__top"><span class="jl-kpi__label">'+k.l+'</span><span class="jl-trend jl-trend--'+k.t+'">'+ti+k.d+'</span></div>'
+      + '<div class="jl-kpi__value">'+k.v+'</div><div class="jl-spark">'+bars+'</div></div>';
+  }).join('');
+
+  var rows = [
+    ['JL-284910','Jane Doe','green','Delivered','2.4 kg','$18.40'],
+    ['JL-284911','Aria Mehta','red','In transit','1.1 kg','$12.00'],
+    ['JL-284912','Ravi Kapoor','amber','Delayed','5.8 kg','$31.25'],
+    ['JL-284913','Lena Ford','blue','Scheduled','0.7 kg','$9.80']
+  ];
+  document.getElementById('tableBody').innerHTML = rows.map(function (r) {
+    return '<tr><td class="cell-strong jl-mono">'+r[0]+'</td><td>'+r[1]+'</td><td><span class="jl-badge jl-badge--'+r[2]+'">'+r[3]+'</span></td><td class="num">'+r[4]+'</td><td class="num cell-strong">'+r[5]+'</td></tr>';
+  }).join('');
+
+  // ---- Scroll-spy for sidebar ----
+  var links = document.querySelectorAll('.nav-group a');
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('active'); });
+        if (map[e.target.id]) map[e.target.id].classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px' });
+  document.querySelectorAll('section.block').forEach(function (s) { obs.observe(s); });
+</script>
+</body>
+</html>

@@ -1,0 +1,1276 @@
+<title>Jetline System — Phase 1 Component Showcase</title>
+<style>
+/* ── Inline the full Jetline token + component system ── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --red-50:#fdebec;--red-100:#fbd6d9;--red-200:#f6a8ae;--red-300:#f2787f;
+  --red-400:#ef3a45;--red-500:#e6121f;--red-600:#c40d17;--red-700:#a30912;
+  --red-glow:rgba(230,18,31,.35);--red-tint:rgba(230,18,31,.08);
+  --ink-900:#161b24;--ink-800:#232a36;--ink-700:#3a4252;--ink-600:#525b6e;
+  --ink-500:#6b7385;--ink-400:#8b94a6;--ink-300:#b6bdca;--ink-200:#d9dee6;
+  --ink-100:#e9edf2;--ink-50:#f1f4f8;
+  --canvas:#f4f6f9;--surface:#ffffff;--surface-sunken:#f7f9fb;
+  --green-500:#14a44d;--green-tint:rgba(20,164,77,.10);--green-700:#0c7a38;
+  --amber-500:#e58a00;--amber-tint:rgba(229,138,0,.12);--amber-700:#a86400;
+  --blue-500:#2b6fe0;--blue-tint:rgba(43,111,224,.10);--blue-700:#1c50ad;
+  --font:'Plus Jakarta Sans',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono',monospace;
+  --fs-display:30px;--fs-h1:24px;--fs-h2:19px;--fs-h3:16px;
+  --fs-body:15px;--fs-sm:13.5px;--fs-xs:12px;
+  --lh-display:1.08;--lh-h1:1.15;--lh-h2:1.2;--lh-h3:1.3;--lh-body:1.5;--lh-sm:1.45;
+  --fw-regular:400;--fw-medium:500;--fw-semibold:600;--fw-bold:700;--fw-extra:800;
+  --tracking-tight:-0.02em;--tracking-caps:0.08em;
+  --s-1:4px;--s-2:8px;--s-3:12px;--s-4:16px;--s-5:20px;
+  --s-6:24px;--s-7:32px;--s-8:40px;--s-9:48px;--s-10:64px;
+  --r-xs:8px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-xl:22px;--r-2xl:28px;--r-pill:999px;
+  --sh-xs:0 1px 2px rgba(16,24,40,.05);
+  --sh-sm:0 1px 2px rgba(16,24,40,.04),0 3px 8px rgba(16,24,40,.05);
+  --sh-md:0 1px 2px rgba(16,24,40,.04),0 6px 16px rgba(16,24,40,.07);
+  --sh-lg:0 8px 20px rgba(16,24,40,.10),0 18px 40px rgba(16,24,40,.12);
+  --sh-xl:0 24px 60px rgba(16,24,40,.20),0 8px 18px rgba(16,24,40,.10);
+  --sh-red:0 10px 24px var(--red-glow);
+  --sh-focus:0 0 0 4px rgba(230,18,31,.18);
+  --sh-inset:inset 0 1px 2px rgba(16,24,40,.06);
+  --ease:cubic-bezier(.2,.8,.2,1);--ease-out:cubic-bezier(.16,1,.3,1);
+  --t-fast:.14s;--t-base:.24s;--t-slow:.4s;
+}
+@media (prefers-color-scheme:dark) {
+  :root {
+    --canvas:#0f1117;--surface:#1a1f2b;--surface-sunken:#141820;
+    --ink-900:#f0f2f5;--ink-800:#d8dce4;--ink-700:#b0b8c8;--ink-600:#8b94a6;
+    --ink-500:#6b7385;--ink-400:#4e5668;--ink-300:#363d4e;--ink-200:#272d3c;
+    --ink-100:#1e2330;--ink-50:#191e2a;
+    --red-tint:rgba(230,18,31,.14);--red-50:rgba(230,18,31,.10);
+    --green-tint:rgba(20,164,77,.14);--amber-tint:rgba(229,138,0,.14);
+    --blue-tint:rgba(43,111,224,.14);
+    --sh-sm:0 1px 3px rgba(0,0,0,.2),0 4px 12px rgba(0,0,0,.18);
+    --sh-md:0 2px 4px rgba(0,0,0,.2),0 8px 20px rgba(0,0,0,.22);
+    --sh-lg:0 8px 24px rgba(0,0,0,.30),0 20px 48px rgba(0,0,0,.28);
+    --sh-inset:inset 0 1px 2px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="light"] {
+  --canvas:#f4f6f9;--surface:#ffffff;--surface-sunken:#f7f9fb;
+  --ink-900:#161b24;--ink-800:#232a36;--ink-700:#3a4252;--ink-600:#525b6e;
+  --ink-500:#6b7385;--ink-400:#8b94a6;--ink-300:#b6bdca;--ink-200:#d9dee6;
+  --ink-100:#e9edf2;--ink-50:#f1f4f8;
+  --red-tint:rgba(230,18,31,.08);--red-50:#fdebec;
+  --green-tint:rgba(20,164,77,.10);--amber-tint:rgba(229,138,0,.12);--blue-tint:rgba(43,111,224,.10);
+  --sh-sm:0 1px 2px rgba(16,24,40,.04),0 3px 8px rgba(16,24,40,.05);
+  --sh-md:0 1px 2px rgba(16,24,40,.04),0 6px 16px rgba(16,24,40,.07);
+  --sh-lg:0 8px 20px rgba(16,24,40,.10),0 18px 40px rgba(16,24,40,.12);
+  --sh-inset:inset 0 1px 2px rgba(16,24,40,.06);
+}
+:root[data-theme="dark"] {
+  --canvas:#0f1117;--surface:#1a1f2b;--surface-sunken:#141820;
+  --ink-900:#f0f2f5;--ink-800:#d8dce4;--ink-700:#b0b8c8;--ink-600:#8b94a6;
+  --ink-500:#6b7385;--ink-400:#4e5668;--ink-300:#363d4e;--ink-200:#272d3c;
+  --ink-100:#1e2330;--ink-50:#191e2a;
+  --red-tint:rgba(230,18,31,.14);--red-50:rgba(230,18,31,.10);
+  --green-tint:rgba(20,164,77,.14);--amber-tint:rgba(229,138,0,.14);
+  --blue-tint:rgba(43,111,224,.14);
+  --sh-sm:0 1px 3px rgba(0,0,0,.2),0 4px 12px rgba(0,0,0,.18);
+  --sh-md:0 2px 4px rgba(0,0,0,.2),0 8px 20px rgba(0,0,0,.22);
+  --sh-lg:0 8px 24px rgba(0,0,0,.30),0 20px 48px rgba(0,0,0,.28);
+  --sh-inset:inset 0 1px 2px rgba(0,0,0,.25);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+*{margin:0;padding:0}
+body{font-family:var(--font);font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-900);background:var(--canvas);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+svg{display:block}
+::selection{background:var(--red-100);color:var(--red-700)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;padding:var(--s-6) var(--s-5);background:var(--surface);box-shadow:var(--sh-sm)}
+.sidebar__brand{display:flex;align-items:center;gap:11px;margin-bottom:var(--s-7);padding-bottom:var(--s-5);border-bottom:1px solid var(--ink-100)}
+.sidebar__brand .mark{width:34px;height:34px;border-radius:var(--r-sm);background:linear-gradient(160deg,var(--red-400),var(--red-600));display:grid;place-items:center;box-shadow:var(--sh-red);flex:none}
+.sidebar__brand .mark svg{width:18px;height:18px}
+.sidebar__brand b{font-size:14px;font-weight:800;letter-spacing:-0.02em;display:block;color:var(--ink-900)}
+.sidebar__brand span{font-size:11px;color:var(--ink-400);font-weight:600}
+.nav-group{margin-bottom:var(--s-5)}
+.nav-group>p{font-size:10.5px;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:var(--ink-300);padding:0 10px;margin-bottom:5px}
+.nav-group a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--ink-500);text-decoration:none;transition:all .14s var(--ease)}
+.nav-group a:hover{background:var(--ink-50);color:var(--ink-900)}
+.nav-group a.active{background:var(--red-tint);color:var(--red-600)}
+.nav-group a svg{width:15px;height:15px;flex:none;opacity:.7}
+.nav-group a.active svg{opacity:1}
+.theme-toggle{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--ink-500);cursor:pointer;width:100%;transition:all .14s}
+.theme-toggle:hover{background:var(--ink-50);color:var(--ink-900)}
+.theme-toggle svg{width:15px;height:15px}
+
+.main{padding:var(--s-8) var(--s-9) var(--s-10);min-width:0}
+.page-head{margin-bottom:var(--s-9)}
+.page-head .eyebrow{font-size:11px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--red-500);margin-bottom:var(--s-3)}
+.page-head h1{font-size:36px;font-weight:800;letter-spacing:-0.03em;line-height:1.06}
+.page-head p{font-size:var(--fs-body);color:var(--ink-500);margin-top:var(--s-3);max-width:58ch}
+
+section.block{margin-bottom:var(--s-10);scroll-margin-top:var(--s-5)}
+.block__head{margin-bottom:var(--s-6)}
+.block__head h2{font-size:20px;font-weight:800;letter-spacing:-0.02em;color:var(--ink-900)}
+.block__head p{font-size:var(--fs-sm);color:var(--ink-500);margin-top:4px}
+.section-rule{height:1px;background:linear-gradient(90deg,var(--red-500),transparent);opacity:.2;margin-bottom:var(--s-5)}
+
+.demo{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--sh-md);padding:var(--s-6)}
+.demo+.demo{margin-top:var(--s-4)}
+.demo-label{font-size:10.5px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-300);margin-bottom:var(--s-4)}
+.demo-row{display:flex;flex-wrap:wrap;gap:var(--s-3);align-items:center}
+.demo-grid{display:grid;gap:var(--s-4)}
+.cols-2{grid-template-columns:repeat(2,1fr)}
+.cols-3{grid-template-columns:repeat(3,1fr)}
+.cols-4{grid-template-columns:repeat(4,1fr)}
+.stack{display:flex;flex-direction:column;gap:var(--s-3)}
+
+/* ── Type utilities ── */
+.jl-display{font-size:var(--fs-display);line-height:var(--lh-display);font-weight:var(--fw-extra);letter-spacing:var(--tracking-tight)}
+.jl-h1{font-size:var(--fs-h1);line-height:var(--lh-h1);font-weight:var(--fw-extra);letter-spacing:var(--tracking-tight)}
+.jl-h2{font-size:var(--fs-h2);line-height:var(--lh-h2);font-weight:var(--fw-bold);letter-spacing:-0.01em}
+.jl-h3{font-size:var(--fs-h3);line-height:var(--lh-h3);font-weight:var(--fw-bold)}
+.jl-body{font-size:var(--fs-body);line-height:var(--lh-body)}
+.jl-sm{font-size:var(--fs-sm);line-height:var(--lh-sm)}
+.jl-xs{font-size:var(--fs-xs);line-height:1.4}
+.jl-muted{color:var(--ink-500)}
+.jl-faint{color:var(--ink-400)}
+.jl-eyebrow{font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--ink-400)}
+.jl-mono{font-family:var(--mono)}
+.jl-soft-divider{height:1px;background:linear-gradient(90deg,transparent,var(--ink-100) 20%,var(--ink-100) 80%,transparent);border:0;margin:var(--s-4) 0}
+
+/* ── Chip ── */
+.jl-chip{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:var(--r-md);background:var(--red-tint);color:var(--red-500);flex:none;transition:background var(--t-base) var(--ease),color var(--t-base),transform var(--t-base) var(--ease)}
+.jl-chip svg{width:22px;height:22px}
+.jl-chip--sm{width:34px;height:34px;border-radius:var(--r-sm)}
+.jl-chip--sm svg{width:18px;height:18px}
+.jl-chip--lg{width:54px;height:54px;border-radius:var(--r-lg)}
+.jl-chip--lg svg{width:28px;height:28px}
+.jl-chip--solid{background:var(--red-500);color:#fff;box-shadow:var(--sh-red)}
+.jl-chip--green{background:var(--green-tint);color:var(--green-700)}
+.jl-chip--blue{background:var(--blue-tint);color:var(--blue-700)}
+.jl-chip--amber{background:var(--amber-tint);color:var(--amber-700)}
+.jl-chip--neutral{background:var(--ink-50);color:var(--ink-600)}
+
+/* ── Buttons ── */
+.jl-btn{--btn-bg:var(--surface);--btn-fg:var(--ink-800);--btn-shadow:var(--sh-sm);display:inline-flex;align-items:center;justify-content:center;gap:var(--s-2);height:42px;padding:0 var(--s-5);border-radius:var(--r-md);background:var(--btn-bg);color:var(--btn-fg);font-size:var(--fs-sm);font-weight:var(--fw-bold);letter-spacing:-0.01em;white-space:nowrap;box-shadow:var(--btn-shadow);transition:transform var(--t-base) var(--ease),box-shadow var(--t-base) var(--ease),background var(--t-fast),filter var(--t-fast);user-select:none}
+.jl-btn svg{width:17px;height:17px}
+.jl-btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+.jl-btn:active{transform:translateY(0);box-shadow:var(--sh-xs);transition-duration:.06s}
+.jl-btn:focus-visible{outline:none;box-shadow:var(--btn-shadow),var(--sh-focus)}
+.jl-btn--primary{--btn-bg:linear-gradient(160deg,var(--red-400),var(--red-500) 55%,var(--red-600));--btn-fg:#fff;--btn-shadow:var(--sh-red)}
+.jl-btn--primary:hover{box-shadow:0 14px 30px var(--red-glow)}
+.jl-btn--secondary{--btn-bg:var(--surface);--btn-fg:var(--ink-800)}
+.jl-btn--soft{--btn-bg:var(--red-tint);--btn-fg:var(--red-600);--btn-shadow:none}
+.jl-btn--soft:hover{background:var(--red-100);box-shadow:var(--sh-sm)}
+.jl-btn--ghost{--btn-bg:transparent;--btn-fg:var(--ink-600);--btn-shadow:none}
+.jl-btn--ghost:hover{background:var(--ink-50);box-shadow:none;color:var(--ink-900)}
+.jl-btn--dark{--btn-bg:var(--ink-900);--btn-fg:#fff}
+.jl-btn--sm{height:34px;padding:0 var(--s-3);font-size:var(--fs-xs);border-radius:var(--r-sm)}
+.jl-btn--lg{height:50px;padding:0 var(--s-6);font-size:var(--fs-body);border-radius:var(--r-lg)}
+.jl-btn--icon{width:42px;padding:0}
+.jl-btn--icon.jl-btn--sm{width:34px}
+.jl-btn:disabled{opacity:.5;pointer-events:none;box-shadow:none;transform:none}
+.jl-btn[data-loading]{color:transparent!important;position:relative;pointer-events:none}
+.jl-btn[data-loading]::after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;color:#fff;animation:jl-spin .6s linear infinite}
+.jl-btn--secondary[data-loading]::after{color:var(--ink-500)}
+@keyframes jl-spin{to{transform:rotate(360deg)}}
+.jl-segment{display:inline-flex;padding:4px;gap:2px;background:var(--ink-50);border-radius:var(--r-md)}
+.jl-segment button{height:34px;padding:0 var(--s-4);border-radius:var(--r-sm);font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--ink-500);transition:all var(--t-fast) var(--ease)}
+.jl-segment button:hover{color:var(--ink-800)}
+.jl-segment button[aria-selected="true"]{background:var(--surface);color:var(--ink-900);box-shadow:var(--sh-sm)}
+
+/* ── Switch / Checkbox / Radio ── */
+.jl-switch{position:relative;display:inline-flex;align-items:center;gap:var(--s-3);cursor:pointer;user-select:none}
+.jl-switch input{position:absolute;opacity:0;width:0;height:0}
+.jl-switch .track{width:46px;height:28px;border-radius:var(--r-pill);background:var(--ink-200);box-shadow:var(--sh-inset);transition:background var(--t-base) var(--ease);flex:none}
+.jl-switch .thumb{position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(16,24,40,.25);transition:transform var(--t-base) var(--ease-out)}
+.jl-switch input:checked~.track{background:var(--red-500)}
+.jl-switch input:checked~.thumb{transform:translateX(18px)}
+.jl-switch .label{font-size:var(--fs-sm);font-weight:var(--fw-medium)}
+.jl-check,.jl-radio{display:inline-flex;align-items:center;gap:var(--s-3);cursor:pointer;user-select:none;font-size:var(--fs-sm);font-weight:var(--fw-medium)}
+.jl-check input,.jl-radio input{position:absolute;opacity:0;width:0;height:0}
+.jl-check .box,.jl-radio .box{width:22px;height:22px;flex:none;background:var(--surface);box-shadow:var(--sh-sm),inset 0 0 0 1.5px var(--ink-200);display:grid;place-items:center;transition:all var(--t-fast) var(--ease)}
+.jl-check .box{border-radius:var(--r-xs)}
+.jl-radio .box{border-radius:50%}
+.jl-check .box svg{width:14px;height:14px;stroke:#fff;stroke-width:3;opacity:0;transform:scale(.5);transition:all var(--t-fast) var(--ease)}
+.jl-radio .box::after{content:"";width:9px;height:9px;border-radius:50%;background:#fff;transform:scale(0);transition:transform var(--t-fast) var(--ease)}
+.jl-check input:checked~.box,.jl-radio input:checked~.box{background:var(--red-500);box-shadow:var(--sh-sm),inset 0 0 0 1.5px var(--red-500)}
+.jl-check input:checked~.box svg{opacity:1;transform:scale(1)}
+.jl-radio input:checked~.box::after{transform:scale(1)}
+
+/* ── Inputs ── */
+.jl-field{display:flex;flex-direction:column;gap:var(--s-2)}
+.jl-field>label{font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--ink-700)}
+.jl-field .hint{font-size:var(--fs-xs);color:var(--ink-400)}
+.jl-field .hint--error{color:var(--red-600)}
+.jl-input,.jl-textarea,.jl-select{width:100%;height:44px;padding:0 var(--s-4);background:var(--ink-50);color:var(--ink-900);border:0;border-radius:var(--r-md);outline:none;box-shadow:var(--sh-inset);font-size:var(--fs-sm);font-weight:var(--fw-medium);transition:box-shadow var(--t-base) var(--ease),background var(--t-fast)}
+.jl-input::placeholder,.jl-textarea::placeholder{color:var(--ink-400);font-weight:var(--fw-regular)}
+.jl-input:hover,.jl-textarea:hover,.jl-select:hover{background:var(--ink-100)}
+.jl-input:focus,.jl-textarea:focus,.jl-select:focus{background:var(--surface);box-shadow:var(--sh-inset),var(--sh-focus)}
+.jl-textarea{height:auto;min-height:88px;padding:var(--s-3) var(--s-4);resize:vertical;line-height:1.5}
+.jl-input.is-error{background:var(--red-tint)}
+.jl-input-group{position:relative;display:flex;align-items:center}
+.jl-input-group .lead{position:absolute;left:var(--s-4);color:var(--ink-400);pointer-events:none;display:grid;place-items:center}
+.jl-input-group .lead svg{width:18px;height:18px}
+.jl-input-group .jl-input{padding-left:44px}
+.jl-select-wrap{position:relative}
+.jl-select{appearance:none;padding-right:40px;cursor:pointer}
+.jl-select-wrap::after{content:"";position:absolute;right:16px;top:50%;width:9px;height:9px;border-right:2px solid var(--ink-400);border-bottom:2px solid var(--ink-400);transform:translateY(-65%) rotate(45deg);pointer-events:none}
+.jl-search{position:relative;display:flex;align-items:center}
+.jl-search svg{position:absolute;left:var(--s-4);width:18px;height:18px;color:var(--ink-400);pointer-events:none}
+.jl-search input{width:100%;height:44px;padding:0 var(--s-4) 0 44px;background:var(--ink-50);border:0;border-radius:var(--r-pill);outline:none;box-shadow:var(--sh-inset);font-size:var(--fs-sm);transition:box-shadow var(--t-base) var(--ease),background var(--t-fast)}
+.jl-search input:focus{background:var(--surface);box-shadow:var(--sh-inset),var(--sh-focus)}
+
+/* ── Cards ── */
+.jl-card{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--sh-md);padding:var(--s-6);text-align:left;transition:transform var(--t-base) var(--ease),box-shadow var(--t-base) var(--ease)}
+.jl-card--interactive{cursor:pointer}
+.jl-card--interactive:hover{transform:translateY(-6px);box-shadow:var(--sh-lg)}
+.jl-card--interactive:active{transform:translateY(-2px);transition-duration:.08s}
+.jl-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s-4);margin-bottom:var(--s-4)}
+.jl-card__title{font-size:var(--fs-h3);font-weight:var(--fw-bold);letter-spacing:-0.01em}
+.jl-card__sub{font-size:var(--fs-sm);color:var(--ink-500);margin-top:2px}
+.jl-card--hero{position:relative;overflow:hidden;background:linear-gradient(155deg,var(--red-400) 0%,var(--red-500) 45%,var(--red-600) 100%);color:#fff;box-shadow:var(--sh-red)}
+.jl-card--hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(420px 220px at 85% 0%,rgba(255,255,255,.22),transparent 60%)}
+.jl-card--hero>*{position:relative;z-index:1}
+.jl-card--hero .jl-card__sub{color:rgba(255,255,255,.82)}
+.jl-tile{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:var(--s-3);background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--sh-md);padding:var(--s-5);text-align:left;cursor:pointer;transition:transform var(--t-base) var(--ease),box-shadow var(--t-base) var(--ease)}
+.jl-tile:hover{transform:translateY(-7px);box-shadow:var(--sh-lg)}
+.jl-tile:hover .jl-chip{background:var(--red-500);color:#fff;transform:scale(1.06) rotate(-3deg)}
+.jl-tile__label{font-size:var(--fs-h3);font-weight:var(--fw-bold);letter-spacing:-0.01em}
+
+/* ── KPI ── */
+.jl-kpi{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-md);padding:var(--s-5);display:flex;flex-direction:column;gap:var(--s-3)}
+.jl-kpi__top{display:flex;align-items:center;justify-content:space-between}
+.jl-kpi__label{font-size:var(--fs-sm);color:var(--ink-500);font-weight:var(--fw-semibold)}
+.jl-kpi__value{font-size:30px;font-weight:var(--fw-extra);letter-spacing:var(--tracking-tight);line-height:1}
+.jl-kpi__foot{display:flex;align-items:center;gap:var(--s-2);font-size:var(--fs-xs);color:var(--ink-400)}
+.jl-trend{display:inline-flex;align-items:center;gap:4px;font-weight:var(--fw-bold);font-size:var(--fs-xs);padding:3px 8px;border-radius:var(--r-pill)}
+.jl-trend svg{width:13px;height:13px}
+.jl-trend--up{background:var(--green-tint);color:var(--green-700)}
+.jl-trend--down{background:var(--red-tint);color:var(--red-600)}
+.jl-trend--flat{background:var(--ink-50);color:var(--ink-500)}
+.jl-spark{display:flex;align-items:flex-end;gap:3px;height:32px}
+.jl-spark span{flex:1;background:var(--red-100);border-radius:3px;transition:background var(--t-base)}
+.jl-kpi:hover .jl-spark span{background:var(--red-200)}
+.jl-spark span:last-child{background:var(--red-500)}
+
+/* ── Badges / Dots / Tags ── */
+.jl-badge{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:var(--r-pill);font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:0.01em;background:var(--ink-50);color:var(--ink-600)}
+.jl-badge svg{width:12px;height:12px}
+.jl-badge--red{background:var(--red-tint);color:var(--red-600)}
+.jl-badge--green{background:var(--green-tint);color:var(--green-700)}
+.jl-badge--amber{background:var(--amber-tint);color:var(--amber-700)}
+.jl-badge--blue{background:var(--blue-tint);color:var(--blue-700)}
+.jl-badge--solid{background:var(--red-500);color:#fff}
+.jl-badge--dark{background:var(--ink-900);color:#fff}
+.jl-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.jl-dot--green{background:var(--green-500);box-shadow:0 0 0 3px var(--green-tint)}
+.jl-dot--red{background:var(--red-500);box-shadow:0 0 0 3px var(--red-tint)}
+.jl-dot--amber{background:var(--amber-500);box-shadow:0 0 0 3px var(--amber-tint)}
+.jl-dot--gray{background:var(--ink-300);box-shadow:0 0 0 3px var(--ink-50)}
+.jl-tag{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 12px;border-radius:var(--r-sm);background:var(--ink-50);font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--ink-700)}
+.jl-tag button{display:grid;place-items:center;width:18px;height:18px;border-radius:6px;color:var(--ink-400);transition:all var(--t-fast)}
+.jl-tag button:hover{background:var(--ink-100);color:var(--ink-700)}
+.jl-tag button svg{width:12px;height:12px}
+
+/* ── Table ── */
+.jl-table-wrap{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-md);overflow:hidden}
+.jl-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.jl-table thead th{text-align:left;padding:var(--s-3) var(--s-5);background:var(--surface-sunken);font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-400);white-space:nowrap}
+.jl-table tbody td{padding:var(--s-4) var(--s-5);color:var(--ink-700);font-weight:var(--fw-medium);vertical-align:middle}
+.jl-table tbody tr{transition:background var(--t-fast)}
+.jl-table tbody tr:hover{background:var(--red-tint)}
+.jl-table tbody tr:nth-child(even){background:var(--surface-sunken)}
+.jl-table tbody tr:nth-child(even):hover{background:var(--red-tint)}
+.jl-table .num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ── Tabs ── */
+.jl-tabs{display:flex;gap:var(--s-1)}
+.jl-tabs button{height:38px;padding:0 var(--s-4);border-radius:var(--r-md);font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--ink-500);transition:all var(--t-fast) var(--ease)}
+.jl-tabs button:hover{color:var(--ink-900);background:var(--ink-50)}
+.jl-tabs button[aria-selected="true"]{color:var(--red-600);background:var(--red-tint)}
+.jl-tabpanel{display:none;animation:jl-fade var(--t-base) var(--ease)}
+.jl-tabpanel[data-active]{display:block}
+@keyframes jl-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── Dropdown ── */
+.jl-dropdown{position:relative;display:block}
+.jl-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:60;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-lg);padding:var(--s-2);opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top left;pointer-events:none;transition:opacity var(--t-fast),transform var(--t-base) var(--ease-out);max-height:220px;overflow-y:auto}
+.jl-menu[data-open]{opacity:1;transform:none;pointer-events:auto}
+.jl-menu__item{display:flex;align-items:center;gap:var(--s-3);width:100%;padding:10px 12px;border-radius:var(--r-sm);font-size:var(--fs-sm);font-weight:var(--fw-medium);color:var(--ink-700);transition:background var(--t-fast),color var(--t-fast);text-align:left;cursor:pointer}
+.jl-menu__item svg{width:17px;height:17px;color:var(--ink-400)}
+.jl-menu__item:hover,.jl-menu__item[aria-selected="true"]{background:var(--red-tint);color:var(--red-600)}
+.jl-menu__item[aria-selected="true"]{font-weight:var(--fw-semibold)}
+.jl-menu__item:hover svg{color:var(--red-500)}
+.jl-menu__item--danger{color:var(--red-600)}
+.jl-menu__sep{height:1px;background:var(--ink-100);margin:var(--s-2) 8px}
+.jl-menu__label{font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--ink-400);padding:8px 12px 4px}
+/* Custom select trigger */
+.jl-select-btn{width:100%;height:44px;padding:0 40px 0 var(--s-4);background:var(--ink-50);border:0;border-radius:var(--r-md);outline:none;box-shadow:var(--sh-inset);font-size:var(--fs-sm);font-weight:var(--fw-medium);color:var(--ink-900);text-align:left;cursor:pointer;transition:box-shadow var(--t-base) var(--ease),background var(--t-fast);position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jl-select-btn:hover{background:var(--ink-100)}
+.jl-select-btn[aria-expanded="true"]{background:var(--surface);box-shadow:var(--sh-inset),var(--sh-focus)}
+.jl-select-wrap{position:relative}
+.jl-select-wrap .arr{position:absolute;right:14px;top:50%;transform:translateY(-65%) rotate(45deg);width:9px;height:9px;border-right:2px solid var(--ink-400);border-bottom:2px solid var(--ink-400);pointer-events:none;transition:transform var(--t-base) var(--ease)}
+.jl-select-wrap:has([aria-expanded="true"]) .arr{transform:translateY(-35%) rotate(225deg)}
+
+/* ── Accordion ── */
+.jl-accordion{display:flex;flex-direction:column;gap:var(--s-3)}
+.jl-acc{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-sm);overflow:hidden;transition:box-shadow var(--t-base)}
+.jl-acc[data-open]{box-shadow:var(--sh-md)}
+.jl-acc__head{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3);width:100%;padding:var(--s-4) var(--s-5);font-size:var(--fs-sm);font-weight:var(--fw-bold);text-align:left}
+.jl-acc__head .chev{width:20px;height:20px;color:var(--ink-400);transition:transform var(--t-base) var(--ease);flex:none}
+.jl-acc[data-open] .jl-acc__head .chev{transform:rotate(180deg);color:var(--red-500)}
+.jl-acc__body{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--t-base) var(--ease)}
+.jl-acc[data-open] .jl-acc__body{grid-template-rows:1fr}
+.jl-acc__body>div{overflow:hidden}
+.jl-acc__body p{padding:0 var(--s-5) var(--s-5);font-size:var(--fs-sm);color:var(--ink-500)}
+
+/* ── Modal ── */
+.jl-overlay{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:var(--s-5);background:rgba(22,27,36,.45);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity var(--t-base)}
+.jl-overlay[data-open]{opacity:1;pointer-events:auto}
+.jl-modal{width:100%;max-width:440px;background:var(--surface);border-radius:var(--r-2xl);box-shadow:var(--sh-xl);padding:var(--s-7);transform:translateY(12px) scale(.97);transition:transform var(--t-base) var(--ease-out)}
+.jl-overlay[data-open] .jl-modal{transform:none}
+.jl-modal__title{font-size:var(--fs-h2);font-weight:var(--fw-extra);letter-spacing:var(--tracking-tight)}
+.jl-modal__text{font-size:var(--fs-sm);color:var(--ink-500);margin-top:var(--s-2)}
+.jl-modal__foot{display:flex;gap:var(--s-3);justify-content:flex-end;margin-top:var(--s-6)}
+
+/* ── Toast ── */
+.jl-toast-host{position:fixed;bottom:var(--s-6);right:var(--s-6);z-index:120;display:flex;flex-direction:column;gap:var(--s-3)}
+.jl-toast{display:flex;align-items:center;gap:var(--s-3);min-width:280px;padding:var(--s-3) var(--s-4);background:var(--ink-900);color:#fff;border-radius:var(--r-md);box-shadow:var(--sh-xl);animation:jl-toast-in var(--t-base) var(--ease-out)}
+.jl-toast .jl-chip{width:32px;height:32px;border-radius:var(--r-sm);background:rgba(255,255,255,.12);color:#fff}
+.jl-toast__text{flex:1;font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+.jl-toast.is-leaving{animation:jl-toast-out var(--t-base) var(--ease) forwards}
+@keyframes jl-toast-in{from{opacity:0;transform:translateX(24px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes jl-toast-out{to{opacity:0;transform:translateX(24px) scale(.96)}}
+
+/* ── Alerts ── */
+.jl-alert{display:flex;gap:var(--s-3);padding:var(--s-4);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--sh-md)}
+.jl-alert .jl-chip{width:38px;height:38px;border-radius:var(--r-sm);flex:none}
+.jl-alert__body{flex:1;min-width:0}
+.jl-alert__title{font-size:var(--fs-sm);font-weight:var(--fw-bold)}
+.jl-alert__text{font-size:var(--fs-sm);color:var(--ink-500);margin-top:2px}
+.jl-alert--red{background:var(--red-50)}
+.jl-alert--green{background:var(--green-tint)}
+.jl-alert--amber{background:var(--amber-tint)}
+
+/* ── Progress / Spinner / Skeleton ── */
+.jl-progress{height:10px;border-radius:var(--r-pill);background:var(--ink-100);box-shadow:var(--sh-inset);overflow:hidden}
+.jl-progress__bar{height:100%;border-radius:var(--r-pill);background:linear-gradient(90deg,var(--red-400),var(--red-500));transition:width var(--t-slow) var(--ease)}
+.jl-skeleton{background:linear-gradient(100deg,var(--ink-100) 30%,var(--ink-50) 50%,var(--ink-100) 70%);background-size:200% 100%;border-radius:var(--r-sm);animation:jl-shimmer 1.4s infinite linear}
+@keyframes jl-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.jl-spinner{width:24px;height:24px;border-radius:50%;border:3px solid var(--red-100);border-top-color:var(--red-500);animation:jl-spin .7s linear infinite}
+.jl-tip{position:relative;display:inline-flex}
+.jl-tip__bubble{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);background:var(--ink-900);color:#fff;font-size:var(--fs-xs);font-weight:var(--fw-semibold);padding:7px 11px;border-radius:var(--r-sm);white-space:nowrap;box-shadow:var(--sh-lg);opacity:0;pointer-events:none;transition:opacity var(--t-fast),transform var(--t-fast) var(--ease);z-index:50}
+.jl-tip__bubble::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink-900)}
+.jl-tip:hover .jl-tip__bubble{opacity:1;transform:translateX(-50%) translateY(0)}
+.jl-pagination{display:inline-flex;align-items:center;gap:var(--s-1)}
+.jl-pagination button{min-width:38px;height:38px;padding:0 10px;border-radius:var(--r-sm);font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--ink-500);display:grid;place-items:center;transition:all var(--t-fast)}
+.jl-pagination button svg{width:16px;height:16px}
+.jl-pagination button:hover{background:var(--ink-50);color:var(--ink-900)}
+.jl-pagination button[aria-current="page"]{background:var(--red-500);color:#fff;box-shadow:var(--sh-red)}
+.jl-breadcrumb{display:flex;align-items:center;gap:var(--s-2);font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+.jl-breadcrumb a{color:var(--ink-400);text-decoration:none;transition:color var(--t-fast)}
+.jl-breadcrumb a:hover{color:var(--ink-700)}
+.jl-breadcrumb .sep{color:var(--ink-300)}
+.jl-breadcrumb .current{color:var(--ink-900)}
+
+/* ── Avatar ── */
+.jl-avatar{position:relative;display:inline-grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--red-tint);color:var(--red-600);font-weight:var(--fw-bold);font-size:var(--fs-sm);box-shadow:var(--sh-xs);flex:none}
+.jl-avatar--sm{width:30px;height:30px;font-size:var(--fs-xs)}
+.jl-avatar--lg{width:54px;height:54px;font-size:var(--fs-h3)}
+.badge-dot{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2.5px var(--surface)}
+
+/* ── Steps ── */
+.jl-steps{display:flex;align-items:flex-start}
+.jl-step{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;position:relative;text-align:center}
+.jl-step .node{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--surface);box-shadow:var(--sh-sm),inset 0 0 0 1.5px var(--ink-200);font-weight:var(--fw-bold);font-size:var(--fs-sm);color:var(--ink-400);z-index:1;transition:all var(--t-base) var(--ease)}
+.jl-step .node svg{width:18px;height:18px}
+.jl-step__label{font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--ink-400)}
+.jl-step::before{content:"";position:absolute;top:19px;left:-50%;width:100%;height:3px;background:var(--ink-100);border-radius:2px;z-index:0}
+.jl-step:first-child::before{display:none}
+.jl-step[data-state="done"] .node{background:var(--red-500);color:#fff;box-shadow:var(--sh-red)}
+.jl-step[data-state="done"]::before{background:var(--red-300)}
+.jl-step[data-state="done"] .jl-step__label{color:var(--ink-600)}
+.jl-step[data-state="active"] .node{box-shadow:var(--sh-md),inset 0 0 0 2px var(--red-500);color:var(--red-600)}
+.jl-step[data-state="active"] .jl-step__label{color:var(--red-600)}
+
+/* ── Page-specific ── */
+.phase-strip{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-3) var(--s-5);background:var(--red-tint);border-radius:var(--r-md);margin-bottom:var(--s-9)}
+.phase-strip .phase-label{font-size:var(--fs-xs);font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:var(--red-600)}
+.phase-strip p{font-size:var(--fs-sm);color:var(--ink-600)}
+.device-card{display:flex;align-items:center;gap:var(--s-4);padding:var(--s-4);background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-sm);cursor:pointer;transition:all var(--t-base) var(--ease)}
+.device-card:hover{box-shadow:var(--sh-md);transform:translateY(-2px)}
+.device-card__icon{width:40px;height:40px;border-radius:var(--r-sm);background:var(--red-tint);display:grid;place-items:center;color:var(--red-500);flex:none}
+.device-card__icon svg{width:20px;height:20px}
+.device-card__name{font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--ink-900)}
+.device-card__meta{font-size:var(--fs-xs);color:var(--ink-400);margin-top:2px}
+.replace-yes{background:var(--red-tint);color:var(--red-600)}
+.replace-no{background:var(--green-tint);color:var(--green-700)}
+.replace-maybe{background:var(--amber-tint);color:var(--amber-700)}
+@media(max-width:860px){.layout{grid-template-columns:1fr}.sidebar{position:static;height:auto}.cols-3,.cols-4{grid-template-columns:repeat(2,1fr)}}
+
+/* ── Date picker ── */
+.jl-datepicker{padding:var(--s-3)}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--s-3)}
+.dp-month-label{font-size:var(--fs-sm);font-weight:var(--fw-bold);color:var(--ink-900)}
+.dp-dow{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:var(--s-2)}
+.dp-dow span{font-size:var(--fs-xs);font-weight:var(--fw-bold);color:var(--ink-400);padding:4px 0}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-day{height:32px;border-radius:var(--r-sm);font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--ink-700);cursor:pointer;display:grid;place-items:center;transition:background var(--t-fast),color var(--t-fast)}
+.dp-day:hover{background:var(--red-tint);color:var(--red-600)}
+.dp-day--today{color:var(--red-500);font-weight:var(--fw-extra)}
+.dp-day--selected{background:var(--red-500);color:#fff;box-shadow:var(--sh-red)}
+.dp-day--selected:hover{background:var(--red-600)}
+.dp-day--other{color:var(--ink-300)}
+.dp-day--empty{pointer-events:none}
+.dp-foot{display:flex;gap:var(--s-2);justify-content:space-between;margin-top:var(--s-3);padding-top:var(--s-3);border-top:1px solid var(--ink-100)}
+
+/* ── Motions showcase ── */
+.motion-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s-4)}
+.motion-card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-sm);padding:var(--s-4) var(--s-4) var(--s-5);display:flex;flex-direction:column;gap:var(--s-3);align-items:flex-start}
+.motion-card__label{font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-400)}
+.motion-demo{width:100%;height:54px;display:grid;place-items:center}
+.mot-chip{width:38px;height:38px;border-radius:var(--r-md);background:var(--red-tint);color:var(--red-500);display:grid;place-items:center}
+.mot-chip svg{width:20px;height:20px}
+/* Lift */
+.motion-card[data-mot="lift"] .mot-chip{transition:transform var(--t-base) var(--ease),box-shadow var(--t-base) var(--ease)}
+.motion-card[data-mot="lift"]:hover .mot-chip{transform:translateY(-8px);box-shadow:var(--sh-lg)}
+/* Pulse */
+.motion-card[data-mot="pulse"] .mot-chip{animation:mot-pulse 2s var(--ease) infinite}
+@keyframes mot-pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 var(--red-glow)}50%{transform:scale(1.08);box-shadow:0 0 0 8px rgba(230,18,31,0)}}
+/* Spin-in */
+.motion-card[data-mot="spin"] .mot-chip{transition:transform var(--t-slow) var(--ease-out),background var(--t-base)}
+.motion-card[data-mot="spin"]:hover .mot-chip{transform:rotate(180deg) scale(1.1);background:var(--red-500);color:#fff}
+/* Slide fade */
+.motion-card[data-mot="slide"] .mot-chip{transition:transform var(--t-base) var(--ease-out),opacity var(--t-base)}
+.motion-card[data-mot="slide"]:hover .mot-chip{transform:translateX(8px)}
+/* Squish */
+.motion-card[data-mot="squish"] .mot-chip{transition:transform var(--t-fast) var(--ease)}
+.motion-card[data-mot="squish"]:hover .mot-chip{transform:scale(.88) skewX(-4deg)}
+.motion-card[data-mot="squish"]:active .mot-chip{transform:scale(.95)}
+/* Glow */
+.motion-card[data-mot="glow"] .mot-chip{transition:box-shadow var(--t-base) var(--ease),background var(--t-base)}
+.motion-card[data-mot="glow"]:hover .mot-chip{background:var(--red-500);color:#fff;box-shadow:0 0 0 6px var(--red-tint),var(--sh-red)}
+/* Ease curves (animated bar) */
+.motion-card[data-mot="ease"] .mot-chip{position:relative;animation:mot-ease 1.8s var(--ease) infinite}
+@keyframes mot-ease{0%,100%{transform:translateX(-16px)}50%{transform:translateX(16px)}}
+.motion-card[data-mot="ease-out"] .mot-chip{animation:mot-ease-out 2s var(--ease-out) infinite}
+@keyframes mot-ease-out{0%,100%{transform:translateX(-16px)}50%{transform:translateX(16px)}}
+.motion-desc{font-size:var(--fs-xs);color:var(--ink-400);font-family:var(--mono)}
+</style>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 8.5 12 4l9 4.5M3 8.5v7L12 20m-9-11.5L12 13m0 7 9-4.5v-7M12 13l9-4.5M12 13v7" stroke="#fff" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+      <span><b>JetlineUI 2.0</b><span>Design system</span></span>
+    </div>
+    <nav class="nav-group">
+      <p>Navigation</p>
+      <a href="#nav-menu" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9" stroke-linecap="round"/></svg>Sidebar &amp; menu</a>
+      <a href="#tabs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 10h18M7 3v4M17 3v4M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" stroke-linecap="round"/></svg>Tabs &amp; segments</a>
+      <a href="#breadcrumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m9 18 6-6-6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>Breadcrumb &amp; steps</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Controls</p>
+      <a href="#buttons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="8" width="16" height="8" rx="4"/></svg>Buttons</a>
+      <a href="#toggles"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2a10 10 0 1 0 0 20"/></svg>Toggles &amp; choices</a>
+      <a href="#inputs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6" stroke-linecap="round"/></svg>Inputs &amp; forms</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Data &amp; surfaces</p>
+      <a href="#cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>Cards &amp; tiles</a>
+      <a href="#badges"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/></svg>Badges &amp; status</a>
+      <a href="#table"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-linecap="round"/></svg>Tables</a>
+      <a href="#device-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4Z"/></svg>Device card</a>
+    </nav>
+    <nav class="nav-group">
+      <p>Feedback</p>
+      <a href="#alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>Alerts</a>
+      <a href="#overlays"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16" stroke-linecap="round"/></svg>Modals &amp; toasts</a>
+      <a href="#loaders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" stroke-linecap="round"/></svg>Loaders</a>
+    </nav>
+    <div style="margin-top:var(--s-5);padding-top:var(--s-4);border-top:1px solid var(--ink-100)">
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        Toggle theme
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="page-head">
+      <div class="eyebrow">Jetline Group · Design system</div>
+      <h1 class="jl-display">JetlineUI 2.0</h1>
+      <p>A single, canonical component library for every product built at Jetline. Drop in <code style="font-family:var(--mono);background:var(--ink-50);padding:2px 8px;border-radius:6px;font-size:13px">jetline-ui.css</code> and <code style="font-family:var(--mono);background:var(--ink-50);padding:2px 8px;border-radius:6px;font-size:13px">jetline-ui.js</code> and you get the full token system, every component, and all interaction behaviour — no framework dependency.</p>
+    </header>
+
+    <!-- NAV MENU -->
+    <section class="block" id="nav-menu">
+      <div class="block__head"><h2>Sidebar navigation</h2><p>Two-level structure: section group label + nav items with icons and active state. Compose any application's left-hand nav from this pattern.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo" style="background:var(--surface-sunken)">
+        <div style="display:flex;gap:0;background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--sh-md);overflow:hidden;max-width:560px">
+          <div style="width:220px;padding:var(--s-5) var(--s-4);border-right:1px solid var(--ink-100)">
+            <nav class="nav-group">
+              <p>Machines</p>
+              <a href="#" class="active" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-linecap="round"/></svg>Operations</a>
+              <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 20V10m7 10V4m7 16v-7" stroke-linecap="round"/></svg>Reports</a>
+              <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4M15 16l5-4-5-4M20 12H9" stroke-linecap="round"/></svg>Mapping</a>
+            </nav>
+            <nav class="nav-group">
+              <p>Equipment</p>
+              <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4Z"/></svg>Database</a>
+              <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>Matrix</a>
+              <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke-linecap="round"/></svg>Status</a>
+            </nav>
+            <nav class="nav-group">
+              <p>Stores</p>
+              <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M9 22V12h6v10"/></svg>Store View</a>
+            </nav>
+          </div>
+          <div style="flex:1;padding:var(--s-5)">
+            <div class="jl-eyebrow" style="margin-bottom:var(--s-4)">Selected: Operations</div>
+            <p class="jl-sm jl-muted">Page content renders here. The sidebar persists across all sections.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABS -->
+    <section class="block" id="tabs">
+      <div class="block__head"><h2>Tabs &amp; segments</h2><p>Pill tabs for switching between views within a page. Segments for mutually exclusive toggle groups — filter, view mode, region.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo stack">
+        <div data-jl-tabs>
+          <div class="jl-tabs" style="margin-bottom:var(--s-5)">
+            <button data-tab="t1" aria-selected="true">Overview</button>
+            <button data-tab="t2">Details</button>
+            <button data-tab="t3">History</button>
+            <button data-tab="t4">Settings</button>
+          </div>
+          <div class="jl-tabpanel" data-tab="t1" data-active><p class="jl-sm jl-muted">Overview panel content renders here. Tab panels animate in on selection.</p></div>
+          <div class="jl-tabpanel" data-tab="t2"><p class="jl-sm jl-muted">Details panel content renders here.</p></div>
+          <div class="jl-tabpanel" data-tab="t3"><p class="jl-sm jl-muted">History panel content renders here.</p></div>
+          <div class="jl-tabpanel" data-tab="t4"><p class="jl-sm jl-muted">Settings panel content renders here.</p></div>
+        </div>
+        <hr class="jl-soft-divider">
+        <div style="display:flex;gap:var(--s-4);align-items:center;flex-wrap:wrap">
+          <div class="demo-label" style="margin:0">Segment:</div>
+          <div class="jl-segment">
+            <button aria-selected="true">List</button>
+            <button>Grid</button>
+            <button>Map</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BREADCRUMB + STEPS -->
+    <section class="block" id="breadcrumb">
+      <div class="block__head"><h2>Breadcrumb &amp; steps</h2><p>Breadcrumb shows position in a hierarchy. Step wizard drives multi-step flows — onboarding, form capture, checkout.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo stack">
+        <nav class="jl-breadcrumb">
+          <a href="#">Home</a><span class="sep">/</span>
+          <a href="#">Products</a><span class="sep">/</span>
+          <a href="#">Category</a><span class="sep">/</span>
+          <span class="current">Item detail</span>
+        </nav>
+        <hr class="jl-soft-divider">
+        <div data-jl-wizard>
+          <div class="jl-steps" style="margin-bottom:var(--s-6)">
+            <div class="jl-step" data-state="done"><span class="node"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span><span class="jl-step__label">Details</span></div>
+            <div class="jl-step" data-state="active"><span class="node">2</span><span class="jl-step__label">Options</span></div>
+            <div class="jl-step"><span class="node">3</span><span class="jl-step__label">Review</span></div>
+            <div class="jl-step"><span class="node">4</span><span class="jl-step__label">Confirm</span></div>
+          </div>
+          <div class="demo-row" style="justify-content:flex-end">
+            <button class="jl-btn jl-btn--ghost" data-jl-prev>Back</button>
+            <button class="jl-btn jl-btn--primary" data-jl-next>Continue <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUTTONS -->
+    <section class="block" id="buttons">
+      <div class="block__head"><h2>Buttons</h2><p>Five variants covering the full action hierarchy. All sizes, states (loading, disabled), and an icon-only form. Compose with any icon.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo stack">
+        <div class="demo-row">
+          <button class="jl-btn jl-btn--primary">New record <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg></button>
+          <button class="jl-btn jl-btn--secondary">Export</button>
+          <button class="jl-btn jl-btn--soft">Edit</button>
+          <button class="jl-btn jl-btn--ghost">Cancel</button>
+          <button class="jl-btn jl-btn--dark">Delete</button>
+        </div>
+        <div class="demo-row">
+          <button class="jl-btn jl-btn--primary jl-btn--lg">Save changes</button>
+          <button class="jl-btn jl-btn--secondary">Default</button>
+          <button class="jl-btn jl-btn--secondary jl-btn--sm">Small</button>
+          <button class="jl-btn jl-btn--secondary jl-btn--icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button class="jl-btn jl-btn--primary" data-loading>Saving</button>
+          <button class="jl-btn jl-btn--secondary" disabled>Locked</button>
+        </div>
+        <div class="demo-row">
+          <div class="jl-segment">
+            <button aria-selected="true">All</button>
+            <button>Active</button>
+            <button>Archived</button>
+            <button>Draft</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOGGLES -->
+    <section class="block" id="toggles">
+      <div class="block__head"><h2>Toggles &amp; choices</h2><p>Switch for binary on/off state. Checkboxes for multi-select. Radios for mutually exclusive single-choice.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo">
+        <div class="demo-grid cols-3">
+          <div class="stack">
+            <div class="demo-label">Switch</div>
+            <label class="jl-switch"><input type="checkbox" checked /><span class="track"></span><span class="thumb"></span><span class="label">Enabled</span></label>
+            <label class="jl-switch"><input type="checkbox" /><span class="track"></span><span class="thumb"></span><span class="label">Notifications</span></label>
+            <label class="jl-switch"><input type="checkbox" disabled /><span class="track"></span><span class="thumb"></span><span class="label">Locked</span></label>
+          </div>
+          <div class="stack">
+            <div class="demo-label">Checkbox</div>
+            <label class="jl-check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span> Option A</label>
+            <label class="jl-check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span> Option B</label>
+            <label class="jl-check"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span> Option C</label>
+          </div>
+          <div class="stack">
+            <div class="demo-label">Radio</div>
+            <label class="jl-radio"><input type="radio" name="rep" /><span class="box"></span> Choice A</label>
+            <label class="jl-radio"><input type="radio" name="rep" checked /><span class="box"></span> Choice B</label>
+            <label class="jl-radio"><input type="radio" name="rep" /><span class="box"></span> Choice C</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INPUTS -->
+    <section class="block" id="inputs">
+      <div class="block__head"><h2>Inputs &amp; forms</h2><p>Zero-border, inset-well inputs with a red focus ring. All controls are fully custom — text, icon-prefixed, custom select dropdown, custom date picker, textarea, and search. No native browser controls.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo">
+        <div class="demo-grid cols-2">
+          <!-- Plain text -->
+          <div class="jl-field"><label>Make &amp; model</label><input class="jl-input" placeholder="e.g. Polar 115 Guillotine" /></div>
+          <!-- Icon input -->
+          <div class="jl-field"><label>Serial number</label>
+            <div class="jl-input-group"><span class="lead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8M8 12h5" stroke-linecap="round"/></svg></span><input class="jl-input" placeholder="4451403" /></div>
+          </div>
+          <!-- Custom dropdown — Equipment type -->
+          <div class="jl-field"><label>Equipment type</label>
+            <div class="jl-dropdown" id="dd-type">
+              <div class="jl-select-wrap">
+                <button class="jl-select-btn" aria-expanded="false" aria-haspopup="listbox" id="dd-type-btn" onclick="jlToggleDd('dd-type')">Guillotine</button>
+                <span class="arr"></span>
+              </div>
+              <div class="jl-menu" role="listbox" id="dd-type-menu">
+                <button class="jl-menu__item" role="option" aria-selected="true" onclick="jlPickDd('dd-type','Guillotine',this)">Guillotine</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-type','Trimmer',this)">Trimmer</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-type','Wire Binder',this)">Wire Binder</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-type','Spiral/Coil Binder',this)">Spiral/Coil Binder</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-type','Laminator',this)">Laminator</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-type','Paper Drill',this)">Paper Drill</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-type','Numbering Machine',this)">Numbering Machine</button>
+              </div>
+            </div>
+          </div>
+          <!-- Custom date picker -->
+          <div class="jl-field"><label>BMS install date</label>
+            <div class="jl-dropdown" id="dd-date">
+              <div class="jl-select-wrap">
+                <button class="jl-select-btn" aria-expanded="false" aria-haspopup="dialog" id="dd-date-btn" onclick="jlToggleDd('dd-date')">2 Jun 2023</button>
+                <span class="arr"></span>
+              </div>
+              <div class="jl-menu jl-datepicker" role="dialog" id="dd-date-menu" style="min-width:280px;right:0;left:auto">
+                <div class="dp-head">
+                  <button class="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm dp-nav" onclick="dpNav(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+                  <span class="dp-month-label" id="dp-month-label">June 2023</span>
+                  <button class="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm dp-nav" onclick="dpNav(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                </div>
+                <div class="dp-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+                <div class="dp-grid" id="dp-grid"></div>
+                <div class="dp-foot">
+                  <button class="jl-btn jl-btn--ghost jl-btn--sm" onclick="dpToday()">Today</button>
+                  <button class="jl-btn jl-btn--soft jl-btn--sm" onclick="dpClear()">Clear</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Error state -->
+          <div class="jl-field"><label>Age (store comment)</label><input class="jl-input is-error" value="" placeholder="e.g. 5y+ · ~8y · 2 months" /><span class="hint hint--error">Required when BMS date is unavailable.</span></div>
+          <!-- Custom dropdown — Store -->
+          <div class="jl-field"><label>Store</label>
+            <div class="jl-dropdown" id="dd-store">
+              <div class="jl-select-wrap">
+                <button class="jl-select-btn" aria-expanded="false" aria-haspopup="listbox" id="dd-store-btn" onclick="jlToggleDd('dd-store')">Melrose Arch</button>
+                <span class="arr"></span>
+              </div>
+              <div class="jl-menu" role="listbox" id="dd-store-menu">
+                <button class="jl-menu__item" role="option" aria-selected="true" onclick="jlPickDd('dd-store','Melrose Arch',this)">Melrose Arch</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-store','Klerksdorp',this)">Klerksdorp</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-store','Benoni',this)">Benoni</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-store','Blackheath',this)">Blackheath</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-store','Alberton',this)">Alberton</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-store','Centurion',this)">Centurion</button>
+                <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-store','Loftus',this)">Loftus</button>
+              </div>
+            </div>
+          </div>
+          <!-- Textarea -->
+          <div class="jl-field" style="grid-column:1/3"><label>Condition notes</label><textarea class="jl-textarea" placeholder="Describe current condition, reliability, recurring issues…">No longer reliable, multiple weekly call-outs, poor quality output on heavy stock.</textarea></div>
+          <!-- Search -->
+          <div class="jl-field" style="grid-column:1/3"><label>Search equipment</label>
+            <div class="jl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg><input placeholder="Search by model, serial, store, type…" /></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARDS -->
+    <section class="block" id="cards">
+      <div class="block__head"><h2>Cards &amp; tiles</h2><p>Three surface types: standard card for content, hero card for primary calls-to-action, and tile for compact grid launchers.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo-grid cols-3">
+        <div class="jl-card jl-card--interactive">
+          <div class="jl-card__head">
+            <span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4Z"/></svg></span>
+            <span class="jl-badge jl-badge--amber">Review</span>
+          </div>
+          <div class="jl-card__title">Xerox Colour C70</div>
+          <div class="jl-card__sub">Serial 3916756053 · Benoni</div>
+        </div>
+        <div class="jl-card jl-card--hero jl-card--interactive">
+          <span class="jl-chip jl-chip--lg" style="background:rgba(255,255,255,.16);color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></span>
+          <div><div class="jl-card__title" style="margin-top:var(--s-4)">Add equipment</div><div class="jl-card__sub">Capture a new item for any store</div></div>
+        </div>
+        <div class="jl-tile">
+          <span class="jl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M9 22V12h6v10"/></svg></span>
+          <span class="jl-tile__label">Melrose Arch</span>
+          <span class="jl-sm jl-faint">4 machines · 11 equipment</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEVICE CARD -->
+    <section class="block" id="device-card">
+      <div class="block__head"><h2>Item row card</h2><p>Compact horizontal card for list views. Icon, name, metadata, and a trailing badge. Click to expand or navigate to detail.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo">
+        <div class="stack">
+          <div class="demo-label">Machines column</div>
+          <div class="device-card">
+            <div class="device-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4Z"/></svg></div>
+            <div style="flex:1;min-width:0">
+              <div class="device-card__name">Xerox Versant 280 Press</div>
+              <div class="device-card__meta">3148395747 · Active · Last read 08 Jul</div>
+            </div>
+            <span class="jl-badge jl-badge--green">Good</span>
+          </div>
+          <div class="device-card" style="box-shadow:var(--sh-md);outline:2px solid var(--red-500)">
+            <div class="device-card__icon" style="background:var(--red-500);color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4Z"/></svg></div>
+            <div style="flex:1;min-width:0">
+              <div class="device-card__name">Xerox C70 Colour</div>
+              <div class="device-card__meta">3916821246 · 11y old · Last read 08 Jul</div>
+            </div>
+            <span class="jl-badge jl-badge--red">Replace</span>
+          </div>
+          <div class="device-card">
+            <div class="device-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4Z"/></svg></div>
+            <div style="flex:1;min-width:0">
+              <div class="device-card__name">Xerox D136</div>
+              <div class="device-card__meta">3514056233 · 7y old</div>
+            </div>
+            <span class="jl-badge jl-badge--red">Replace</span>
+          </div>
+          <hr class="jl-soft-divider">
+          <div class="demo-label">Equipment column</div>
+          <div class="device-card">
+            <div class="device-card__icon" style="background:var(--blue-tint);color:var(--blue-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg></div>
+            <div style="flex:1;min-width:0">
+              <div class="device-card__name">Polar - Mohr Standard 72</div>
+              <div class="device-card__meta">Guillotine · S/N 4451403</div>
+            </div>
+            <span class="jl-badge">Good</span>
+          </div>
+          <div class="device-card">
+            <div class="device-card__icon" style="background:var(--amber-tint);color:var(--amber-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg></div>
+            <div style="flex:1;min-width:0">
+              <div class="device-card__name">RENZ SRW360 3:1</div>
+              <div class="device-card__meta">Wire Binder · No serial</div>
+            </div>
+            <span class="jl-badge jl-badge--amber">Aged</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BADGES -->
+    <section class="block" id="badges">
+      <div class="block__head"><h2>Badges &amp; status</h2><p>Semantic colour variants for any status — success, warning, critical, info, neutral. Dot indicators for live/offline state. Removable tags for active filters.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo stack">
+        <div class="demo-row">
+          <span class="jl-badge jl-badge--red">Replace</span>
+          <span class="jl-badge jl-badge--amber">Review</span>
+          <span class="jl-badge jl-badge--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>Keep</span>
+          <span class="jl-badge jl-badge--blue">BMS Active</span>
+          <span class="jl-badge">No serial</span>
+          <span class="jl-badge jl-badge--dark">Off</span>
+          <span class="jl-badge jl-badge--solid">Critical</span>
+        </div>
+        <div class="demo-row">
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--green"></span><span class="jl-sm">Reporting live</span></span>
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--amber"></span><span class="jl-sm">Stale (14d)</span></span>
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--red"></span><span class="jl-sm">Critical (30d+)</span></span>
+          <span class="demo-row" style="gap:8px"><span class="jl-dot jl-dot--gray"></span><span class="jl-sm">Off / archived</span></span>
+        </div>
+        <div class="demo-row">
+          <span class="jl-tag">Guillotine <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+          <span class="jl-tag">Klerksdorp <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+          <span class="jl-tag">Replace: YES <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLE -->
+    <section class="block" id="table">
+      <div class="block__head"><h2>Tables</h2><p>Used across Machine Reports (Summary, MTD, YTD) and the Equipment Database / Status views. Banded rows, red-tint hover, no grid lines.</p></div>
+      <div class="section-rule"></div>
+      <div style="overflow-x:auto">
+        <div class="jl-table-wrap">
+          <table class="jl-table">
+            <thead>
+              <tr>
+                <th>Store</th>
+                <th>Model</th>
+                <th>Type</th>
+                <th>Serial</th>
+                <th>BMS Age</th>
+                <th>Condition</th>
+                <th>Replace</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Alberton</td><td>Polar-Mohr Standard 72</td><td>Guillotine</td><td class="jl-mono">4451403</td><td>—</td>
+                <td><span class="jl-sm jl-muted">Down — waiting on parts</span></td>
+                <td><span class="jl-badge jl-badge--amber">Review</span></td>
+              </tr>
+              <tr>
+                <td>Benoni</td><td>Xerox Colour C70</td><td>Machine</td><td class="jl-mono">3916756053</td><td>5y+</td>
+                <td><span class="jl-sm jl-muted">Unreliable, very worn</span></td>
+                <td><span class="jl-badge jl-badge--red">Replace</span></td>
+              </tr>
+              <tr>
+                <td>Klerksdorp</td><td>Xerox C9275 + Fiery</td><td>Machine</td><td class="jl-mono">3050234630</td><td>2m</td>
+                <td><span class="jl-sm jl-muted">Excellent — brand new</span></td>
+                <td><span class="jl-badge jl-badge--green">Keep</span></td>
+              </tr>
+              <tr>
+                <td>Melrose Arch</td><td>RENZ SRW360 3:1</td><td>Wire Binder</td><td class="jl-mono">—</td><td>—</td>
+                <td><span class="jl-sm jl-muted">Average / aged</span></td>
+                <td><span class="jl-badge">—</span></td>
+              </tr>
+              <tr>
+                <td>Blackheath</td><td>Xerox D125 (A)</td><td>Machine</td><td class="jl-mono">3909712644</td><td>8y 2m</td>
+                <td><span class="jl-sm jl-muted">Good, normal wear</span></td>
+                <td><span class="jl-badge jl-badge--green">Keep</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section class="block" id="alerts">
+      <div class="block__head"><h2>Alerts</h2><p>Inline feedback banners — success, warning, and critical. Include a title, supporting text, and optional action button.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo stack">
+        <div class="jl-alert jl-alert--green">
+          <span class="jl-chip jl-chip--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span>
+          <div class="jl-alert__body"><div class="jl-alert__title">BMS sync complete</div><div class="jl-alert__text">210 machines synced · Fixtrade · 08 Jul 2026 02:00</div></div>
+        </div>
+        <div class="jl-alert jl-alert--amber">
+          <span class="jl-chip jl-chip--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></span>
+          <div class="jl-alert__body"><div class="jl-alert__title">Stale readings — 3 machines</div><div class="jl-alert__text">Centurion D125, Illovo XV180CP ×2 haven't reported in 14+ days.</div></div>
+          <button class="jl-btn jl-btn--soft jl-btn--sm">View</button>
+        </div>
+        <div class="jl-alert jl-alert--red">
+          <span class="jl-chip jl-chip--solid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+          <div class="jl-alert__body"><div class="jl-alert__title">8 machines flagged for replacement</div><div class="jl-alert__text">Benoni C70, Centurion D125, Loftus C70, Loftus D125, Melrose Arch C70, D136 ×2, Wits C70</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODALS + TOASTS -->
+    <section class="block" id="overlays">
+      <div class="block__head"><h2>Modals &amp; toasts</h2><p>Modal for confirmations, forms, and destructive actions. Toasts for non-blocking feedback — success, error, info. Auto-dismiss after 2.6s.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo demo-row">
+        <button class="jl-btn jl-btn--primary" data-jl-open="equipModal">Open edit modal</button>
+        <button class="jl-btn jl-btn--secondary" onclick="Jetline.toast('Equipment record saved','green')">Success toast</button>
+        <button class="jl-btn jl-btn--secondary" onclick="Jetline.toast('BMS sync failed — check connection','red')">Error toast</button>
+        <button class="jl-btn jl-btn--secondary" onclick="Jetline.toast('Syncing Klerksdorp…','info')">Info toast</button>
+      </div>
+    </section>
+
+    <!-- LOADERS -->
+    <section class="block" id="loaders">
+      <div class="block__head"><h2>Loaders &amp; progress</h2><p>Spinner for async operations. Progress bar for stepped flows. Skeleton shimmer for loading states. Tooltip for contextual help.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo demo-row" style="gap:var(--s-7);flex-wrap:wrap;align-items:flex-start">
+        <div class="jl-spinner"></div>
+        <div style="flex:1;max-width:320px">
+          <div class="demo-label">Equipment capture — step 2 of 4</div>
+          <div class="jl-progress"><div class="jl-progress__bar" style="width:50%"></div></div>
+        </div>
+        <div style="flex:1;min-width:180px">
+          <div class="demo-label">Loading table</div>
+          <div class="jl-skeleton" style="height:12px;width:80%;margin-bottom:8px"></div>
+          <div class="jl-skeleton" style="height:12px;width:60%;margin-bottom:8px"></div>
+          <div class="jl-skeleton" style="height:12px;width:72%"></div>
+        </div>
+        <div>
+          <div class="demo-label">Tooltip</div>
+          <span class="jl-tip">
+            <button class="jl-btn jl-btn--secondary jl-btn--icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4m0-4h.01" stroke-linecap="round"/></svg></button>
+            <span class="jl-tip__bubble">BMS install date from Dagster ETL</span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACCORDION -->
+    <section class="block">
+      <div class="block__head"><h2>Accordion</h2><p>Collapsible content sections. Supports single-open mode (one panel at a time) or multi-open. Smooth grid-template-rows animation.</p></div>
+      <div class="section-rule"></div>
+      <div class="jl-accordion" data-jl-accordion data-single>
+        <div class="jl-acc" data-open>
+          <button class="jl-acc__head">Melrose Arch — 6 equipment items <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="jl-acc__body"><div><p>Versant 280 Press · Epson SC-T7200 · HP DesignJet T830 · D136 ×2 · C70 — 3 flagged for replacement.</p></div></div>
+        </div>
+        <div class="jl-acc">
+          <button class="jl-acc__head">Klerksdorp — 9 equipment items <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="jl-acc__body"><div><p>Xerox C9070, C9275, D125, Primelink B9125 ×2, WorkCentre 5855, Canon TM-350, Epson T7200 ×2 — 0 flagged.</p></div></div>
+        </div>
+        <div class="jl-acc">
+          <button class="jl-acc__head">Blackheath — 6 equipment items <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="jl-acc__body"><div><p>Versant 280, D125 ×2, C70, Canon TX-3200, Canon TM-300 — 1 flagged for replacement (C70).</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGINATION -->
+    <section class="block">
+      <div class="block__head"><h2>Pagination</h2><p>Page controls for any data table or list. Current page highlighted in red. Prev/next arrows with chevron icons.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo">
+        <div class="jl-pagination">
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button>1</button>
+          <button aria-current="page">2</button>
+          <button>3</button>
+          <button>4</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MOTIONS -->
+    <section class="block" style="margin-bottom:var(--s-6)">
+      <div class="block__head"><h2>Motion &amp; animation tokens</h2><p>JetlineUI 2.0 uses three timing tokens: <code style="font-family:var(--mono);background:var(--ink-50);padding:2px 6px;border-radius:6px;font-size:12px">--t-fast .14s</code> for micro-interactions, <code style="font-family:var(--mono);background:var(--ink-50);padding:2px 6px;border-radius:6px;font-size:12px">--t-base .24s</code> for transitions, <code style="font-family:var(--mono);background:var(--ink-50);padding:2px 6px;border-radius:6px;font-size:12px">--t-slow .4s</code> for reveals. Two easing curves: <code style="font-family:var(--mono);background:var(--ink-50);padding:2px 6px;border-radius:6px;font-size:12px">--ease</code> (natural) and <code style="font-family:var(--mono);background:var(--ink-50);padding:2px 6px;border-radius:6px;font-size:12px">--ease-out</code> (spring-like). Hover each card to preview.</p></div>
+      <div class="section-rule"></div>
+      <div class="demo">
+        <div class="motion-grid">
+          <div class="motion-card" data-mot="lift">
+            <div class="motion-card__label">Lift</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4Z"/></svg></div></div>
+            <span class="motion-desc">translateY(-8px) · t-base · ease</span>
+          </div>
+          <div class="motion-card" data-mot="glow">
+            <div class="motion-card__label">Glow</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></div></div>
+            <span class="motion-desc">box-shadow · red-glow · t-base</span>
+          </div>
+          <div class="motion-card" data-mot="spin">
+            <div class="motion-card__label">Spin-fill</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></div></div>
+            <span class="motion-desc">rotate(180deg) · t-slow · ease-out</span>
+          </div>
+          <div class="motion-card" data-mot="squish">
+            <div class="motion-card__label">Squish</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div></div>
+            <span class="motion-desc">scale(.88) skewX(-4deg) · t-fast</span>
+          </div>
+          <div class="motion-card" data-mot="pulse">
+            <div class="motion-card__label">Pulse (auto)</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/></svg></div></div>
+            <span class="motion-desc">scale + glow ring · 2s infinite</span>
+          </div>
+          <div class="motion-card" data-mot="slide">
+            <div class="motion-card__label">Slide</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div></div>
+            <span class="motion-desc">translateX(8px) · t-base · ease-out</span>
+          </div>
+          <div class="motion-card" data-mot="ease">
+            <div class="motion-card__label">ease (natural)</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12h14" stroke-linecap="round"/></svg></div></div>
+            <span class="motion-desc">cubic-bezier(.2,.8,.2,1)</span>
+          </div>
+          <div class="motion-card" data-mot="ease-out">
+            <div class="motion-card__label">ease-out (spring)</div>
+            <div class="motion-demo"><div class="mot-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12h14" stroke-linecap="round"/></svg></div></div>
+            <span class="motion-desc">cubic-bezier(.16,1,.3,1)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Edit equipment modal -->
+<div class="jl-overlay" id="equipModal">
+  <div class="jl-modal" role="dialog" aria-modal="true">
+    <div style="display:flex;align-items:center;gap:var(--s-3);margin-bottom:var(--s-5)">
+      <span class="jl-chip jl-chip--solid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-linecap="round"/></svg></span>
+      <div>
+        <div class="jl-modal__title">Edit equipment record</div>
+        <p class="jl-sm jl-muted">Polar-Mohr Standard 72 · Alberton</p>
+      </div>
+    </div>
+    <div class="stack" style="gap:var(--s-4)">
+      <div class="jl-field"><label>Condition notes</label><textarea class="jl-textarea" style="min-height:72px">Still in good condition (currently down — waiting on parts)</textarea></div>
+      <div class="demo-grid cols-2" style="gap:var(--s-3)">
+        <div class="jl-field"><label>Age</label><input class="jl-input" value="~15y" /></div>
+        <div class="jl-field"><label>Replace?</label>
+          <div class="jl-dropdown" id="dd-modal-rep">
+            <div class="jl-select-wrap">
+              <button class="jl-select-btn" aria-expanded="false" aria-haspopup="listbox" onclick="jlToggleDd('dd-modal-rep')">NO</button>
+              <span class="arr"></span>
+            </div>
+            <div class="jl-menu" role="listbox" id="dd-modal-rep-menu">
+              <button class="jl-menu__item" role="option" aria-selected="true" onclick="jlPickDd('dd-modal-rep','NO',this)">NO — keep</button>
+              <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-modal-rep','YES',this)">YES — replace</button>
+              <button class="jl-menu__item" role="option" onclick="jlPickDd('dd-modal-rep','MAYBE',this)">MAYBE — review</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="jl-modal__foot">
+      <button class="jl-btn jl-btn--ghost" data-jl-close>Cancel</button>
+      <button class="jl-btn jl-btn--primary" data-jl-close onclick="Jetline.toast('Record updated','green')">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ── Tabs ── */
+  function initTabs(root){
+    root.querySelectorAll('[data-jl-tabs]').forEach(function(g){
+      var btns=g.querySelectorAll('.jl-tabs button[data-tab]'),panels=g.querySelectorAll('.jl-tabpanel[data-tab]');
+      btns.forEach(function(b){b.addEventListener('click',function(){
+        btns.forEach(function(x){x.setAttribute('aria-selected',x===b?'true':'false')});
+        panels.forEach(function(p){p.getAttribute('data-tab')===b.getAttribute('data-tab')?p.setAttribute('data-active',''):p.removeAttribute('data-active')});
+      })});
+    });
+  }
+
+  /* ── Segments ── */
+  function initSegments(root){
+    root.querySelectorAll('.jl-segment').forEach(function(s){
+      var btns=s.querySelectorAll('button');
+      btns.forEach(function(b){b.addEventListener('click',function(){btns.forEach(function(x){x.setAttribute('aria-selected',x===b?'true':'false')})})});
+    });
+  }
+
+  /* ── Custom dropdowns (select & date) ── */
+  function closeAllMenus(except){
+    document.querySelectorAll('.jl-menu[data-open]').forEach(function(m){
+      if(m!==except){
+        m.removeAttribute('data-open');
+        var btn=m.closest('.jl-dropdown') && m.closest('.jl-dropdown').querySelector('.jl-select-btn');
+        if(btn)btn.setAttribute('aria-expanded','false');
+      }
+    });
+  }
+
+  window.jlToggleDd=function(id){
+    var dd=document.getElementById(id);
+    var menu=document.getElementById(id+'-menu') || (dd && dd.querySelector('.jl-menu'));
+    var btn=document.getElementById(id+'-btn') || (dd && dd.querySelector('.jl-select-btn'));
+    if(!menu)return;
+    var isOpen=menu.hasAttribute('data-open');
+    closeAllMenus(isOpen?null:menu);
+    if(isOpen){menu.removeAttribute('data-open');if(btn)btn.setAttribute('aria-expanded','false');}
+    else{menu.setAttribute('data-open','');if(btn)btn.setAttribute('aria-expanded','true');}
+    event && event.stopPropagation && event.stopPropagation();
+  };
+
+  window.jlPickDd=function(id,value,item){
+    var dd=document.getElementById(id);
+    var menu=document.getElementById(id+'-menu') || (dd && dd.querySelector('.jl-menu'));
+    var btn=document.getElementById(id+'-btn') || (dd && dd.querySelector('.jl-select-btn'));
+    if(btn)btn.textContent=value;
+    if(menu){
+      menu.querySelectorAll('.jl-menu__item').forEach(function(i){i.setAttribute('aria-selected',i===item?'true':'false')});
+      menu.removeAttribute('data-open');
+    }
+    if(btn)btn.setAttribute('aria-expanded','false');
+    event && event.stopPropagation && event.stopPropagation();
+  };
+
+  /* ── Date picker ── */
+  var dpState={y:2023,m:5,sel:{y:2023,m:5,d:2}};
+  var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function dpRender(){
+    var grid=document.getElementById('dp-grid');
+    var label=document.getElementById('dp-month-label');
+    if(!grid||!label)return;
+    label.textContent=MONTHS[dpState.m]+' '+dpState.y;
+    var first=new Date(dpState.y,dpState.m,1).getDay();
+    var startOffset=(first===0?6:first-1);
+    var daysInMonth=new Date(dpState.y,dpState.m+1,0).getDate();
+    var today=new Date();
+    var html='';
+    for(var i=0;i<startOffset;i++)html+='<span class="dp-day dp-day--empty"></span>';
+    for(var d=1;d<=daysInMonth;d++){
+      var cls='dp-day';
+      var s=dpState.sel;
+      if(s&&s.y===dpState.y&&s.m===dpState.m&&s.d===d)cls+=' dp-day--selected';
+      else if(today.getFullYear()===dpState.y&&today.getMonth()===dpState.m&&today.getDate()===d)cls+=' dp-day--today';
+      html+='<button class="'+cls+'" onclick="dpPick('+d+')">'+d+'</button>';
+    }
+    grid.innerHTML=html;
+  }
+
+  window.dpNav=function(dir){dpState.m+=dir;if(dpState.m>11){dpState.m=0;dpState.y++;}else if(dpState.m<0){dpState.m=11;dpState.y--;}dpRender();event&&event.stopPropagation&&event.stopPropagation();};
+
+  window.dpPick=function(d){
+    dpState.sel={y:dpState.y,m:dpState.m,d:d};
+    var btn=document.getElementById('dd-date-btn');
+    if(btn)btn.textContent=d+' '+MONTHS[dpState.m].slice(0,3)+' '+dpState.y;
+    var menu=document.getElementById('dd-date-menu');
+    if(menu)menu.removeAttribute('data-open');
+    if(btn)btn.setAttribute('aria-expanded','false');
+    dpRender();
+    event&&event.stopPropagation&&event.stopPropagation();
+  };
+
+  window.dpToday=function(){
+    var t=new Date();dpState.y=t.getFullYear();dpState.m=t.getMonth();
+    dpPick(t.getDate());
+    event&&event.stopPropagation&&event.stopPropagation();
+  };
+
+  window.dpClear=function(){
+    dpState.sel=null;
+    var btn=document.getElementById('dd-date-btn');
+    if(btn)btn.textContent='Select date';
+    dpRender();
+    event&&event.stopPropagation&&event.stopPropagation();
+  };
+
+  /* ── Accordion ── */
+  function initAccordion(root){
+    root.querySelectorAll('.jl-acc').forEach(function(acc){
+      var h=acc.querySelector('.jl-acc__head');if(!h)return;
+      h.addEventListener('click',function(){
+        var parent=acc.closest('[data-jl-accordion]'),open=acc.hasAttribute('data-open');
+        if(parent&&parent.hasAttribute('data-single'))parent.querySelectorAll('.jl-acc[data-open]').forEach(function(a){a.removeAttribute('data-open')});
+        open?acc.removeAttribute('data-open'):acc.setAttribute('data-open','');
+      });
+    });
+  }
+
+  /* ── Modals ── */
+  function openModal(id){var m=document.getElementById(id);if(m)m.setAttribute('data-open','');}
+  function closeModal(id){var m=document.getElementById(id);if(m)m.removeAttribute('data-open');}
+  function initModals(root){
+    root.querySelectorAll('[data-jl-open]').forEach(function(b){b.addEventListener('click',function(){openModal(b.getAttribute('data-jl-open'))})});
+    root.querySelectorAll('.jl-overlay').forEach(function(ov){
+      ov.addEventListener('click',function(e){if(e.target===ov)closeModal(ov.id)});
+      ov.querySelectorAll('[data-jl-close]').forEach(function(c){c.addEventListener('click',function(){closeModal(ov.id)})});
+    });
+  }
+
+  /* ── Wizard ── */
+  function initWizards(root){
+    root.querySelectorAll('[data-jl-wizard]').forEach(function(wz){
+      var steps=[].slice.call(wz.querySelectorAll('.jl-step'));
+      var idx=steps.findIndex(function(s){return s.getAttribute('data-state')==='active'});
+      if(idx<0)idx=0;
+      function render(){
+        steps.forEach(function(s,i){s.setAttribute('data-state',i<idx?'done':i===idx?'active':'')});
+        var prev=wz.querySelector('[data-jl-prev]'),next=wz.querySelector('[data-jl-next]');
+        if(prev)prev.toggleAttribute('disabled',idx===0);
+        if(next){next.innerHTML=idx===steps.length-1?'Finish':'Continue <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';}
+      }
+      var n=wz.querySelector('[data-jl-next]'),p=wz.querySelector('[data-jl-prev]');
+      if(n)n.addEventListener('click',function(){if(idx<steps.length-1){idx++;render();}else{toast('All steps complete!','green');}});
+      if(p)p.addEventListener('click',function(){if(idx>0){idx--;render();}});
+      render();
+    });
+  }
+
+  /* ── Toasts ── */
+  function ensureHost(){var h=document.querySelector('.jl-toast-host');if(!h){h=document.createElement('div');h.className='jl-toast-host';document.body.appendChild(h);}return h;}
+  var ICON={
+    green:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>',
+    red:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4m0-4h.01" stroke-linecap="round"/></svg>'
+  };
+  function toast(msg,kind){
+    kind=kind||'info';var host=ensureHost();
+    var el=document.createElement('div');el.className='jl-toast';
+    el.innerHTML='<span class="jl-chip">'+(ICON[kind]||ICON.info)+'</span><span class="jl-toast__text">'+msg+'</span>';
+    host.appendChild(el);
+    setTimeout(function(){el.classList.add('is-leaving');el.addEventListener('animationend',function(){el.remove()},{once:true})},2600);
+  }
+
+  /* ── Global listeners ── */
+  document.addEventListener('click',function(){closeAllMenus()});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){
+      document.querySelectorAll('.jl-overlay[data-open]').forEach(function(o){o.removeAttribute('data-open')});
+      closeAllMenus();
+    }
+  });
+
+  /* ── Theme toggle ── */
+  window.toggleTheme=function(){
+    var r=document.documentElement,cur=r.getAttribute('data-theme');
+    if(!cur){var dark=window.matchMedia('(prefers-color-scheme:dark)').matches;r.setAttribute('data-theme',dark?'light':'dark');}
+    else{r.setAttribute('data-theme',cur==='dark'?'light':'dark');}
+  };
+
+  /* ── Public API ── */
+  window.Jetline={toast:toast,openModal:openModal,closeModal:closeModal};
+
+  function initAll(root){
+    root=root||document;
+    initTabs(root);initSegments(root);initAccordion(root);initModals(root);initWizards(root);
+    dpRender();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){initAll(document)});
+  else initAll(document);
+})();
+</script>

@@ -1,0 +1,169 @@
+/* ============================================================
+   JETLINE UI — Design Tokens
+   The single source of truth. Every component reads from here.
+   ============================================================ */
+
+/* Font is loaded via next/font in layout.tsx (Plus Jakarta Sans). External
+   @import removed so it works offline and under the app Content-Security-Policy. */
+
+:root {
+  /* ---- Brand: Red ---------------------------------------- */
+  --red-50:  #fdebec;
+  --red-100: #fbd6d9;
+  --red-200: #f6a8ae;
+  --red-300: #f2787f;
+  --red-400: #ef3a45;
+  --red-500: #e6121f;   /* primary brand */
+  --red-600: #c40d17;
+  --red-700: #a30912;
+  --red-glow: rgba(230, 18, 31, 0.35);
+  --red-tint: rgba(230, 18, 31, 0.08);
+
+  /* ---- Neutrals (cool slate) ----------------------------- */
+  --ink-900: #161b24;   /* primary text */
+  --ink-800: #232a36;
+  --ink-700: #3a4252;
+  --ink-600: #525b6e;
+  --ink-500: #6b7385;   /* secondary text */
+  --ink-400: #8b94a6;   /* muted / placeholder */
+  --ink-300: #b6bdca;
+  --ink-200: #d9dee6;
+  --ink-100: #e9edf2;
+  --ink-50:  #f1f4f8;
+
+  /* Inverted per brand direction: page is pure white, cards carry a soft grey
+     tint + shadow so they lift off the white. */
+  --canvas:  #ffffff;   /* page background — pure white */
+  --surface: #f3f5f8;   /* cards, sheets — soft grey tint */
+  --surface-sunken: #eef1f5;  /* nested/inset surfaces, one step deeper */
+
+  /* ---- Semantic ------------------------------------------ */
+  --green-500: #14a44d; --green-tint: rgba(20,164,77,.10); --green-700:#0c7a38;
+  --amber-500: #e58a00; --amber-tint: rgba(229,138,0,.12); --amber-700:#a86400;
+  --blue-500:  #2b6fe0; --blue-tint:  rgba(43,111,224,.10); --blue-700:#1c50ad;
+  --danger-500: var(--red-500); --danger-tint: var(--red-tint);
+
+  /* ---- Typography ---------------------------------------- */
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+
+  --fs-display: 30px;  --lh-display: 1.08;
+  --fs-h1: 24px;       --lh-h1: 1.15;
+  --fs-h2: 19px;       --lh-h2: 1.2;
+  --fs-h3: 16px;       --lh-h3: 1.3;
+  --fs-body: 15px;     --lh-body: 1.5;
+  --fs-sm: 13.5px;     --lh-sm: 1.45;
+  --fs-xs: 12px;       --lh-xs: 1.4;
+
+  --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700; --fw-extra: 800;
+  --tracking-tight: -0.02em;
+  --tracking-caps: 0.08em;
+
+  /* ---- Spacing (4pt) ------------------------------------- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+
+  /* ---- Radius -------------------------------------------- */
+  --r-xs: 8px; --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 22px; --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* ---- Shadows (the backbone — no borders) --------------- */
+  --sh-xs: 0 1px 2px rgba(16,24,40,.05);
+  --sh-sm: 0 1px 2px rgba(16,24,40,.04), 0 3px 8px rgba(16,24,40,.05);
+  --sh-md: 0 1px 2px rgba(16,24,40,.04), 0 6px 16px rgba(16,24,40,.07);
+  --sh-lg: 0 8px 20px rgba(16,24,40,.10), 0 18px 40px rgba(16,24,40,.12);
+  --sh-xl: 0 24px 60px rgba(16,24,40,.20), 0 8px 18px rgba(16,24,40,.10);
+  --sh-red: 0 10px 24px var(--red-glow);
+  --sh-focus: 0 0 0 4px rgba(230,18,31,.18);
+  --sh-inset: inset 0 1px 2px rgba(16,24,40,.06);
+
+  /* ---- Motion -------------------------------------------- */
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --t-fast: .14s;
+  --t-base: .24s;
+  --t-slow: .4s;
+}
+
+/* ============================================================
+   Reset + base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-900);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; }
+a { color: var(--red-600); text-decoration: none; }
+svg { display: block; }
+
+::selection { background: var(--red-100); color: var(--red-700); }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+/* ============================================================
+   Type utilities
+   ============================================================ */
+.jl-display { font-size: var(--fs-display); line-height: var(--lh-display); font-weight: var(--fw-extra); letter-spacing: var(--tracking-tight); }
+.jl-h1 { font-size: var(--fs-h1); line-height: var(--lh-h1); font-weight: var(--fw-extra); letter-spacing: var(--tracking-tight); }
+.jl-h2 { font-size: var(--fs-h2); line-height: var(--lh-h2); font-weight: var(--fw-bold); letter-spacing: -0.01em; }
+.jl-h3 { font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: var(--fw-bold); }
+.jl-body { font-size: var(--fs-body); line-height: var(--lh-body); }
+.jl-sm { font-size: var(--fs-sm); line-height: var(--lh-sm); }
+.jl-xs { font-size: var(--fs-xs); line-height: var(--lh-xs); }
+.jl-muted { color: var(--ink-500); }
+.jl-faint { color: var(--ink-400); }
+.jl-eyebrow { font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-400); }
+.jl-mono { font-family: var(--mono); }
+
+/* ============================================================
+   Back-compat aliases — maps the legacy --jl-* names used across
+   the app onto the real Jetline UI tokens above. Lets existing
+   inline styles keep working while screens migrate to jl-* classes.
+   ============================================================ */
+:root {
+  --jl-red-50: var(--red-50);   --jl-red-100: var(--red-100);
+  --jl-red-200: var(--red-200); --jl-red-300: var(--red-300);
+  --jl-red-400: var(--red-400); --jl-red-500: var(--red-500);
+  --jl-red-600: var(--red-600); --jl-red-700: var(--red-700);
+  --jl-red-glow: var(--red-glow); --jl-red-tint: var(--red-tint);
+
+  --jl-ink-900: var(--ink-900); --jl-ink-800: var(--ink-800);
+  --jl-ink-700: var(--ink-700); --jl-ink-600: var(--ink-600);
+  --jl-ink-500: var(--ink-500); --jl-ink-400: var(--ink-400);
+  --jl-ink-300: var(--ink-300); --jl-ink-200: var(--ink-200);
+  --jl-ink-100: var(--ink-100); --jl-ink-50: var(--ink-50);
+
+  --jl-canvas: var(--canvas);
+  --jl-surface: var(--surface);
+  --jl-surface-sunken: var(--surface-sunken);
+
+  --jl-green-500: var(--green-500); --jl-green-700: var(--green-700); --jl-green-tint: var(--green-tint);
+  --jl-amber-500: var(--amber-500); --jl-amber-700: var(--amber-700); --jl-amber-tint: var(--amber-tint);
+  --jl-blue-500: var(--blue-500);   --jl-blue-700: var(--blue-700);   --jl-blue-tint: var(--blue-tint);
+
+  --jl-font: var(--font);
+
+  --jl-r-sm: var(--r-sm); --jl-r-md: var(--r-md); --jl-r-lg: var(--r-lg);
+  --jl-r-xl: var(--r-xl); --jl-r-pill: var(--r-pill);
+
+  --jl-sh-xs: var(--sh-xs); --jl-sh-sm: var(--sh-sm); --jl-sh-md: var(--sh-md);
+  --jl-sh-lg: var(--sh-lg); --jl-sh-xl: var(--sh-xl);
+  --jl-sh-red: var(--sh-red); --jl-sh-focus: var(--sh-focus);
+
+  --jl-ease: var(--ease); --jl-t-fast: var(--t-fast); --jl-t-slow: var(--t-slow);
+}

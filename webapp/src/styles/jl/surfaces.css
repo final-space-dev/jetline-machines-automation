@@ -1,0 +1,155 @@
+/* ============================================================
+   JETLINE UI — Surfaces (cards, KPIs, badges, feedback)
+   Requires tokens.css
+   ============================================================ */
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.jl-card {
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-md);
+  padding: var(--s-6);
+  text-align: left;
+  transition: transform var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease);
+}
+.jl-card--pad-sm { padding: var(--s-4); }
+.jl-card--pad-lg { padding: var(--s-7); }
+
+/* interactive card — lifts on hover */
+.jl-card--interactive { cursor: pointer; }
+.jl-card--interactive:hover { transform: translateY(-6px); box-shadow: var(--sh-lg); }
+.jl-card--interactive:active { transform: translateY(-2px); transition-duration: .08s; }
+
+.jl-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-4); }
+.jl-card__title { font-size: var(--fs-h3); font-weight: var(--fw-bold); letter-spacing: -0.01em; }
+.jl-card__sub { font-size: var(--fs-sm); color: var(--ink-500); margin-top: 2px; }
+
+/* Hero / featured card (red) */
+.jl-card--hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(155deg, var(--red-400) 0%, var(--red-500) 45%, var(--red-600) 100%);
+  color: #fff; box-shadow: var(--sh-red);
+}
+.jl-card--hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(420px 220px at 85% 0%, rgba(255,255,255,.22), transparent 60%);
+}
+.jl-card--hero.jl-card--interactive:hover { box-shadow: 0 24px 46px var(--red-glow); }
+.jl-card--hero > * { position: relative; z-index: 1; }
+.jl-card--hero .jl-card__sub { color: rgba(255,255,255,.82); }
+
+/* Tile (menu / launcher) */
+.jl-tile {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  background: var(--surface); border-radius: var(--r-xl);
+  box-shadow: var(--sh-md); padding: var(--s-5);
+  text-align: left; cursor: pointer;
+  transition: transform var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease);
+}
+.jl-tile:hover { transform: translateY(-7px); box-shadow: var(--sh-lg); }
+.jl-tile:hover .jl-chip { background: var(--red-500); color: #fff; transform: scale(1.06) rotate(-3deg); }
+.jl-tile__label { font-size: var(--fs-h3); font-weight: var(--fw-bold); letter-spacing: -0.01em; }
+
+/* ============================================================
+   KPI / Stat card
+   ============================================================ */
+.jl-kpi { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-md); padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-3); }
+.jl-kpi__top { display: flex; align-items: center; justify-content: space-between; }
+.jl-kpi__label { font-size: var(--fs-sm); color: var(--ink-500); font-weight: var(--fw-semibold); }
+.jl-kpi__value { font-size: 30px; font-weight: var(--fw-extra); letter-spacing: var(--tracking-tight); line-height: 1; }
+.jl-kpi__foot { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-xs); color: var(--ink-400); }
+.jl-trend { display: inline-flex; align-items: center; gap: 4px; font-weight: var(--fw-bold); font-size: var(--fs-xs); padding: 3px 8px; border-radius: var(--r-pill); }
+.jl-trend svg { width: 13px; height: 13px; }
+.jl-trend--up { background: var(--green-tint); color: var(--green-700); }
+.jl-trend--down { background: var(--red-tint); color: var(--red-600); }
+.jl-trend--flat { background: var(--ink-50); color: var(--ink-500); }
+
+/* tiny sparkline bars */
+.jl-spark { display: flex; align-items: flex-end; gap: 3px; height: 32px; }
+.jl-spark span { flex: 1; background: var(--red-100); border-radius: 3px; transition: background var(--t-base); }
+.jl-kpi:hover .jl-spark span { background: var(--red-200); }
+.jl-spark span:last-child { background: var(--red-500); }
+
+/* ============================================================
+   Badges / Pills / Tags / Status
+   ============================================================ */
+.jl-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 10px; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.01em;
+  background: var(--ink-50); color: var(--ink-600);
+}
+.jl-badge svg { width: 12px; height: 12px; }
+.jl-badge--red { background: var(--red-tint); color: var(--red-600); }
+.jl-badge--green { background: var(--green-tint); color: var(--green-700); }
+.jl-badge--amber { background: var(--amber-tint); color: var(--amber-700); }
+.jl-badge--blue { background: var(--blue-tint); color: var(--blue-700); }
+.jl-badge--solid { background: var(--red-500); color: #fff; }
+.jl-badge--dark { background: var(--ink-900); color: #fff; }
+
+.jl-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.jl-dot--green { background: var(--green-500); box-shadow: 0 0 0 3px var(--green-tint); }
+.jl-dot--red { background: var(--red-500); box-shadow: 0 0 0 3px var(--red-tint); }
+.jl-dot--amber { background: var(--amber-500); box-shadow: 0 0 0 3px var(--amber-tint); }
+.jl-dot--gray { background: var(--ink-300); box-shadow: 0 0 0 3px var(--ink-50); }
+
+/* removable tag */
+.jl-tag { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 12px; border-radius: var(--r-sm); background: var(--ink-50); font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--ink-700); }
+.jl-tag button { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; color: var(--ink-400); transition: all var(--t-fast); }
+.jl-tag button:hover { background: var(--ink-100); color: var(--ink-700); }
+.jl-tag button svg { width: 12px; height: 12px; }
+
+/* ============================================================
+   Avatars
+   ============================================================ */
+.jl-avatar { position: relative; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--red-tint); color: var(--red-600); font-weight: var(--fw-bold); font-size: var(--fs-sm); box-shadow: var(--sh-xs); flex: none; }
+.jl-avatar--sm { width: 30px; height: 30px; font-size: var(--fs-xs); }
+.jl-avatar--lg { width: 54px; height: 54px; font-size: var(--fs-h3); }
+.jl-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.jl-avatar .badge-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 2.5px var(--surface); }
+.jl-avatar-stack { display: flex; }
+.jl-avatar-stack .jl-avatar { box-shadow: 0 0 0 2.5px var(--surface); margin-left: -10px; }
+.jl-avatar-stack .jl-avatar:first-child { margin-left: 0; }
+
+/* ============================================================
+   Alerts / Banners
+   ============================================================ */
+.jl-alert { display: flex; gap: var(--s-3); padding: var(--s-4); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--sh-md); }
+.jl-alert .jl-chip { width: 38px; height: 38px; border-radius: var(--r-sm); }
+.jl-alert__body { flex: 1; min-width: 0; }
+.jl-alert__title { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
+.jl-alert__text { font-size: var(--fs-sm); color: var(--ink-500); margin-top: 2px; }
+.jl-alert--red { background: var(--red-50); }
+.jl-alert--green { background: var(--green-tint); }
+.jl-alert--amber { background: var(--amber-tint); }
+.jl-alert--blue { background: var(--blue-tint); }
+
+/* ============================================================
+   Tooltip (CSS only)
+   ============================================================ */
+.jl-tip { position: relative; display: inline-flex; }
+.jl-tip__bubble {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%) translateY(4px);
+  background: var(--ink-900); color: #fff; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  padding: 7px 11px; border-radius: var(--r-sm); white-space: nowrap;
+  box-shadow: var(--sh-lg); opacity: 0; pointer-events: none;
+  transition: opacity var(--t-fast), transform var(--t-fast) var(--ease); z-index: 50;
+}
+.jl-tip__bubble::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--ink-900); }
+.jl-tip:hover .jl-tip__bubble { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============================================================
+   Progress + Skeleton + Spinner
+   ============================================================ */
+.jl-progress { height: 10px; border-radius: var(--r-pill); background: var(--ink-100); box-shadow: var(--sh-inset); overflow: hidden; }
+.jl-progress__bar { height: 100%; border-radius: var(--r-pill); background: linear-gradient(90deg, var(--red-400), var(--red-500)); transition: width var(--t-slow) var(--ease); }
+
+.jl-skeleton { background: linear-gradient(100deg, var(--ink-100) 30%, var(--ink-50) 50%, var(--ink-100) 70%); background-size: 200% 100%; border-radius: var(--r-sm); animation: jl-shimmer 1.4s infinite linear; }
+@keyframes jl-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.jl-spinner { width: 24px; height: 24px; border-radius: 50%; border: 3px solid var(--red-100); border-top-color: var(--red-500); animation: jl-spin .7s linear infinite; }
+.jl-spinner--sm { width: 16px; height: 16px; border-width: 2px; }
+.jl-spinner--lg { width: 36px; height: 36px; border-width: 4px; }
