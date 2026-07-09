@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pencil, Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { JlSelect } from "@/components/ui/jl-select";
 import { useRole } from "@/lib/use-role";
@@ -19,6 +20,14 @@ type Level = "holdingGroup" | "storeGroup" | "group";
 
 const UNASSIGNED = "Unassigned";
 
+// Working copy of the form while a store is being edited.
+interface EditForm {
+  holdingGroup: string;
+  storeGroup: string;
+  group: string;
+  active: boolean;
+}
+
 export default function StoreGroupsPage() {
   const { isAdmin, loading: roleLoading } = useRole();
 
@@ -27,6 +36,10 @@ export default function StoreGroupsPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingStore, setSavingStore] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+
+  // Which store's edit form is open, plus its working values.
+  const [editingStore, setEditingStore] = useState<string | null>(null);
+  const [form, setForm] = useState<EditForm | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,8 +90,9 @@ export default function StoreGroupsPage() {
     const q = query.trim().toLowerCase();
     const filtered = q
       ? rows.filter((r) =>
-          [r.store, r.holdingGroup, r.storeGroup, r.group]
-            .some((v) => (v ?? "").toLowerCase().includes(q)),
+          [r.store, r.holdingGroup, r.storeGroup, r.group].some((v) =>
+            (v ?? "").toLowerCase().includes(q),
+          ),
         )
       : rows;
 
@@ -102,16 +116,45 @@ export default function StoreGroupsPage() {
     [grouped],
   );
 
-  // PATCH a single field for one store, then optimistically reflect the change.
-  const patch = useCallback(
-    async (store: string, patchBody: Partial<Record<Level, string> & { active: boolean }>) => {
+  // Open the inline edit form for a store, seeded with its current assignments.
+  const startEdit = useCallback((r: StoreRow) => {
+    setError(null);
+    setEditingStore(r.store);
+    setForm({
+      holdingGroup: r.holdingGroup ?? "",
+      storeGroup: r.storeGroup ?? "",
+      group: r.group ?? "",
+      active: r.active,
+    });
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setEditingStore(null);
+    setForm(null);
+  }, []);
+
+  // PATCH the full set of edited fields for one store, then reflect the change.
+  const submitEdit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingStore || !form) return;
+      const store = editingStore;
+
       setSavingStore(store);
       setError(null);
       try {
         const res = await fetch("/api/setup/store-groups", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ store, ...patchBody }),
+          // Send strings (never null) so the API's `typeof === "string"` guard
+          // fires; an empty string is trimmed to NULL server-side and clears it.
+          body: JSON.stringify({
+            store,
+            holdingGroup: form.holdingGroup,
+            storeGroup: form.storeGroup,
+            group: form.group,
+            active: form.active,
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -122,44 +165,54 @@ export default function StoreGroupsPage() {
         if (updated) {
           setRows((prev) => prev.map((r) => (r.store === store ? updated : r)));
         }
+        setEditingStore(null);
+        setForm(null);
       } catch {
         setError("Failed to save");
       } finally {
         setSavingStore(null);
       }
     },
-    [],
+    [editingStore, form],
   );
 
   if (roleLoading || loading) {
     return (
       <AppShell>
-        <div className="jl-card jl-card--pad-lg" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span className="jl-spinner jl-spinner--sm" />
-          <span className="jl-sm jl-muted">Loading store groups</span>
-        </div>
+        <main className="mx-auto max-w-6xl">
+          <div
+            className="jl-card jl-card--pad-lg"
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
+            <span className="jl-spinner jl-spinner--sm" />
+            <span className="jl-sm jl-muted">Loading store groups</span>
+          </div>
+        </main>
       </AppShell>
     );
   }
 
+  const editingRow = editingStore
+    ? rows.find((r) => r.store === editingStore) ?? null
+    : null;
+
   return (
     <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <main
+        className="mx-auto max-w-6xl"
+        style={{ display: "flex", flexDirection: "column", gap: 18 }}
+      >
         {/* ---- Header ---- */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span className="jl-chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              </svg>
-            </span>
-            <div>
-              <h1 className="jl-h1">Store Groups</h1>
-            </div>
-          </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <h1 className="jl-h1">Store Groups</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span className="jl-badge">{rows.length} stores</span>
             {!isAdmin && <span className="jl-badge jl-badge--amber">Read only</span>}
@@ -170,7 +223,14 @@ export default function StoreGroupsPage() {
         {error && (
           <div className="jl-alert jl-alert--red" role="alert">
             <span className="jl-chip jl-chip--solid">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
               </svg>
             </span>
@@ -187,10 +247,7 @@ export default function StoreGroupsPage() {
         {/* ---- Search ---- */}
         <div style={{ maxWidth: 380 }}>
           <div className="jl-search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-            </svg>
+            <Search size={16} />
             <input
               placeholder="Search stores or groups"
               value={query}
@@ -199,25 +256,140 @@ export default function StoreGroupsPage() {
           </div>
         </div>
 
-        {/* ---- 3-level editable table ---- */}
+        {/* ---- Inline edit form-card (opens above the table) ---- */}
+        {editingRow && form && (
+          <form
+            onSubmit={submitEdit}
+            className="jl-card"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              padding: 18,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <span className="jl-h3" style={{ color: "var(--ink-900)" }}>
+                {editingRow.store}
+              </span>
+              <span className="jl-sm jl-muted">Edit group assignments</span>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 14,
+              }}
+            >
+              <div className="jl-field">
+                <label>Holding Group</label>
+                <JlSelect
+                  value={form.holdingGroup}
+                  onChange={(v) => setForm((f) => (f ? { ...f, holdingGroup: v } : f))}
+                  options={holdingOptions}
+                  placeholder="Set holding group"
+                  disabled={!isAdmin}
+                />
+              </div>
+              <div className="jl-field">
+                <label>Store Group</label>
+                <JlSelect
+                  value={form.storeGroup}
+                  onChange={(v) => setForm((f) => (f ? { ...f, storeGroup: v } : f))}
+                  options={storeGroupOptions}
+                  placeholder="Set store group"
+                  disabled={!isAdmin}
+                />
+              </div>
+              <div className="jl-field">
+                <label>Group</label>
+                <JlSelect
+                  value={form.group}
+                  onChange={(v) => setForm((f) => (f ? { ...f, group: v } : f))}
+                  options={groupOptions}
+                  placeholder="Set group"
+                  disabled={!isAdmin}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <label className="jl-switch">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  disabled={!isAdmin}
+                  onChange={(e) =>
+                    setForm((f) => (f ? { ...f, active: e.target.checked } : f))
+                  }
+                />
+                <span className="track" />
+                <span className="thumb" />
+                <span className="label">Active</span>
+              </label>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {savingStore === editingRow.store && (
+                  <span className="jl-spinner jl-spinner--sm" />
+                )}
+                <button
+                  type="button"
+                  className="jl-btn jl-btn--ghost"
+                  onClick={cancelEdit}
+                  disabled={savingStore === editingRow.store}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="jl-btn jl-btn--primary"
+                  disabled={!isAdmin || savingStore === editingRow.store}
+                >
+                  Save changes
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* ---- Read-only 3-level table (white card, sunken header, hover rows) ---- */}
         <div className="jl-table-wrap">
           <div style={{ overflowX: "auto" }}>
-            <table className="jl-table" style={{ minWidth: 900 }}>
+            <table className="jl-table" style={{ minWidth: 880 }}>
               <thead>
                 <tr>
                   <th style={{ minWidth: 180 }}>Store</th>
                   <th style={{ minWidth: 200 }}>Holding Group</th>
                   <th style={{ minWidth: 200 }}>Store Group</th>
                   <th style={{ minWidth: 200 }}>Group</th>
-                  <th style={{ width: 120 }}>Active</th>
+                  <th style={{ width: 110 }}>Active</th>
+                  <th style={{ width: 64 }} />
                 </tr>
               </thead>
               <tbody>
                 {totalShown === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "40px 16px" }}>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "40px 16px" }}>
                       <span className="jl-sm jl-muted">
-                        {query ? "No stores match your search." : "No stores configured yet."}
+                        {query
+                          ? "No stores match your search."
+                          : "No stores configured yet."}
                       </span>
                     </td>
                   </tr>
@@ -227,12 +399,9 @@ export default function StoreGroupsPage() {
                       key={g.holding}
                       holding={g.holding}
                       rows={g.rows}
-                      holdingOptions={holdingOptions}
-                      storeGroupOptions={storeGroupOptions}
-                      groupOptions={groupOptions}
-                      savingStore={savingStore}
-                      disabled={!isAdmin}
-                      onPatch={patch}
+                      canEdit={isAdmin}
+                      editingStore={editingStore}
+                      onEdit={startEdit}
                     />
                   ))
                 )}
@@ -240,48 +409,33 @@ export default function StoreGroupsPage() {
             </table>
           </div>
         </div>
-      </div>
+      </main>
     </AppShell>
   );
 }
 
-// ---- One Holding Group section: a banded header row + its store rows. ----
+// ---- One Holding Group section: a plain band header + its read-only rows. ----
 function HoldingGroup({
   holding,
   rows,
-  holdingOptions,
-  storeGroupOptions,
-  groupOptions,
-  savingStore,
-  disabled,
-  onPatch,
+  canEdit,
+  editingStore,
+  onEdit,
 }: {
   holding: string;
   rows: StoreRow[];
-  holdingOptions: { value: string; label: string }[];
-  storeGroupOptions: { value: string; label: string }[];
-  groupOptions: { value: string; label: string }[];
-  savingStore: string | null;
-  disabled: boolean;
-  onPatch: (
-    store: string,
-    body: Partial<Record<Level, string> & { active: boolean }>,
-  ) => void;
+  canEdit: boolean;
+  editingStore: string | null;
+  onEdit: (row: StoreRow) => void;
 }) {
   return (
     <>
       <tr>
         <td
-          colSpan={5}
-          style={{
-            padding: "12px 20px",
-            background: "var(--surface-sunken)",
-          }}
+          colSpan={6}
+          style={{ padding: "10px 20px", background: "var(--surface-sunken)" }}
         >
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-            <span className="jl-eyebrow" style={{ color: "var(--red-600)" }}>
-              Holding Group
-            </span>
             <span className="jl-h3" style={{ color: "var(--ink-900)" }}>
               {holding}
             </span>
@@ -290,53 +444,42 @@ function HoldingGroup({
         </td>
       </tr>
       {rows.map((r) => {
-        const saving = savingStore === r.store;
+        const isEditing = editingStore === r.store;
         return (
-          <tr key={r.store}>
+          <tr
+            key={r.store}
+            style={
+              isEditing ? { background: "var(--red-tint)" } : undefined
+            }
+          >
             <td className="cell-strong" style={{ paddingLeft: 32 }}>
               {r.store}
             </td>
             <td>
-              <JlSelect
-                value={r.holdingGroup ?? ""}
-                onChange={(v) => onPatch(r.store, { holdingGroup: v })}
-                options={holdingOptions}
-                placeholder="Set holding group"
-                disabled={disabled || saving}
-              />
+              {r.holdingGroup ?? <span className="jl-muted">Unassigned</span>}
             </td>
             <td>
-              <JlSelect
-                value={r.storeGroup ?? ""}
-                onChange={(v) => onPatch(r.store, { storeGroup: v })}
-                options={storeGroupOptions}
-                placeholder="Set store group"
-                disabled={disabled || saving}
-              />
+              {r.storeGroup ?? <span className="jl-muted">Unassigned</span>}
+            </td>
+            <td>{r.group ?? <span className="jl-muted">Unassigned</span>}</td>
+            <td>
+              {r.active ? (
+                <span className="jl-badge jl-badge--green">Active</span>
+              ) : (
+                <span className="jl-badge">Inactive</span>
+              )}
             </td>
             <td>
-              <JlSelect
-                value={r.group ?? ""}
-                onChange={(v) => onPatch(r.store, { group: v })}
-                options={groupOptions}
-                placeholder="Set group"
-                disabled={disabled || saving}
-              />
-            </td>
-            <td>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <label className="jl-switch">
-                  <input
-                    type="checkbox"
-                    checked={r.active}
-                    disabled={disabled || saving}
-                    onChange={(e) => onPatch(r.store, { active: e.target.checked })}
-                  />
-                  <span className="track" />
-                  <span className="thumb" />
-                </label>
-                {saving && <span className="jl-spinner jl-spinner--sm" />}
-              </div>
+              {canEdit && (
+                <button
+                  type="button"
+                  className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
+                  aria-label={`Edit ${r.store}`}
+                  onClick={() => onEdit(r)}
+                >
+                  <Pencil size={15} />
+                </button>
+              )}
             </td>
           </tr>
         );

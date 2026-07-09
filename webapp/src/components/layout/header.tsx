@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { User, Search, Menu, ChevronDown, KeyRound, LogOut } from "lucide-react";
+import { Search, Menu, ChevronDown, KeyRound, LogOut } from "lucide-react";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { MobileNavDrawer } from "@/components/layout/sidebar";
 
 function openCommandPalette() {
-  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+  // CommandPalette self-registers this event (same path app-shell + bottom nav use).
+  window.dispatchEvent(new Event("jl:open-command-palette"));
 }
 
 /* Profile / avatar dropdown. Uses the Jetline UI kit .jl-dropdown + .jl-menu.
@@ -111,7 +112,17 @@ export function Header() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6">
+    <header
+      className="flex items-center justify-between px-4 md:px-6"
+      style={{
+        height: 64,
+        flex: "none",
+        background: "var(--surface)",
+        boxShadow: "var(--sh-sm)",
+        zIndex: 1,
+        fontFamily: "var(--font)",
+      }}
+    >
       {/* Left: mobile hamburger + logo (mobile) / desktop search trigger */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {/* Mobile: hamburger */}
@@ -135,26 +146,46 @@ export function Header() {
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Mobile: JetlineFleet logo */}
-        <div className="jl-show-mobile" style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-          <span style={{ fontSize: 18, fontWeight: 900, color: "var(--ink-900)", letterSpacing: "-0.03em", lineHeight: 1 }}>
-            Jetline
-          </span>
-          <span
+        {/* Mobile: brand mark + Fleet wordmark (matches sidebar brand block) */}
+        <div className="jl-show-mobile" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div
             style={{
-              fontSize: 18,
-              fontWeight: 900,
+              width: 32,
+              height: 32,
+              flex: "none",
+              borderRadius: "var(--r-sm)",
+              background:
+                "linear-gradient(160deg, var(--red-400), var(--red-500) 55%, var(--red-600))",
+              boxShadow: "var(--sh-red)",
+              display: "grid",
+              placeItems: "center",
               color: "#fff",
-              background: "var(--red-500)",
-              borderRadius: 8,
-              padding: "2px 8px 3px 6px",
-              marginLeft: 4,
-              letterSpacing: "-0.02em",
-              lineHeight: 1,
+              fontWeight: 800,
+              fontSize: 15,
             }}
           >
-            Fleet
-          </span>
+            J
+          </div>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: "var(--ink-900)", letterSpacing: "-0.03em", lineHeight: 1 }}>
+              Jetline
+            </span>
+            <span
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                color: "#fff",
+                background: "var(--red-500)",
+                borderRadius: 8,
+                padding: "2px 8px 3px 6px",
+                marginLeft: 4,
+                letterSpacing: "-0.02em",
+                lineHeight: 1,
+              }}
+            >
+              Fleet
+            </span>
+          </div>
         </div>
 
         {/* Desktop: full search trigger */}

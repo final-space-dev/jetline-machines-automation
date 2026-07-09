@@ -9,11 +9,10 @@ import { JlSelect } from "@/components/ui/jl-select";
 import { getStoreGroup, getMainGroups, getStoreGroupsByMain } from "@/lib/store-groups";
 import { toast } from "sonner";
 import {
-  Plus, Search, ChevronRight, ChevronDown, Package, Printer,
+  Plus, Search, ChevronRight, ChevronDown, Package,
   X, Download,
 } from "lucide-react";
 import { CompletenessBadge } from "@/components/equipment/completeness-badge";
-import { formatK } from "@/components/equipment/print-section";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -230,22 +229,6 @@ function ConditionBar({ good, fair, poor, unknown }: { good: number; fair: numbe
   );
 }
 
-function ConditionLegend({ good, fair, poor }: { good: number; fair: number; poor: number }) {
-  const items = [
-    { label: "Good", val: good, color: "var(--green-700)" },
-    { label: "Fair", val: fair, color: "var(--amber-700)" },
-    { label: "Poor", val: poor, color: "var(--red-600)" },
-  ].filter((x) => x.val > 0);
-  if (items.length === 0) return null;
-  return (
-    <div style={{ display: "flex", gap: 10, marginTop: 7 }}>
-      {items.map((x) => (
-        <span key={x.label} style={{ fontSize: 10.5, fontWeight: 700, color: x.color }}>{x.val} {x.label}</span>
-      ))}
-    </div>
-  );
-}
-
 // ─── Store Card ───────────────────────────────────────────────────────────────
 
 function StoreCard({ store, onAdd, score }: { store: ResolvedStore; onAdd: (storeName: string) => void; score?: number | null }) {
@@ -256,86 +239,57 @@ function StoreCard({ store, onAdd, score }: { store: ResolvedStore; onAdd: (stor
   const groupLabel = store.storeGroup && store.storeGroup !== UNGROUPED_SUB ? store.storeGroup : undefined;
 
   return (
-    <div
-      className="jl-card jl-card--pad-sm"
-      style={{ display: "flex", flexDirection: "column", gap: 14, opacity: hasData ? 1 : 0.9 }}
+    <a
+      href={`/equipment/stores/${encodeURIComponent(store.name)}`}
+      className="jl-card jl-card--pad-sm jl-card--interactive"
+      style={{ display: "flex", flexDirection: "column", gap: 16, textDecoration: "none", color: "inherit" }}
+      title={`Open ${store.name}`}
     >
-      {/* Store name + actions */}
+      {/* Store name + open affordance */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span className={hasData ? "jl-dot jl-dot--green" : "jl-dot jl-dot--amber"} title={hasData ? "Has equipment data" : "No equipment data yet"} />
             <p className="jl-h3" style={{ letterSpacing: "-0.01em" }}>{store.name}</p>
           </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-            {groupLabel && (
+          {groupLabel && (
+            <div style={{ marginTop: 10 }}>
               <span className="jl-badge jl-badge--blue">{groupLabel}</span>
-            )}
-            <span className={hasData ? "jl-badge jl-badge--green" : "jl-badge"}>
-              <Package size={12} />
-              {hasData ? `${total} items` : "No data yet"}
-            </span>
-            {store.machine_count > 0 && (
-              <span className="jl-badge">
-                <Printer size={12} /> {store.machine_count} printers
-              </span>
-            )}
-            {typeof store.monthlyVolume === "number" && store.monthlyVolume > 0 && (
-              <span
-                className="jl-badge"
-                title={`${store.monthlyVolume.toLocaleString("en-ZA")} prints in the last 30 days`}
-              >
-                {formatK(store.monthlyVolume)} prints
-              </span>
-            )}
-            {store.printerHealth && store.printerHealth.active > 0 && (
-              <span
-                className={store.printerHealth.replaceFlagged > 0 ? "jl-badge jl-badge--amber" : "jl-badge jl-badge--green"}
-                title={`${store.printerHealth.active} active printer${store.printerHealth.active !== 1 ? "s" : ""}, ${store.printerHealth.replaceFlagged} flagged for replacement`}
-              >
-                {store.printerHealth.active} active
-                {store.printerHealth.replaceFlagged > 0 ? ` / ${store.printerHealth.replaceFlagged} replace` : ""}
-              </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-          <button
-            onClick={() => onAdd(store.name)}
-            className="jl-btn jl-btn--soft jl-btn--icon jl-btn--sm"
-            title="Add equipment"
-            aria-label={`Add equipment to ${store.name}`}
-          ><Plus size={15} /></button>
-          <a
-            href={`/equipment/stores/${encodeURIComponent(store.name)}`}
-            className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-            title="Open store"
-            aria-label={`Open ${store.name}`}
-          ><ChevronRight size={15} /></a>
-        </div>
+        <ChevronRight size={18} style={{ color: "var(--ink-300)", flexShrink: 0, marginTop: 2 }} />
       </div>
 
-      {/* Condition health bar */}
-      {hasData && total > 0 && (
-        <div>
+      {/* One secondary line: item count + thin condition bar */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: "auto" }}>
+        <p className="jl-muted" style={{ fontSize: 13, fontWeight: 600 }}>
+          {hasData ? `${total} ${total === 1 ? "item" : "items"}` : "No equipment data yet"}
+        </p>
+        {hasData && total > 0 && (
           <ConditionBar good={good} fair={fair} poor={poor} unknown={unknown} />
-          <ConditionLegend good={good} fair={fair} poor={poor} />
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Completeness badge (bottom-right) */}
-      {typeof score === "number" && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto" }}>
-          <a
-            href={`/stores/${encodeURIComponent(store.name)}/completeness`}
-            style={{ textDecoration: "none" }}
+      {/* Footer: add action + completeness score */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAdd(store.name); }}
+          className="jl-btn jl-btn--soft jl-btn--sm"
+          title="Add equipment"
+          aria-label={`Add equipment to ${store.name}`}
+        ><Plus size={14} /> Add</button>
+        {typeof score === "number" && (
+          <span
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/stores/${encodeURIComponent(store.name)}/completeness`; }}
+            style={{ cursor: "pointer" }}
             title="View data completeness breakdown"
           >
             <CompletenessBadge score={score} />
-          </a>
-        </div>
-      )}
-    </div>
+          </span>
+        )}
+      </div>
+    </a>
   );
 }
 
@@ -394,10 +348,7 @@ function GroupHeaderCard({
 
       <div style={{ flex: 1, minWidth: 120, maxWidth: 360 }}>
         {bucket.totalEquipment > 0 && (
-          <>
-            <ConditionBar good={bucket.good} fair={bucket.fair} poor={bucket.poor} unknown={unknown} />
-            <ConditionLegend good={bucket.good} fair={bucket.fair} poor={bucket.poor} />
-          </>
+          <ConditionBar good={bucket.good} fair={bucket.fair} poor={bucket.poor} unknown={unknown} />
         )}
       </div>
     </button>

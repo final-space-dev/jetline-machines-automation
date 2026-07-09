@@ -124,35 +124,17 @@ export default function EquipmentModelsCataloguePage() {
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return null;
     return sortDir === "asc"
-      ? <ChevronUp size={13} style={{ marginLeft: 4 }} />
-      : <ChevronDown size={13} style={{ marginLeft: 4 }} />;
-  };
-
-  const headBtnStyle: React.CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    font: "inherit",
-    color: "inherit",
-    letterSpacing: "inherit",
-    textTransform: "inherit" as React.CSSProperties["textTransform"],
-    cursor: "pointer",
+      ? <ChevronUp className="w-3.5 h-3.5" />
+      : <ChevronDown className="w-3.5 h-3.5" />;
   };
 
   return (
     <AppShell>
-      <div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "var(--s-6)",
-            gap: "var(--s-3)",
-            flexWrap: "wrap",
-          }}
-        >
+      <div className="space-y-4">
+        {/* Header + filters */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="jl-h1" style={{ margin: 0 }}>Model Catalogue</h1>
-          <div style={{ display: "flex", gap: "var(--s-3)", alignItems: "center", flexWrap: "wrap" }}>
+          <div className="flex items-center gap-3 flex-wrap">
             <div className="jl-search" style={{ width: 260 }}>
               <Search />
               <input
@@ -171,60 +153,72 @@ export default function EquipmentModelsCataloguePage() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="jl-card" style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-9)" }}>
-            Loading catalogue
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="jl-card" style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-9)" }}>
-            No models match your filters.
-          </div>
-        ) : (
-          <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
-            <table className="jl-table" style={{ minWidth: 720 }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 36 }} aria-hidden />
-                  <th>
-                    <button style={headBtnStyle} onClick={() => toggleSort("name")}>
-                      Model {sortIcon("name")}
-                    </button>
-                  </th>
-                  <th>
-                    <button style={headBtnStyle} onClick={() => toggleSort("manufacturer")}>
-                      Manufacturer {sortIcon("manufacturer")}
-                    </button>
-                  </th>
-                  <th>
-                    <button style={headBtnStyle} onClick={() => toggleSort("equipment_type")}>
-                      Type {sortIcon("equipment_type")}
-                    </button>
-                  </th>
-                  <th className="num">
-                    <button
-                      style={{ ...headBtnStyle, justifyContent: "flex-end", width: "100%" }}
-                      onClick={() => toggleSort("item_count")}
-                    >
-                      Items {sortIcon("item_count")}
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((m) => (
-                  <FragmentRow
-                    key={m.id}
-                    model={m}
-                    open={expandedId === m.id}
-                    items={items}
-                    itemsLoading={itemsLoading}
-                    onToggle={() => void openModel(m)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Catalogue table */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500 text-sm">Loading catalogue</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 text-sm">No models match your filters.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="w-9 px-4 py-2" aria-hidden />
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 uppercase hover:text-gray-900"
+                        onClick={() => toggleSort("name")}
+                      >
+                        Model {sortIcon("name")}
+                      </button>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 uppercase hover:text-gray-900"
+                        onClick={() => toggleSort("manufacturer")}
+                      >
+                        Manufacturer {sortIcon("manufacturer")}
+                      </button>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 uppercase hover:text-gray-900"
+                        onClick={() => toggleSort("equipment_type")}
+                      >
+                        Type {sortIcon("equipment_type")}
+                      </button>
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 uppercase hover:text-gray-900"
+                        onClick={() => toggleSort("item_count")}
+                      >
+                        Items {sortIcon("item_count")}
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filtered.map((m) => (
+                    <FragmentRow
+                      key={m.id}
+                      model={m}
+                      open={expandedId === m.id}
+                      items={items}
+                      itemsLoading={itemsLoading}
+                      onToggle={() => void openModel(m)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </AppShell>
   );
@@ -245,18 +239,18 @@ function FragmentRow({
 }) {
   return (
     <>
-      <tr style={{ cursor: "pointer" }} onClick={onToggle}>
-        <td style={{ width: 36, color: "var(--ink-400)" }}>
-          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+      <tr className="hover:bg-gray-50 cursor-pointer" onClick={onToggle}>
+        <td className="px-4 py-3 text-gray-400">
+          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </td>
-        <td className="cell-strong">{model.name}</td>
-        <td>
-          {model.manufacturer || <span style={{ color: "var(--ink-400)" }}>Not set</span>}
+        <td className="px-4 py-3 text-sm font-medium text-gray-900">{model.name}</td>
+        <td className="px-4 py-3 text-sm text-gray-700">
+          {model.manufacturer || <span className="text-gray-400">Not set</span>}
         </td>
-        <td>
+        <td className="px-4 py-3">
           <span className="jl-badge jl-badge--blue">{model.equipment_type}</span>
         </td>
-        <td className="num">
+        <td className="px-4 py-3 text-right">
           <span className={`jl-badge ${model.item_count > 0 ? "jl-badge--green" : ""}`}>
             {model.item_count}
           </span>
@@ -265,43 +259,41 @@ function FragmentRow({
 
       {open && (
         <tr>
-          <td colSpan={5} style={{ padding: 0, background: "var(--surface-sunken)" }}>
+          <td colSpan={5} className="p-0 bg-gray-50">
             {itemsLoading ? (
-              <div style={{ padding: "var(--s-5)", textAlign: "center", color: "var(--ink-400)", fontSize: "var(--fs-sm)" }}>
-                Loading items
-              </div>
+              <div className="text-center py-5 text-gray-500 text-sm">Loading items</div>
             ) : items.length === 0 ? (
-              <div style={{ padding: "var(--s-5)", textAlign: "center", color: "var(--ink-400)", fontSize: "var(--fs-sm)" }}>
-                No items are using this model yet.
-              </div>
+              <div className="text-center py-5 text-gray-500 text-sm">No items are using this model yet.</div>
             ) : (
-              <div style={{ padding: "var(--s-3) var(--s-4) var(--s-4)", overflowX: "auto" }}>
-                <table className="jl-table" style={{ minWidth: 640, background: "var(--surface)", borderRadius: "var(--r-md)", boxShadow: "var(--sh-sm)", overflow: "hidden" }}>
-                  <thead>
-                    <tr>
-                      <th>Store</th>
-                      <th>Serial</th>
-                      <th>Located At</th>
-                      <th>Condition</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((it) => (
-                      <tr
-                        key={it.id}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => { window.location.href = `/equipment/items/${it.id}`; }}
-                      >
-                        <td className="cell-strong">{it.store}</td>
-                        <td>{it.serial || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
-                        <td>{it.located_at || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
-                        <td>{it.condition || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
-                        <td>{it.status || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
+              <div className="p-4 overflow-x-auto">
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <table className="w-full" style={{ minWidth: 640 }}>
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Store</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Serial</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Located At</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Condition</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {items.map((it) => (
+                        <tr
+                          key={it.id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => { window.location.href = `/equipment/items/${it.id}`; }}
+                        >
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{it.store}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{it.serial || <span className="text-gray-400">Not set</span>}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{it.located_at || <span className="text-gray-400">Not set</span>}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{it.condition || <span className="text-gray-400">Not set</span>}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{it.status || <span className="text-gray-400">Not set</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </td>

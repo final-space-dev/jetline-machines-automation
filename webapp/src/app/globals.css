@@ -313,6 +313,22 @@ textarea:focus-visible,
   .jl-cmd-panel > div:nth-child(2) { max-height: none !important; flex: 1 !important; }
 }
 
+/* ─── Tailwind color overrides — map gray-* to ink-* tokens ─────────── */
+/* Ensures Tailwind gray-* utilities (used by the courier-style table/form
+   pattern) pick up the cool-slate ink palette instead of Tailwind defaults. */
+:root {
+  --color-gray-50:  var(--ink-50);
+  --color-gray-100: var(--ink-100);
+  --color-gray-200: var(--ink-200);
+  --color-gray-300: var(--ink-300);
+  --color-gray-400: var(--ink-400);
+  --color-gray-500: var(--ink-500);
+  --color-gray-600: var(--ink-600);
+  --color-gray-700: var(--ink-700);
+  --color-gray-800: var(--ink-800);
+  --color-gray-900: var(--ink-900);
+}
+
 @media print {
   /* Hide chrome when printing equipment pages */
   nav, aside, header, [data-sidebar], .sync-panel, .jl-bottom-nav { display: none !important; }

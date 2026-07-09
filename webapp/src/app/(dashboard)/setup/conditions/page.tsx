@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageLoading } from "@/components/ui/page-loading";
 import { JlSelect } from "@/components/ui/jl-select";
-import { Plus, Check, X, Pencil, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
 
 interface ConditionRow {
   id: number;
@@ -39,15 +39,11 @@ export default function ConditionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [newLabel, setNewLabel] = useState("");
-  const [newColor, setNewColor] = useState("grey");
-  const [newKeywords, setNewKeywords] = useState("");
-  const [adding, setAdding] = useState(false);
-
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editLabel, setEditLabel] = useState("");
-  const [editColor, setEditColor] = useState("grey");
-  const [editKeywords, setEditKeywords] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [label, setLabel] = useState("");
+  const [color, setColor] = useState("grey");
+  const [keywords, setKeywords] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -65,48 +61,53 @@ export default function ConditionsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function addCondition() {
-    const label = newLabel.trim();
-    if (!label || adding) return;
-    setAdding(true);
+  function openCreate() {
+    setEditingId(null);
+    setLabel("");
+    setColor("grey");
+    setKeywords("");
     setError(null);
-    try {
-      const res = await fetch("/api/setup/conditions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label, color: newColor, keywords: newKeywords }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to add"); return; }
-      setNewLabel(""); setNewColor("grey"); setNewKeywords("");
-      await load();
-    } finally {
-      setAdding(false);
-    }
+    setIsCreating(true);
   }
 
-  function startEdit(row: ConditionRow) {
-    setEditId(row.id);
-    setEditLabel(row.label);
-    setEditColor(row.color);
-    setEditKeywords(row.keywords.join(", "));
+  function openEdit(row: ConditionRow) {
+    setEditingId(row.id);
+    setLabel(row.label);
+    setColor(row.color);
+    setKeywords(row.keywords.join(", "));
+    setError(null);
+    setIsCreating(true);
   }
 
-  async function saveEdit() {
-    if (editId === null || saving) return;
-    const label = editLabel.trim();
-    if (!label) return;
+  function closeForm() {
+    setIsCreating(false);
+    setEditingId(null);
+    setLabel("");
+    setColor("grey");
+    setKeywords("");
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = label.trim();
+    if (!trimmed || saving) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/setup/conditions", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editId, label, color: editColor, keywords: editKeywords }),
-      });
+      const res = editingId === null
+        ? await fetch("/api/setup/conditions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label: trimmed, color, keywords }),
+          })
+        : await fetch("/api/setup/conditions", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: editingId, label: trimmed, color, keywords }),
+          });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed to save"); return; }
-      setEditId(null);
+      closeForm();
       await load();
     } finally {
       setSaving(false);
@@ -128,180 +129,117 @@ export default function ConditionsPage() {
     return <AppShell><PageLoading variant="table" /></AppShell>;
   }
 
-  const canAdd = !!newLabel.trim() && !adding;
-
   return (
     <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-5)", maxWidth: 980 }}>
-        <h1 className="jl-h1">Conditions</h1>
-
-        {error && (
-          <div className="jl-alert jl-alert--red" role="alert">
-            <span className="jl-chip jl-chip--solid" style={{ width: 38, height: 38, borderRadius: "var(--r-sm)" }}>
-              <X strokeWidth={2} />
-            </span>
-            <div className="jl-alert__body">
-              <div className="jl-alert__text" style={{ marginTop: 0, color: "var(--red-600)", fontWeight: 600 }}>{error}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Add row pinned above the table */}
-        <div className="jl-card jl-card--pad-sm">
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(160px,1fr) 150px minmax(200px,1.4fr) auto", gap: "var(--s-3)", alignItems: "center" }}>
-            <input
-              className="jl-input"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") addCondition(); }}
-              placeholder="Condition label"
-              aria-label="New condition label"
-            />
-            <JlSelect value={newColor} onChange={setNewColor} options={COLOR_OPTIONS} />
-            <input
-              className="jl-input"
-              value={newKeywords}
-              onChange={(e) => setNewKeywords(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") addCondition(); }}
-              placeholder="Keyword triggers (comma separated)"
-              aria-label="New condition keywords"
-            />
-            <button
-              type="button"
-              className="jl-btn jl-btn--primary"
-              onClick={addCondition}
-              disabled={!canAdd}
-              data-loading={adding ? "" : undefined}
-            >
-              <Plus /> Add
-            </button>
-          </div>
+      <div className="max-w-5xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">Conditions</h1>
+          <button type="button" onClick={openCreate} className="jl-btn jl-btn--primary jl-btn--sm">
+            <Plus className="w-4 h-4" />
+            New Condition
+          </button>
         </div>
 
-        <div className="jl-table-wrap">
-          <table className="jl-table">
-            <thead>
-              <tr>
-                <th style={{ width: 190 }}>Label</th>
-                <th style={{ width: 150 }}>Colour</th>
-                <th>Keyword Triggers</th>
-                <th style={{ width: 120, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
+        {error && (
+          <div className="bg-red-50 rounded-lg p-2 text-sm text-red-700">{error}</div>
+        )}
+
+        {isCreating && (
+          <form onSubmit={handleSubmit} className="space-y-3 bg-white rounded-xl shadow-sm p-4">
+            <h2 className="text-sm font-bold text-gray-900">
+              {editingId === null ? "New Condition" : "Edit Condition"}
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Label *</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  className="jl-input"
+                  required
+                  placeholder="e.g. Needs Repair"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Colour</label>
+                <JlSelect value={color} onChange={setColor} options={COLOR_OPTIONS} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Keyword Triggers</label>
+              <input
+                type="text"
+                value={keywords}
+                onChange={(e) => setKeywords(e.target.value)}
+                className="jl-input"
+                placeholder="Comma separated, e.g. broken, jam, error"
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <button type="button" onClick={closeForm} className="jl-btn jl-btn--ghost flex-1">Cancel</button>
+              <button type="submit" disabled={saving} className="jl-btn jl-btn--primary flex-1">
+                {editingId === null ? "Create" : "Update"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {rows.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 text-sm">No conditions yet. Create one to get started.</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-7)" }}>
-                    No conditions yet. Add one above.
-                  </td>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Label</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Colour</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Keyword Triggers</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
-              ) : (
-                rows.map((row) => {
-                  const editing = editId === row.id;
-                  return (
-                    <tr key={row.id}>
-                      <td>
-                        {editing ? (
-                          <input
-                            autoFocus
-                            className="jl-input"
-                            style={{ height: 36 }}
-                            value={editLabel}
-                            onChange={(e) => setEditLabel(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveEdit();
-                              if (e.key === "Escape") setEditId(null);
-                            }}
-                            aria-label="Edit label"
-                          />
-                        ) : (
-                          <span className="cell-strong">{row.label}</span>
-                        )}
-                      </td>
-                      <td>
-                        {editing ? (
-                          <JlSelect value={editColor} onChange={setEditColor} options={COLOR_OPTIONS} style={{ maxWidth: 140 }} />
-                        ) : (
-                          colorBadge(row.color, COLOR_OPTIONS.find((c) => c.value === row.color)?.label ?? row.color)
-                        )}
-                      </td>
-                      <td>
-                        {editing ? (
-                          <input
-                            className="jl-input"
-                            style={{ height: 36 }}
-                            value={editKeywords}
-                            onChange={(e) => setEditKeywords(e.target.value)}
-                            placeholder="comma, separated, keywords"
-                            aria-label="Edit keywords"
-                          />
-                        ) : (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-2)" }}>
-                            {row.keywords.length === 0 ? (
-                              <span style={{ color: "var(--ink-400)", fontSize: "var(--fs-xs)" }}>None</span>
-                            ) : (
-                              row.keywords.map((k) => (
-                                <span key={k} className="jl-tag" style={{ height: 24 }}>{k}</span>
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: "var(--s-2)" }}>
-                          {editing ? (
-                            <>
-                              <button
-                                type="button"
-                                className="jl-btn jl-btn--soft jl-btn--icon jl-btn--sm"
-                                onClick={saveEdit}
-                                disabled={saving}
-                                aria-label="Save"
-                                title="Save"
-                              >
-                                <Check />
-                              </button>
-                              <button
-                                type="button"
-                                className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                onClick={() => setEditId(null)}
-                                aria-label="Cancel"
-                                title="Cancel"
-                              >
-                                <X />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                onClick={() => startEdit(row)}
-                                aria-label="Edit"
-                                title="Edit"
-                              >
-                                <Pencil />
-                              </button>
-                              <button
-                                type="button"
-                                className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                onClick={() => deleteCondition(row.id)}
-                                aria-label="Delete"
-                                title="Delete"
-                                style={{ color: "var(--red-500)" }}
-                              >
-                                <Trash2 />
-                              </button>
-                            </>
-                          )}
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rows.map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.label}</td>
+                    <td className="px-4 py-3">
+                      {colorBadge(row.color, COLOR_OPTIONS.find((c) => c.value === row.color)?.label ?? row.color)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.keywords.length === 0 ? (
+                        <span className="text-xs text-gray-400">None</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {row.keywords.map((k) => (
+                            <span key={k} className="jl-tag" style={{ height: 24 }}>{k}</span>
+                          ))}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(row)}
+                        className="p-1 hover:bg-gray-100 rounded mr-1"
+                        aria-label="Edit"
+                      >
+                        <Edit className="w-3.5 h-3.5 text-gray-500" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteCondition(row.id)}
+                        className="p-1 hover:bg-red-50 rounded"
+                        aria-label="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </AppShell>

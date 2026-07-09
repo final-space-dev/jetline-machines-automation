@@ -31,11 +31,11 @@
   --ink-100: #e9edf2;
   --ink-50:  #f1f4f8;
 
-  /* Inverted per brand direction: page is pure white, cards carry a soft grey
-     tint + shadow so they lift off the white. */
-  --canvas:  #ffffff;   /* page background — pure white */
-  --surface: #f3f5f8;   /* cards, sheets — soft grey tint */
-  --surface-sunken: #eef1f5;  /* nested/inset surfaces, one step deeper */
+  /* Matches jetline-whatsapp-business / jetline-courier-system: grey page,
+     white cards. Separation via shadow + soft fill, no hard borders. */
+  --canvas:  #f4f6f9;   /* page background — grey */
+  --surface: #ffffff;   /* cards, sheets — white */
+  --surface-sunken: #f7f9fb;  /* inset wells */
 
   /* ---- Semantic ------------------------------------------ */
   --green-500: #14a44d; --green-tint: rgba(20,164,77,.10); --green-700:#0c7a38;

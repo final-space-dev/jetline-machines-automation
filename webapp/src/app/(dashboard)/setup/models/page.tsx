@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Check, X, Upload } from "lucide-react";
+import { Plus, Edit, Trash2, Upload, X } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { JlSelect } from "@/components/ui/jl-select";
+import { useRole } from "@/lib/use-role";
 
 interface ModelRow {
   id: number;
@@ -37,16 +38,20 @@ function draftFromRow(r: ModelRow): Draft {
 }
 
 export default function SetupModelsPage() {
+  const { isAdmin, loading: roleLoading } = useRole();
+
   const [rows, setRows] = useState<ModelRow[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [adding, setAdding] = useState(false);
-  const [addDraft, setAddDraft] = useState<Draft>(EMPTY_DRAFT);
+  // Single form state serves both Create and Edit. editingId === null while
+  // creating; a real <form> card above the table handles both, no inline cells.
+  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -77,52 +82,49 @@ export default function SetupModelsPage() {
 
   const typeOptions = types.map((t) => ({ value: t, label: t }));
 
-  async function createModel(draft: Draft): Promise<boolean> {
-    if (!draft.name.trim() || !draft.equipment_type.trim()) {
-      setError("Name and type are required");
-      return false;
-    }
-    setBusy(true);
+  function openCreate() {
+    setEditingId(null);
+    setDraft(EMPTY_DRAFT);
     setError(null);
-    try {
-      const res = await fetch("/api/setup/models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setError(j.error || "Could not add model");
-        return false;
-      }
-      await load();
-      return true;
-    } finally {
-      setBusy(false);
-    }
+    setNotice(null);
+    setShowForm(true);
   }
 
-  async function saveEdit() {
-    if (editingId == null) return;
-    if (!editDraft.name.trim() || !editDraft.equipment_type.trim()) {
-      setError("Name and type are required");
+  function openEdit(r: ModelRow) {
+    setEditingId(r.id);
+    setDraft(draftFromRow(r));
+    setError(null);
+    setNotice(null);
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setError(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.name.trim() || !draft.equipment_type.trim()) {
+      setError("Model name and type are required.");
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/setup/models", {
-        method: "PATCH",
+        method: editingId == null ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingId, ...editDraft }),
+        body: JSON.stringify(editingId == null ? draft : { id: editingId, ...draft }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setError(j.error || "Could not save model");
+        setError(j.error || (editingId == null ? "Could not add model." : "Could not save model."));
         return;
       }
-      setEditingId(null);
       await load();
+      closeForm();
     } finally {
       setBusy(false);
     }
@@ -136,9 +138,10 @@ export default function SetupModelsPage() {
       const res = await fetch(`/api/setup/models?id=${id}`, { method: "DELETE" });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setError(j.error || "Could not delete model");
+        setError(j.error || "Could not delete model.");
         return;
       }
+      if (editingId === id) closeForm();
       await load();
     } finally {
       setBusy(false);
@@ -151,6 +154,7 @@ export default function SetupModelsPage() {
   async function importCsv(file: File) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const text = await file.text();
       const drafts = parseCsv(text);
@@ -170,273 +174,217 @@ export default function SetupModelsPage() {
         else skipped++;
       }
       await load();
-      setError(`Imported ${ok} model(s)${skipped ? `, skipped ${skipped} (duplicate or invalid)` : ""}.`);
+      setNotice(`Imported ${ok} model(s)${skipped ? `, skipped ${skipped} (duplicate or invalid)` : ""}.`);
     } catch {
-      setError("Could not read CSV file");
+      setError("Could not read CSV file.");
     } finally {
       setBusy(false);
     }
   }
 
+  if (roleLoading) {
+    return (
+      <AppShell>
+        <div className="bg-white rounded-xl shadow-sm p-6 text-sm text-gray-500">Loading</div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-5)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-4)", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span className="jl-chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <path d="M3 9h18M9 20V9" />
-              </svg>
-            </span>
-            <h1 className="jl-h1">Model Catalogue</h1>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-3)" }}>
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <h1 className="jl-h1" style={{ margin: 0 }}>Model Catalogue</h1>
             <span className="jl-badge">{rows.length} models</span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void importCsv(f);
-                e.target.value = "";
-              }}
-            />
-            <button
-              type="button"
-              className="jl-btn jl-btn--secondary"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload /> Import CSV
-            </button>
-            <button
-              type="button"
-              className="jl-btn jl-btn--primary"
-              disabled={busy || adding}
-              onClick={() => { setAdding(true); setAddDraft(EMPTY_DRAFT); setError(null); }}
-            >
-              <Plus /> Add Model
-            </button>
+            {!isAdmin && <span className="jl-badge jl-badge--amber">Read only</span>}
           </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void importCsv(f);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                className="jl-btn jl-btn--secondary"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload /> Import CSV
+              </button>
+              <button
+                type="button"
+                className="jl-btn jl-btn--primary"
+                disabled={busy}
+                onClick={openCreate}
+              >
+                <Plus /> Add Model
+              </button>
+            </div>
+          )}
         </div>
 
+        {/* Notice / error banners */}
         {error && (
-          <div className="jl-alert jl-alert--red" role="alert">
-            <span className="jl-chip jl-chip--solid">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-              </svg>
-            </span>
-            <div className="jl-alert__body">
-              <div className="jl-alert__title">Notice</div>
-              <div className="jl-alert__text">{error}</div>
-            </div>
-            <button type="button" className="jl-btn jl-btn--soft jl-btn--sm" onClick={() => setError(null)}>
-              Dismiss
+          <div className="bg-red-50 rounded-lg p-3 text-sm text-red-700 flex items-start justify-between gap-3">
+            <span>{error}</span>
+            <button type="button" className="p-0.5 hover:bg-red-100 rounded" onClick={() => setError(null)} aria-label="Dismiss">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        {notice && (
+          <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 flex items-start justify-between gap-3">
+            <span>{notice}</span>
+            <button type="button" className="p-0.5 hover:bg-gray-100 rounded" onClick={() => setNotice(null)} aria-label="Dismiss">
+              <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        <div className="jl-table-wrap">
-          <div style={{ overflowX: "auto" }}>
-            <table className="jl-table" style={{ minWidth: 880 }}>
-              <thead>
-                <tr>
-                  <th>Model Name</th>
-                  <th>Manufacturer</th>
-                  <th>Type</th>
-                  <th className="num">Year</th>
-                  <th className="num">Items</th>
-                  <th style={{ width: 120, textAlign: "right" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {adding && (
-                  <tr>
-                    <td>
-                      <input
-                        autoFocus
-                        className="jl-input"
-                        style={{ height: 36 }}
-                        placeholder="Polar Mohr 76 EM"
-                        value={addDraft.name}
-                        onChange={(e) => setAddDraft({ ...addDraft, name: e.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="jl-input"
-                        style={{ height: 36 }}
-                        placeholder="Polar Mohr"
-                        value={addDraft.manufacturer}
-                        onChange={(e) => setAddDraft({ ...addDraft, manufacturer: e.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <JlSelect
-                        value={addDraft.equipment_type}
-                        onChange={(v) => setAddDraft({ ...addDraft, equipment_type: v })}
-                        options={typeOptions}
-                        placeholder="Select type"
-                        style={{ minWidth: 170 }}
-                      />
-                    </td>
-                    <td className="num">
-                      <input
-                        className="jl-input"
-                        style={{ height: 36, width: 84, textAlign: "right" }}
-                        placeholder="2019"
-                        inputMode="numeric"
-                        value={addDraft.year_introduced}
-                        onChange={(e) => setAddDraft({ ...addDraft, year_introduced: e.target.value.replace(/[^\d]/g, "") })}
-                      />
-                    </td>
-                    <td className="num" style={{ color: "var(--ink-400)" }}>0</td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                      <div style={{ display: "inline-flex", gap: "var(--s-2)" }}>
-                        <button
-                          type="button"
-                          className="jl-btn jl-btn--soft jl-btn--icon jl-btn--sm"
-                          title="Save"
-                          aria-label="Save"
-                          disabled={busy}
-                          onClick={async () => { if (await createModel(addDraft)) setAdding(false); }}
-                        >
-                          <Check />
-                        </button>
-                        <button
-                          type="button"
-                          className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                          title="Cancel"
-                          aria-label="Cancel"
-                          onClick={() => { setAdding(false); setError(null); }}
-                        >
-                          <X />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )}
+        {/* Create / Edit form card: real form, no inline table editing */}
+        {showForm && isAdmin && (
+          <form onSubmit={handleSubmit} className="space-y-3 bg-white rounded-xl shadow-sm p-4">
+            <h2 className="text-sm font-bold text-gray-900">
+              {editingId == null ? "Add Model" : "Edit Model"}
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Model Name *</label>
+                <input
+                  autoFocus
+                  className="jl-input"
+                  placeholder="Polar Mohr 76 EM"
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Manufacturer</label>
+                <input
+                  className="jl-input"
+                  placeholder="Polar Mohr"
+                  value={draft.manufacturer}
+                  onChange={(e) => setDraft({ ...draft, manufacturer: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Type *</label>
+                <JlSelect
+                  value={draft.equipment_type}
+                  onChange={(v) => setDraft({ ...draft, equipment_type: v })}
+                  options={typeOptions}
+                  placeholder="Select type"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Year Introduced</label>
+                <input
+                  className="jl-input"
+                  inputMode="numeric"
+                  placeholder="2019"
+                  value={draft.year_introduced}
+                  onChange={(e) => setDraft({ ...draft, year_introduced: e.target.value.replace(/[^\d]/g, "") })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+              <input
+                className="jl-input"
+                placeholder="Optional"
+                value={draft.notes}
+                onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <button type="button" className="jl-btn jl-btn--ghost flex-1" onClick={closeForm}>
+                Cancel
+              </button>
+              <button type="submit" className="jl-btn jl-btn--primary flex-1" disabled={busy}>
+                {editingId == null ? "Create" : "Update"}
+              </button>
+            </div>
+          </form>
+        )}
 
-                {loading ? (
+        {/* Models table */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500 text-sm">Loading models</div>
+          ) : rows.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 text-sm">No models yet. Add one to start the catalogue.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <td colSpan={6} style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-7)" }}>
-                      <span className="jl-sm jl-muted">Loading models</span>
-                    </td>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Model Name</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Manufacturer</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Year</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Items</th>
+                    {isAdmin && <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>}
                   </tr>
-                ) : rows.length === 0 && !adding ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-7)" }}>
-                      No models yet. Add one to start the catalogue.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((r) => {
-                    const isEditing = editingId === r.id;
-                    return (
-                      <tr key={r.id}>
-                        <td>
-                          {isEditing ? (
-                            <input
-                              className="jl-input"
-                              style={{ height: 36 }}
-                              value={editDraft.name}
-                              onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
-                            />
-                          ) : (
-                            <span className="cell-strong">{r.name}</span>
-                          )}
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {rows.map((r) => (
+                    <tr key={r.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {r.manufacturer || <span className="text-gray-400">Not set</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="jl-badge jl-badge--blue">{r.equipment_type}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 text-right tabular-nums">
+                        {r.year_introduced ?? <span className="text-gray-400">Not set</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right tabular-nums">{r.item_count}</td>
+                      {isAdmin && (
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            className="p-1 hover:bg-gray-100 rounded mr-1"
+                            title="Edit"
+                            aria-label="Edit"
+                            disabled={busy}
+                            onClick={() => openEdit(r)}
+                          >
+                            <Edit className="w-3.5 h-3.5 text-gray-500" />
+                          </button>
+                          <button
+                            type="button"
+                            className="p-1 hover:bg-red-50 rounded"
+                            title="Delete"
+                            aria-label="Delete"
+                            disabled={busy}
+                            onClick={() => void removeModel(r.id, r.name)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          </button>
                         </td>
-                        <td>
-                          {isEditing ? (
-                            <input
-                              className="jl-input"
-                              style={{ height: 36 }}
-                              value={editDraft.manufacturer}
-                              onChange={(e) => setEditDraft({ ...editDraft, manufacturer: e.target.value })}
-                            />
-                          ) : (
-                            r.manufacturer || <span style={{ color: "var(--ink-400)" }}>Not set</span>
-                          )}
-                        </td>
-                        <td>
-                          {isEditing ? (
-                            <JlSelect
-                              value={editDraft.equipment_type}
-                              onChange={(v) => setEditDraft({ ...editDraft, equipment_type: v })}
-                              options={typeOptions}
-                              placeholder="Select type"
-                              style={{ minWidth: 170 }}
-                            />
-                          ) : (
-                            <span className="jl-badge jl-badge--blue">{r.equipment_type}</span>
-                          )}
-                        </td>
-                        <td className="num">
-                          {isEditing ? (
-                            <input
-                              className="jl-input"
-                              style={{ height: 36, width: 84, textAlign: "right" }}
-                              inputMode="numeric"
-                              value={editDraft.year_introduced}
-                              onChange={(e) => setEditDraft({ ...editDraft, year_introduced: e.target.value.replace(/[^\d]/g, "") })}
-                            />
-                          ) : (
-                            r.year_introduced ?? <span style={{ color: "var(--ink-400)" }}>Not set</span>
-                          )}
-                        </td>
-                        <td className="num cell-strong">
-                          {r.item_count}
-                        </td>
-                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                          <div style={{ display: "inline-flex", gap: "var(--s-2)" }}>
-                            {isEditing ? (
-                              <>
-                                <button type="button" className="jl-btn jl-btn--soft jl-btn--icon jl-btn--sm" title="Save" aria-label="Save" disabled={busy} onClick={saveEdit}>
-                                  <Check />
-                                </button>
-                                <button type="button" className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm" title="Cancel" aria-label="Cancel" onClick={() => { setEditingId(null); setError(null); }}>
-                                  <X />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                  title="Edit"
-                                  aria-label="Edit"
-                                  onClick={() => { setEditingId(r.id); setEditDraft(draftFromRow(r)); setError(null); }}
-                                >
-                                  <Pencil />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                  title="Delete"
-                                  aria-label="Delete"
-                                  style={{ color: "var(--red-500)" }}
-                                  onClick={() => void removeModel(r.id, r.name)}
-                                >
-                                  <Trash2 />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        <p className="jl-xs jl-faint">
+        <p className="text-xs text-gray-400">
           CSV columns: name, manufacturer, equipment_type, year_introduced, notes. Header row required.
         </p>
       </div>

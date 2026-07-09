@@ -3,28 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
   RefreshCw,
   Download,
+  Search,
+  X,
+  MapPin,
+  Pencil,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -77,6 +64,10 @@ const PRINTER_TYPES = ["Colour", "Black and White", "Plan"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function cx(...parts: (string | false | null | undefined)[]): string {
+  return parts.filter(Boolean).join(" ");
+}
+
 function daysSince(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -85,28 +76,28 @@ function daysSince(dateStr: string | null): number | null {
 
 function ReadingBadge({ dateStr }: { dateStr: string | null }) {
   const d = daysSince(dateStr);
-  if (d === null) return <Badge variant="outline" className="text-muted-foreground font-normal">Never</Badge>;
-  if (d <= 3)    return <Badge className="bg-emerald-100 text-emerald-800 border-0 font-normal">{d}d ago</Badge>;
-  if (d <= 14)   return <Badge className="bg-amber-100 text-amber-800 border-0 font-normal">{d}d ago</Badge>;
-  return           <Badge className="bg-red-100 text-red-800 border-0 font-normal">{d}d ago</Badge>;
+  if (d === null) return <span className="jl-badge">Never</span>;
+  if (d <= 3)    return <span className="jl-badge jl-badge--green">{d}d ago</span>;
+  if (d <= 14)   return <span className="jl-badge jl-badge--amber">{d}d ago</span>;
+  return           <span className="jl-badge jl-badge--red">{d}d ago</span>;
 }
 
 function XeroxStatusBadge({ m }: { m: XeroxMachine }) {
   if (m.xerox_status === "Present")
-    return <Badge className="bg-emerald-100 text-emerald-800 border-0 font-normal">Present</Badge>;
-  return <Badge className="bg-red-100 text-red-800 border-0 font-normal">Missing</Badge>;
+    return <span className="jl-badge jl-badge--green">Present</span>;
+  return <span className="jl-badge jl-badge--red">Missing</span>;
 }
 
 function BmsBadge({ m }: { m: XeroxMachine }) {
-  if (!m.bms_found)       return <Badge variant="outline" className="text-muted-foreground font-normal border-dashed">Not in BMS</Badge>;
-  if (m.bms_active)       return <Badge className="bg-emerald-100 text-emerald-800 border-0 font-normal">BMS Active</Badge>;
-  return                         <Badge className="bg-slate-100 text-slate-600 border-0 font-normal">BMS Inactive</Badge>;
+  if (!m.bms_found) return <span className="jl-badge">Not in BMS</span>;
+  if (m.bms_active) return <span className="jl-badge jl-badge--green">BMS Active</span>;
+  return <span className="jl-badge">BMS Inactive</span>;
 }
 
 function MappingBadge({ m }: { m: XeroxMachine }) {
   const mapped = m.store || m.company_group;
-  if (!mapped) return <Badge variant="outline" className="text-amber-600 border-amber-300 font-normal">Unmapped</Badge>;
-  return <Badge className="bg-blue-50 text-blue-700 border-0 font-normal">Mapped</Badge>;
+  if (!mapped) return <span className="jl-badge jl-badge--amber">Unmapped</span>;
+  return <span className="jl-badge jl-badge--blue">Mapped</span>;
 }
 
 // BMS company name contains-match heuristic
@@ -153,6 +144,8 @@ const FILTER_LABELS: Record<QuickFilter, string> = {
   xerox_missing: "Missing from Xerox",
 };
 
+const WARNING_FILTERS: QuickFilter[] = ["unmapped", "no_bms", "bms_inactive", "bms_mismatch", "xerox_missing"];
+
 function matchesFilter(m: XeroxMachine, f: QuickFilter): boolean {
   switch (f) {
     case "all":           return true;
@@ -165,6 +158,34 @@ function matchesFilter(m: XeroxMachine, f: QuickFilter): boolean {
     case "no_readings":   return !m.latest_reading_date;
     case "xerox_missing": return m.xerox_status === "Missing";
   }
+}
+
+// ─── Sort header button ───────────────────────────────────────────────────────
+
+function SortHeader({
+  label, col, sortKey, sortDir, onSort, align = "left",
+}: {
+  label: string;
+  col: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (k: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = sortKey === col;
+  return (
+    <th className={cx("px-4 py-2 text-xs font-semibold text-gray-600 uppercase", align === "right" ? "text-right" : "text-left")}>
+      <button
+        onClick={() => onSort(col)}
+        className={cx("inline-flex items-center gap-1 uppercase", active && "text-gray-900")}
+      >
+        {label}
+        {active
+          ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)
+          : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+      </button>
+    </th>
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -212,7 +233,7 @@ export default function MachineMappingPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Counts per filter for the tab badges
+  // Counts per filter for the chip badges
   const filterCounts = useMemo(() => {
     const counts = {} as Record<QuickFilter, number>;
     for (const f of Object.keys(FILTER_LABELS) as QuickFilter[]) {
@@ -243,13 +264,6 @@ export default function MachineMappingPage() {
     else { setSortKey(key); setSortDir("asc"); }
   }
 
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
-    return sortDir === "asc"
-      ? <ArrowUp className="h-3 w-3 ml-1" />
-      : <ArrowDown className="h-3 w-3 ml-1" />;
-  }
-
   function openPanel(m: XeroxMachine) {
     setSelected(m);
     setForm({
@@ -261,7 +275,8 @@ export default function MachineMappingPage() {
     setSaveError(null);
   }
 
-  async function saveMapping() {
+  async function saveMapping(e: React.FormEvent) {
+    e.preventDefault();
     if (!selected) return;
     setSaving(true);
     setSaveError(null);
@@ -305,7 +320,8 @@ export default function MachineMappingPage() {
     }
   }
 
-  const actionNeeded = filterCounts.unmapped + filterCounts.no_bms + filterCounts.bms_inactive + filterCounts.bms_mismatch + filterCounts.xerox_missing;
+  const actionNeeded =
+    filterCounts.unmapped + filterCounts.no_bms + filterCounts.bms_inactive + filterCounts.bms_mismatch + filterCounts.xerox_missing;
 
   function exportCSV() {
     const headers = ["Serial", "Model", "Model Name", "Store", "Group", "Type", "Xerox Status", "BMS Status", "BMS Store", "Mapping", "Last Reading", "Reporting"];
@@ -338,374 +354,331 @@ export default function MachineMappingPage() {
 
   return (
     <AppShell>
-      <div className="flex h-full -m-6 overflow-hidden">
+      <main className="px-6 py-4 max-w-6xl mx-auto space-y-4">
 
-        {/* ── MAIN AREA ── */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <h1 className="jl-h1">Machine Mapping</h1>
+            <span className="jl-badge">{machines.length} total</span>
+            {actionNeeded > 0 && (
+              <span className="jl-badge jl-badge--amber">{actionNeeded} need attention</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={exportCSV} className="jl-btn jl-btn--secondary jl-btn--sm">
+              <Download />
+              Export ({filtered.length})
+            </button>
+            <button
+              onClick={() => fetchData(true)}
+              disabled={isRefreshing}
+              className="jl-btn jl-btn--secondary jl-btn--sm"
+            >
+              <RefreshCw className={isRefreshing ? "animate-spin" : undefined} />
+              Refresh
+            </button>
+          </div>
+        </div>
 
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b bg-card shrink-0">
-            <div>
-              <h1 className="text-base font-semibold">Machine Mapping</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {machines.length} total
-                {actionNeeded > 0 && (
-                  <span className="ml-2 text-amber-600 font-medium">{actionNeeded} need attention</span>
+        {/* ── Filter chips ── */}
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(FILTER_LABELS) as QuickFilter[]).map((f) => {
+            const count = filterCounts[f];
+            const isActive = activeFilter === f;
+            const isWarning = WARNING_FILTERS.includes(f) && count > 0 && !isActive;
+            return (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={cx(
+                  "jl-badge",
+                  isActive ? "jl-badge--solid" : isWarning ? "jl-badge--amber" : undefined,
                 )}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportCSV}
-                className="h-8 gap-1.5 text-xs"
+                style={{ cursor: "pointer", height: 30, paddingInline: 12 }}
               >
-                <Download className="h-3.5 w-3.5" />
-                Export ({filtered.length})
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchData(true)}
-                disabled={isRefreshing}
-                className="h-8 gap-1.5 text-xs"
-              >
-                <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-                Refresh
-              </Button>
-            </div>
-          </div>
+                {FILTER_LABELS[f]}
+                <span
+                  className="inline-flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
+                  style={{
+                    minWidth: 18, height: 18,
+                    background: isActive ? "rgba(255,255,255,.22)" : "var(--surface)",
+                    color: isActive ? "#fff" : "var(--ink-500)",
+                  }}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-          {/* Filter tabs + Search */}
-          <div className="border-b bg-card shrink-0">
-            {/* Quick filter tabs — scrollable */}
-            <div className="flex gap-1 px-6 pt-3 overflow-x-auto no-scrollbar">
-              {(Object.keys(FILTER_LABELS) as QuickFilter[]).map((f) => {
-                const count = filterCounts[f];
-                const isActive = activeFilter === f;
-                const isWarning = (f === "unmapped" || f === "no_bms" || f === "bms_inactive" || f === "bms_mismatch" || f === "xerox_missing") && count > 0 && !isActive;
-                return (
-                  <button
-                    key={f}
-                    onClick={() => setActiveFilter(f)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-t-md text-xs font-medium whitespace-nowrap border-b-2 transition-colors",
-                      isActive
-                        ? "border-blue-600 text-blue-700 bg-blue-50"
-                        : isWarning
-                          ? "border-transparent text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                          : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                    )}
-                  >
-                    {FILTER_LABELS[f]}
-                    <span className={cn(
-                      "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
-                      isActive ? "bg-blue-600 text-white" : isWarning ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
-                    )}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+        {/* ── Search ── */}
+        <div className="jl-search" style={{ maxWidth: 420 }}>
+          <Search />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search serial, store, group, model, BMS company"
+          />
+        </div>
 
-            {/* Search */}
-            <div className="px-6 py-2.5">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search serial, store, group, model, BMS company..."
-                className="h-8 text-xs max-w-sm"
-              />
-            </div>
-          </div>
+        {error && (
+          <div className="bg-red-50 rounded-xl shadow-sm px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
 
-          {/* Table */}
-          <div className="flex-1 overflow-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-                Loading...
-              </div>
-            ) : error ? (
-              <div className="m-6 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                {error}
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[140px]">
-                      <button onClick={() => toggleSort("serial_number")} className="flex items-center text-xs font-semibold">
-                        Serial <SortIcon col="serial_number" />
-                      </button>
-                    </TableHead>
-                    <TableHead className="w-[160px]">
-                      <button onClick={() => toggleSort("model")} className="flex items-center text-xs font-semibold">
-                        Model <SortIcon col="model" />
-                      </button>
-                    </TableHead>
-                    <TableHead className="w-[100px] text-xs font-semibold">Model Name</TableHead>
-                    <TableHead className="w-[150px]">
-                      <button onClick={() => toggleSort("store")} className="flex items-center text-xs font-semibold">
-                        Store <SortIcon col="store" />
-                      </button>
-                    </TableHead>
-                    <TableHead className="w-[140px]">
-                      <button onClick={() => toggleSort("company_group")} className="flex items-center text-xs font-semibold">
-                        Group <SortIcon col="company_group" />
-                      </button>
-                    </TableHead>
-                    <TableHead className="w-[110px] text-xs font-semibold">Type</TableHead>
-                    <TableHead className="w-[110px] text-xs font-semibold">Xerox Status</TableHead>
-                    <TableHead className="w-[120px]">
-                      <button onClick={() => toggleSort("bms_active")} className="flex items-center text-xs font-semibold">
-                        BMS Status <SortIcon col="bms_active" />
-                      </button>
-                    </TableHead>
-                    <TableHead className="w-[130px] text-xs font-semibold">BMS Store</TableHead>
-                    <TableHead className="w-[100px] text-xs font-semibold">Mapping</TableHead>
-                    <TableHead className="w-[110px]">
-                      <button onClick={() => toggleSort("latest_reading_date")} className="flex items-center text-xs font-semibold">
-                        Last Reading <SortIcon col="latest_reading_date" />
-                      </button>
-                    </TableHead>
-                    <TableHead className="w-[72px] text-xs font-semibold text-center">On/Off</TableHead>
-                    <TableHead className="w-[60px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+        {/* ── Table ── */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="jl-spinner jl-spinner--lg" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <SortHeader label="Serial" col="serial_number" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <SortHeader label="Model" col="model" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Model Name</th>
+                    <SortHeader label="Store" col="store" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <SortHeader label="Group" col="company_group" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Xerox</th>
+                    <SortHeader label="BMS" col="bms_active" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">BMS Store</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Mapping</th>
+                    <SortHeader label="Last Reading" col="latest_reading_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">On/Off</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
                   {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={13} className="text-center py-12 text-muted-foreground text-sm">
+                    <tr>
+                      <td colSpan={13} className="text-center py-12 text-sm text-gray-500">
                         No machines match the current filter.
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ) : (
                     filtered.map((m) => {
                       const isOff = m.reporting_enabled === false;
                       const isMismatch = hasBmsMismatch(m);
                       return (
-                        <TableRow
-                          key={m.serial_number}
-                          className={cn(isOff && "opacity-40")}
-                        >
-                          <TableCell className="font-mono text-xs">{m.serial_number}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{m.model || "—"}</TableCell>
-                          <TableCell className="text-xs font-medium">{m.model_name || "—"}</TableCell>
-                          <TableCell className="text-xs">
+                        <tr key={m.serial_number} className={cx("hover:bg-gray-50", isOff && "opacity-40")}>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-900">{m.serial_number}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500">{m.model || "None"}</td>
+                          <td className="px-4 py-3 text-xs font-medium text-gray-900">{m.model_name || "None"}</td>
+                          <td className="px-4 py-3 text-sm">
                             {m.store
-                              ? <span className="font-medium">{m.store}</span>
-                              : <span className="text-muted-foreground">—</span>
-                            }
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {m.company_group || "—"}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {m.printer_type || "—"}
-                          </TableCell>
-                          <TableCell><XeroxStatusBadge m={m} /></TableCell>
-                          <TableCell><BmsBadge m={m} /></TableCell>
-                          <TableCell className="text-xs">
+                              ? <span className="font-medium text-gray-900">{m.store}</span>
+                              : <span className="text-gray-400">None</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500">{m.company_group || "None"}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500">{m.printer_type || "None"}</td>
+                          <td className="px-4 py-3"><XeroxStatusBadge m={m} /></td>
+                          <td className="px-4 py-3"><BmsBadge m={m} /></td>
+                          <td className="px-4 py-3 text-xs">
                             {m.bms_company
-                              ? <span className={cn("font-medium", isMismatch && "text-amber-600")}>{m.bms_company}</span>
-                              : <span className="text-muted-foreground">—</span>
-                            }
-                          </TableCell>
-                          <TableCell><MappingBadge m={m} /></TableCell>
-                          <TableCell><ReadingBadge dateStr={m.latest_reading_date} /></TableCell>
-                          <TableCell className="text-center">
-                            <Switch
-                              checked={m.reporting_enabled !== false}
-                              onCheckedChange={(v) => toggleReporting(m, v)}
-                              className="scale-90"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              ? <span className={cx("font-medium", isMismatch ? "text-amber-700" : "text-gray-700")}>{m.bms_company}</span>
+                              : <span className="text-gray-400">None</span>}
+                          </td>
+                          <td className="px-4 py-3"><MappingBadge m={m} /></td>
+                          <td className="px-4 py-3"><ReadingBadge dateStr={m.latest_reading_date} /></td>
+                          <td className="px-4 py-3 text-center">
+                            <label className="jl-switch" style={{ transform: "scale(.85)" }}>
+                              <input
+                                type="checkbox"
+                                checked={m.reporting_enabled !== false}
+                                onChange={(e) => toggleReporting(m, e.target.checked)}
+                              />
+                              <span className="track" />
+                              <span className="thumb" />
+                            </label>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
                               onClick={() => openPanel(m)}
+                              className="jl-btn jl-btn--soft jl-btn--sm"
                             >
                               {m.store || m.company_group ? "Edit" : "Map"}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                            </button>
+                          </td>
+                        </tr>
                       );
                     })
                   )}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-
-          {/* Footer count */}
-          {!isLoading && !error && (
-            <div className="px-6 py-2.5 border-t bg-card shrink-0 text-xs text-muted-foreground">
-              Showing {filtered.length} of {machines.length} machines
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        {/* ── MAPPING PANEL (Sheet) ── */}
-        <Sheet open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
-          <SheetContent side="right" className="w-[360px] sm:w-[360px] flex flex-col p-0">
-            <SheetHeader className="px-5 pt-5 pb-4 border-b">
-              <SheetTitle className="text-sm">
-                {selected?.store ? "Edit Mapping" : "Map Machine"}
-              </SheetTitle>
-              <p className="text-xs font-mono text-muted-foreground">{selected?.serial_number}</p>
-              {selected && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <XeroxStatusBadge m={selected} />
-                  <BmsBadge m={selected} />
-                  <MappingBadge m={selected} />
-                  <ReadingBadge dateStr={selected.latest_reading_date} />
+        {!isLoading && !error && (
+          <p className="text-xs text-gray-500">Showing {filtered.length} of {machines.length} machines</p>
+        )}
+      </main>
+
+      {/* ── Mapping modal ── */}
+      {selected && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-lg w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="jl-chip jl-chip--sm">
+                    {selected.store || selected.company_group ? <Pencil /> : <MapPin />}
+                  </span>
+                  <h2 className="jl-h3">{selected.store || selected.company_group ? "Edit Mapping" : "Map Machine"}</h2>
                 </div>
+                <p className="text-xs font-mono text-gray-500 mt-1">{selected.serial_number}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="p-1 hover:bg-gray-100 rounded"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Status badges */}
+            <div className="flex flex-wrap gap-1.5">
+              <XeroxStatusBadge m={selected} />
+              <BmsBadge m={selected} />
+              <MappingBadge m={selected} />
+              <ReadingBadge dateStr={selected.latest_reading_date} />
+            </div>
+
+            {/* BMS record */}
+            <div
+              className={cx(
+                "rounded-lg px-3 py-2.5 text-xs space-y-1",
+                selected.bms_found ? "bg-gray-50" : "bg-amber-50",
               )}
-            </SheetHeader>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-              {selected && (
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">BMS Record</p>
+              {selected.bms_found ? (
                 <>
-                  <p className="text-xs text-muted-foreground">{selected.model}</p>
-
-                  {/* BMS info box */}
-                  <div className={cn(
-                    "rounded-md border px-3 py-2.5 text-xs space-y-1",
-                    selected.bms_found ? "border-border bg-muted/40" : "border-dashed border-amber-300 bg-amber-50"
-                  )}>
-                    <p className="font-semibold text-[11px] uppercase tracking-wide text-muted-foreground">BMS Record</p>
-                    {selected.bms_found ? (
-                      <>
-                        <p>Status: <span className={selected.bms_active ? "text-emerald-700 font-medium" : "text-slate-500"}>{selected.bms_active ? "Active" : "Inactive"}</span></p>
-                        {selected.bms_company && <p>Company: <span className="font-medium">{selected.bms_company}</span></p>}
-                        {hasBmsMismatch(selected) && (
-                          <p className="text-amber-600 font-medium">⚠ BMS company doesn&apos;t match store name</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-amber-700">This serial is not in BMS. It may need to be loaded or the serial is different.</p>
-                    )}
-                  </div>
-
-                  <Separator />
-
-                  {/* Store */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Store</Label>
-                    <Select
-                      value={form.store || "__custom__"}
-                      onValueChange={(v) => {
-                        if (v !== "__custom__") setForm((f) => ({ ...f, store: v }));
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select store" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {companies.map((c) => (
-                          <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={form.store}
-                      onChange={(e) => setForm((f) => ({ ...f, store: e.target.value }))}
-                      placeholder="Or type a custom store name"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-
-                  {/* Group */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Group</Label>
-                    <Select
-                      value={form.company_group || "__custom__"}
-                      onValueChange={(v) => {
-                        if (v !== "__custom__") setForm((f) => ({ ...f, company_group: v }));
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select group" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {groups.map((g) => (
-                          <SelectItem key={g} value={g} className="text-xs">{g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={form.company_group}
-                      onChange={(e) => setForm((f) => ({ ...f, company_group: e.target.value }))}
-                      placeholder="Or type a custom group name"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-
-                  {/* Printer Type */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Printer Type</Label>
-                    <Select
-                      value={form.printer_type || ""}
-                      onValueChange={(v) => setForm((f) => ({ ...f, printer_type: v }))}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRINTER_TYPES.map((t) => (
-                          <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Model Name */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Model Name</Label>
-                    <Input
-                      value={form.model_name}
-                      onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))}
-                      placeholder="e.g. B9125, Versant 180"
-                      className="h-8 text-xs"
-                    />
-                    {selected?.model && (
-                      <p className="text-[11px] text-muted-foreground">Xerox model: {selected.model}</p>
-                    )}
-                  </div>
-
-                  {saveError && (
-                    <p className="text-xs text-destructive">{saveError}</p>
+                  <p className="text-gray-700">
+                    Status:{" "}
+                    <span className={selected.bms_active ? "text-green-700 font-medium" : "text-gray-500"}>
+                      {selected.bms_active ? "Active" : "Inactive"}
+                    </span>
+                  </p>
+                  {selected.bms_company && (
+                    <p className="text-gray-700">Company: <span className="font-medium text-gray-900">{selected.bms_company}</span></p>
+                  )}
+                  {hasBmsMismatch(selected) && (
+                    <p className="text-amber-700 font-medium">BMS company does not match store name</p>
                   )}
                 </>
+              ) : (
+                <p className="text-amber-700">This serial is not in BMS. It may need to be loaded or the serial is different.</p>
               )}
             </div>
 
-            <div className="px-5 py-4 border-t flex gap-2 shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 text-xs"
-                onClick={() => setSelected(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1 text-xs"
-                onClick={saveMapping}
-                disabled={saving}
-              >
-                {saving ? "Saving..." : "Save"}
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+            {/* Form */}
+            <form onSubmit={saveMapping} className="space-y-3">
+              {/* Store */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Store</label>
+                <div className="jl-select-wrap mb-2">
+                  <select
+                    className="jl-select"
+                    value={companies.some((c) => c.name === form.store) ? form.store : ""}
+                    onChange={(e) => { if (e.target.value) setForm((f) => ({ ...f, store: e.target.value })); }}
+                  >
+                    <option value="">Select store</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  className="jl-input"
+                  value={form.store}
+                  onChange={(e) => setForm((f) => ({ ...f, store: e.target.value }))}
+                  placeholder="Or type a custom store name"
+                />
+              </div>
 
-      </div>
+              {/* Group */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Group</label>
+                <div className="jl-select-wrap mb-2">
+                  <select
+                    className="jl-select"
+                    value={groups.includes(form.company_group) ? form.company_group : ""}
+                    onChange={(e) => { if (e.target.value) setForm((f) => ({ ...f, company_group: e.target.value })); }}
+                  >
+                    <option value="">Select group</option>
+                    {groups.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  className="jl-input"
+                  value={form.company_group}
+                  onChange={(e) => setForm((f) => ({ ...f, company_group: e.target.value }))}
+                  placeholder="Or type a custom group name"
+                />
+              </div>
+
+              {/* Printer Type */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Printer Type</label>
+                <div className="jl-select-wrap">
+                  <select
+                    className="jl-select"
+                    value={form.printer_type}
+                    onChange={(e) => setForm((f) => ({ ...f, printer_type: e.target.value }))}
+                  >
+                    <option value="">Select type</option>
+                    {PRINTER_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Model Name */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Model Name</label>
+                <input
+                  className="jl-input"
+                  value={form.model_name}
+                  onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))}
+                  placeholder="e.g. B9125, Versant 180"
+                />
+                {selected.model && (
+                  <p className="text-[11px] text-gray-400 mt-1">Xerox model: {selected.model}</p>
+                )}
+              </div>
+
+              {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+
+              <div className="flex items-end gap-2 pt-1">
+                <button type="button" onClick={() => setSelected(null)} className="jl-btn jl-btn--ghost flex-1">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving} className="jl-btn jl-btn--primary flex-1">
+                  {saving ? "Saving" : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

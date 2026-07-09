@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageLoading } from "@/components/ui/page-loading";
-import { Plus, Check, X, Pencil, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
 
 interface TypeRow {
   id: number;
@@ -17,11 +17,9 @@ export default function EquipmentTypesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [newName, setNewName] = useState("");
-  const [adding, setAdding] = useState(false);
-
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editName, setEditName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -39,42 +37,47 @@ export default function EquipmentTypesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function addType() {
-    const name = newName.trim();
-    if (!name || adding) return;
-    setAdding(true);
+  function openCreate() {
+    setEditingId(null);
+    setName("");
     setError(null);
-    try {
-      const res = await fetch("/api/setup/equipment-types", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to add type"); return; }
-      setNewName("");
-      await load();
-    } finally {
-      setAdding(false);
-    }
+    setIsCreating(true);
   }
 
-  async function saveEdit() {
-    if (editId === null) return;
-    const name = editName.trim();
-    if (!name || saving) return;
+  function openEdit(row: TypeRow) {
+    setEditingId(row.id);
+    setName(row.name);
+    setError(null);
+    setIsCreating(true);
+  }
+
+  function closeForm() {
+    setIsCreating(false);
+    setEditingId(null);
+    setName("");
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || saving) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/setup/equipment-types", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editId, name }),
-      });
+      const res = editingId === null
+        ? await fetch("/api/setup/equipment-types", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: trimmed }),
+          })
+        : await fetch("/api/setup/equipment-types", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: editingId, name: trimmed }),
+          });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to save"); return; }
-      setEditId(null);
-      setEditName("");
+      if (!res.ok) { setError(data.error || "Failed to save type"); return; }
+      closeForm();
       await load();
     } finally {
       setSaving(false);
@@ -97,159 +100,92 @@ export default function EquipmentTypesPage() {
     return <AppShell><PageLoading variant="table" /></AppShell>;
   }
 
-  const canAdd = !!newName.trim() && !adding;
-
   return (
     <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-5)", maxWidth: 760 }}>
-        <h1 className="jl-h1">Equipment Types</h1>
-
-        {error && (
-          <div className="jl-alert jl-alert--red" role="alert">
-            <span className="jl-chip jl-chip--solid" style={{ width: 38, height: 38, borderRadius: "var(--r-sm)" }}>
-              <X strokeWidth={2} />
-            </span>
-            <div className="jl-alert__body">
-              <div className="jl-alert__text" style={{ marginTop: 0, color: "var(--red-600)", fontWeight: 600 }}>{error}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Add row pinned above the table */}
-        <div className="jl-card jl-card--pad-sm">
-          <div style={{ display: "flex", gap: "var(--s-3)", alignItems: "center" }}>
-            <input
-              className="jl-input"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") addType(); }}
-              placeholder="Add a new equipment type"
-              aria-label="New equipment type name"
-            />
-            <button
-              type="button"
-              className="jl-btn jl-btn--primary"
-              onClick={addType}
-              disabled={!canAdd}
-              data-loading={adding ? "" : undefined}
-            >
-              <Plus /> Add Type
-            </button>
-          </div>
+      <div className="max-w-4xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">Equipment Types</h1>
+          <button type="button" onClick={openCreate} className="jl-btn jl-btn--primary jl-btn--sm">
+            <Plus className="w-4 h-4" />
+            New Type
+          </button>
         </div>
 
-        <div className="jl-table-wrap">
-          <table className="jl-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th className="num" style={{ width: 110 }}>Items</th>
-                <th style={{ width: 130, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
+        {error && (
+          <div className="bg-red-50 rounded-lg p-2 text-sm text-red-700">{error}</div>
+        )}
+
+        {isCreating && (
+          <form onSubmit={handleSubmit} className="space-y-3 bg-white rounded-xl shadow-sm p-4">
+            <h2 className="text-sm font-bold text-gray-900">
+              {editingId === null ? "New Equipment Type" : "Edit Equipment Type"}
+            </h2>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
+              <input
+                autoFocus
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="jl-input"
+                required
+                placeholder="e.g. Laminator"
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <button type="button" onClick={closeForm} className="jl-btn jl-btn--ghost flex-1">Cancel</button>
+              <button type="submit" disabled={saving} className="jl-btn jl-btn--primary flex-1">
+                {editingId === null ? "Create" : "Update"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {rows.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 text-sm">No equipment types yet. Create one to get started.</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-7)" }}>
-                    No equipment types yet. Add one above.
-                  </td>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Items</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
-              ) : (
-                rows.map((row) => {
-                  const editing = editId === row.id;
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rows.map((row) => {
                   const canDelete = row.count === 0;
                   return (
-                    <tr key={row.id}>
-                      <td>
-                        {editing ? (
-                          <input
-                            autoFocus
-                            className="jl-input"
-                            style={{ height: 36, maxWidth: 340 }}
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveEdit();
-                              if (e.key === "Escape") { setEditId(null); setEditName(""); }
-                            }}
-                            aria-label="Edit type name"
-                          />
-                        ) : (
-                          <span className="cell-strong">{row.name}</span>
-                        )}
-                      </td>
-                      <td className="num">
-                        <span className={`jl-badge${row.count > 0 ? " jl-badge--blue" : ""}`}>{row.count}</span>
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: "var(--s-2)" }}>
-                          {editing ? (
-                            <>
-                              <button
-                                type="button"
-                                className="jl-btn jl-btn--soft jl-btn--icon jl-btn--sm"
-                                onClick={saveEdit}
-                                disabled={saving}
-                                aria-label="Save"
-                                title="Save"
-                              >
-                                <Check />
-                              </button>
-                              <button
-                                type="button"
-                                className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                onClick={() => { setEditId(null); setEditName(""); }}
-                                aria-label="Cancel"
-                                title="Cancel"
-                              >
-                                <X />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                onClick={() => { setEditId(row.id); setEditName(row.name); }}
-                                aria-label="Rename"
-                                title="Rename"
-                              >
-                                <Pencil />
-                              </button>
-                              {canDelete ? (
-                                <button
-                                  type="button"
-                                  className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                  onClick={() => deleteType(row)}
-                                  aria-label="Delete"
-                                  title="Delete"
-                                  style={{ color: "var(--red-500)" }}
-                                >
-                                  <Trash2 />
-                                </button>
-                              ) : (
-                                <span className="jl-tip">
-                                  <button
-                                    type="button"
-                                    className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                                    disabled
-                                    aria-label="Delete"
-                                  >
-                                    <Trash2 />
-                                  </button>
-                                  <span className="jl-tip__bubble">In use, cannot delete</span>
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </div>
+                    <tr key={row.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{row.count}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(row)}
+                          className="p-1 hover:bg-gray-100 rounded mr-1"
+                          aria-label="Edit"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteType(row)}
+                          disabled={!canDelete}
+                          className="p-1 hover:bg-red-50 rounded disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          aria-label="Delete"
+                          title={canDelete ? "Delete" : "In use, cannot delete"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </button>
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </AppShell>

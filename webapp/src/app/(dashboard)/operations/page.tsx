@@ -325,26 +325,6 @@ export default function OperationsPage() {
                 </div>
               ))}
             </div>
-
-            {/* Mapping health */}
-            <hr className="jl-soft-divider" />
-            <div className="jl-h3" style={{ marginBottom: "var(--s-4)" }}>Mapping</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--s-3)", textAlign: "center" }}>
-              <div>
-                <div className="jl-h2" style={{ color: "var(--green-700)" }}>{mapping.mapped}</div>
-                <div className="jl-xs jl-muted">Mapped</div>
-              </div>
-              <div>
-                <div className="jl-h2" style={{ color: mapping.unmapped > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
-                  {mapping.unmapped}
-                </div>
-                <div className="jl-xs jl-muted">Unmapped</div>
-              </div>
-              <div>
-                <div className="jl-h2" style={{ color: "var(--ink-500)" }}>{mapping.reportingOff}</div>
-                <div className="jl-xs jl-muted">Reporting Off</div>
-              </div>
-            </div>
           </div>
 
           {/* Alert feed */}
@@ -410,31 +390,29 @@ export default function OperationsPage() {
           </div>
         )}
 
-        {/* ── Xerox fleet breakdown ── */}
-        <div className="jl-card">
-          <div className="jl-card__head">
-            <div className="jl-card__title">Xerox Fleet Breakdown</div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--s-5)", textAlign: "center" }}>
-            <div>
-              <div className="jl-display" style={{ color: "var(--green-700)" }}>{fleet.present}</div>
-              <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Present on Xerox</div>
+        {/* ── Xerox fleet breakdown — one stat per KPI card ── */}
+        <div>
+          <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Xerox Fleet Breakdown</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "var(--s-4)" }}>
+            <div className="jl-kpi">
+              <div className="jl-kpi__value" style={{ color: "var(--green-700)" }}>{fleet.present}</div>
+              <div className="jl-kpi__label">Present on Xerox</div>
             </div>
-            <div>
-              <div className="jl-display" style={{ color: "var(--red-600)" }}>{fleet.missing}</div>
-              <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Missing from Xerox</div>
+            <div className="jl-kpi">
+              <div className="jl-kpi__value" style={{ color: "var(--red-600)" }}>{fleet.missing}</div>
+              <div className="jl-kpi__label">Missing from Xerox</div>
             </div>
-            <div>
-              <div className="jl-display" style={{ color: mapping.unmapped > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
+            <div className="jl-kpi">
+              <div className="jl-kpi__value" style={{ color: mapping.unmapped > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
                 {mapping.unmapped}
               </div>
-              <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Unmapped machines</div>
+              <div className="jl-kpi__label">Unmapped machines</div>
             </div>
-            <div>
-              <div className="jl-display" style={{ color: crossRef.notInBms > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
+            <div className="jl-kpi">
+              <div className="jl-kpi__value" style={{ color: crossRef.notInBms > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
                 {crossRef.notInBms}
               </div>
-              <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Present, not in BMS</div>
+              <div className="jl-kpi__label">Present, not in BMS</div>
             </div>
           </div>
         </div>
