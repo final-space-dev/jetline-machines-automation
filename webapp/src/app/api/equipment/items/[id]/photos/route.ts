@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { bmsPool } from "@/lib/bms-pool";
 import { withClient, notFound, badRequest, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
+import { requireUser, AuthError, type SessionUser } from "@/lib/auth";
 
 function validId(id: string): boolean {
   return /^\d+$/.test(id) && parseInt(id) > 0;
@@ -29,6 +30,15 @@ function uploadDir(id: string): string {
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!validId(id)) return notFound();
+
+  let user: SessionUser;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const timer = routeTimer(`POST /api/equipment/items/${id}/photos`);
 
   const form = await req.formData().catch(() => null);
@@ -38,8 +48,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (files.length === 0) return badRequest("No files provided");
 
   return withClient(bmsPool, async (client) => {
-    const exists = await client.query(`SELECT id FROM equipment.items WHERE id = $1`, [id]);
+    const exists = await client.query(`SELECT id, store FROM equipment.items WHERE id = $1`, [id]);
     if (exists.rows.length === 0) return notFound();
+    if (user.role !== "admin" && exists.rows[0].store !== user.store) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const dir = uploadDir(id);
     await fs.mkdir(dir, { recursive: true });
@@ -76,6 +89,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!validId(id)) return notFound();
+
+  let user: SessionUser;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
   const timer = routeTimer(`DELETE /api/equipment/items/${id}/photos`);
 
   const body = await req.json().catch(() => null);
@@ -83,6 +105,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!url) return badRequest("Missing url");
 
   return withClient(bmsPool, async (client) => {
+    const owner = await client.query(`SELECT store FROM equipment.items WHERE id = $1`, [id]);
+    if (owner.rows.length === 0) return notFound();
+    if (user.role !== "admin" && owner.rows[0].store !== user.store) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const updated = await client.query(
       `UPDATE equipment.items
          SET photos = array_remove(COALESCE(photos, ARRAY[]::text[]), $1),

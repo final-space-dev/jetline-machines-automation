@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, ChevronUp, Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { JlSelect } from "@/components/ui/jl-select";
-import { jlPage } from "@/lib/jl";
 
 interface ModelRow {
   id: number;
@@ -141,19 +140,19 @@ export default function EquipmentModelsCataloguePage() {
 
   return (
     <AppShell>
-      <div style={{ ...jlPage, padding: "28px 32px" }}>
+      <div>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 20,
-            gap: 12,
+            marginBottom: "var(--s-6)",
+            gap: "var(--s-3)",
             flexWrap: "wrap",
           }}
         >
           <h1 className="jl-h1" style={{ margin: 0 }}>Model Catalogue</h1>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "var(--s-3)", alignItems: "center", flexWrap: "wrap" }}>
             <div className="jl-search" style={{ width: 260 }}>
               <Search />
               <input
@@ -173,62 +172,57 @@ export default function EquipmentModelsCataloguePage() {
         </div>
 
         {loading ? (
-          <div className="jl-card" style={{ textAlign: "center", color: "var(--ink-400)", padding: "48px" }}>
-            Loading catalogue…
+          <div className="jl-card" style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-9)" }}>
+            Loading catalogue
           </div>
         ) : filtered.length === 0 ? (
-          <div className="jl-card" style={{ textAlign: "center", color: "var(--ink-400)", padding: "48px" }}>
+          <div className="jl-card" style={{ textAlign: "center", color: "var(--ink-400)", padding: "var(--s-9)" }}>
             No models match your filters.
           </div>
         ) : (
-          <div className="jl-table-wrap">
-            <div style={{ overflowX: "auto" }}>
-              <table className="jl-table" style={{ minWidth: 720 }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 36 }} aria-hidden />
-                    <th>
-                      <button style={headBtnStyle} onClick={() => toggleSort("name")}>
-                        Model {sortIcon("name")}
-                      </button>
-                    </th>
-                    <th>
-                      <button style={headBtnStyle} onClick={() => toggleSort("manufacturer")}>
-                        Manufacturer {sortIcon("manufacturer")}
-                      </button>
-                    </th>
-                    <th>
-                      <button style={headBtnStyle} onClick={() => toggleSort("equipment_type")}>
-                        Type {sortIcon("equipment_type")}
-                      </button>
-                    </th>
-                    <th className="num">
-                      <button
-                        style={{ ...headBtnStyle, justifyContent: "flex-end", width: "100%" }}
-                        onClick={() => toggleSort("item_count")}
-                      >
-                        Items {sortIcon("item_count")}
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((m) => {
-                    const open = expandedId === m.id;
-                    return (
-                      <FragmentRow
-                        key={m.id}
-                        model={m}
-                        open={open}
-                        items={items}
-                        itemsLoading={itemsLoading}
-                        onToggle={() => void openModel(m)}
-                      />
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
+            <table className="jl-table" style={{ minWidth: 720 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 36 }} aria-hidden />
+                  <th>
+                    <button style={headBtnStyle} onClick={() => toggleSort("name")}>
+                      Model {sortIcon("name")}
+                    </button>
+                  </th>
+                  <th>
+                    <button style={headBtnStyle} onClick={() => toggleSort("manufacturer")}>
+                      Manufacturer {sortIcon("manufacturer")}
+                    </button>
+                  </th>
+                  <th>
+                    <button style={headBtnStyle} onClick={() => toggleSort("equipment_type")}>
+                      Type {sortIcon("equipment_type")}
+                    </button>
+                  </th>
+                  <th className="num">
+                    <button
+                      style={{ ...headBtnStyle, justifyContent: "flex-end", width: "100%" }}
+                      onClick={() => toggleSort("item_count")}
+                    >
+                      Items {sortIcon("item_count")}
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((m) => (
+                  <FragmentRow
+                    key={m.id}
+                    model={m}
+                    open={expandedId === m.id}
+                    items={items}
+                    itemsLoading={itemsLoading}
+                    onToggle={() => void openModel(m)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -271,45 +265,43 @@ function FragmentRow({
 
       {open && (
         <tr>
-          <td colSpan={5} style={{ padding: 0, background: "var(--surface)" }}>
+          <td colSpan={5} style={{ padding: 0, background: "var(--surface-sunken)" }}>
             {itemsLoading ? (
-              <div style={{ padding: "20px", textAlign: "center", color: "var(--ink-400)", fontSize: 13 }}>
-                Loading items…
+              <div style={{ padding: "var(--s-5)", textAlign: "center", color: "var(--ink-400)", fontSize: "var(--fs-sm)" }}>
+                Loading items
               </div>
             ) : items.length === 0 ? (
-              <div style={{ padding: "20px", textAlign: "center", color: "var(--ink-400)", fontSize: 13 }}>
+              <div style={{ padding: "var(--s-5)", textAlign: "center", color: "var(--ink-400)", fontSize: "var(--fs-sm)" }}>
                 No items are using this model yet.
               </div>
             ) : (
-              <div style={{ padding: "8px 16px 16px" }}>
-                <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
-                  <table className="jl-table" style={{ minWidth: 640 }}>
-                    <thead>
-                      <tr>
-                        <th>Store</th>
-                        <th>Serial</th>
-                        <th>Located At</th>
-                        <th>Condition</th>
-                        <th>Status</th>
+              <div style={{ padding: "var(--s-3) var(--s-4) var(--s-4)", overflowX: "auto" }}>
+                <table className="jl-table" style={{ minWidth: 640, background: "var(--surface)", borderRadius: "var(--r-md)", boxShadow: "var(--sh-sm)", overflow: "hidden" }}>
+                  <thead>
+                    <tr>
+                      <th>Store</th>
+                      <th>Serial</th>
+                      <th>Located At</th>
+                      <th>Condition</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((it) => (
+                      <tr
+                        key={it.id}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => { window.location.href = `/equipment/items/${it.id}`; }}
+                      >
+                        <td className="cell-strong">{it.store}</td>
+                        <td>{it.serial || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
+                        <td>{it.located_at || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
+                        <td>{it.condition || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
+                        <td>{it.status || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((it) => (
-                        <tr
-                          key={it.id}
-                          style={{ cursor: "pointer" }}
-                          onClick={() => { window.location.href = `/equipment/items/${it.id}`; }}
-                        >
-                          <td className="cell-strong">{it.store}</td>
-                          <td>{it.serial || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
-                          <td>{it.located_at || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
-                          <td>{it.condition || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
-                          <td>{it.status || <span style={{ color: "var(--ink-400)" }}>Not set</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </td>

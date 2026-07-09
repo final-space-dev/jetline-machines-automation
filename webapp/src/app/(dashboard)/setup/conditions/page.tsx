@@ -146,7 +146,7 @@ export default function ConditionsPage() {
           </div>
         )}
 
-        {/* Add row — pinned above the table */}
+        {/* Add row pinned above the table */}
         <div className="jl-card jl-card--pad-sm">
           <div style={{ display: "grid", gridTemplateColumns: "minmax(160px,1fr) 150px minmax(200px,1.4fr) auto", gap: "var(--s-3)", alignItems: "center" }}>
             <input
@@ -203,10 +203,15 @@ export default function ConditionsPage() {
                       <td>
                         {editing ? (
                           <input
+                            autoFocus
                             className="jl-input"
                             style={{ height: 36 }}
                             value={editLabel}
                             onChange={(e) => setEditLabel(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveEdit();
+                              if (e.key === "Escape") setEditId(null);
+                            }}
                             aria-label="Edit label"
                           />
                         ) : (

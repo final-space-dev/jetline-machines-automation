@@ -29,7 +29,7 @@ const TYPE_BUTTONS: Array<{ value: TypeFilter; label: string }> = [
   { value: "printer", label: "Printer" },
 ];
 
-// ── Date grouping ────────────────────────────────────────────────────────────
+// Date grouping
 
 type GroupKey = "Today" | "Yesterday" | "This Week" | "Earlier";
 
@@ -52,7 +52,7 @@ function groupFor(iso: string): GroupKey {
 const GROUP_ORDER: GroupKey[] = ["Today", "Yesterday", "This Week", "Earlier"];
 
 function dotColor(type: ActivityEntry["item_type"]): string {
-  return type === "printer" ? "var(--jl-blue-500)" : "var(--jl-red-500)";
+  return type === "printer" ? "var(--blue-500)" : "var(--red-500)";
 }
 
 function fieldLabel(field: string): string {
@@ -143,84 +143,52 @@ export default function ActivityPage() {
 
   return (
     <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: 18, fontFamily: "var(--jl-font)" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--jl-ink-900)", letterSpacing: "-0.02em" }}>
-          Activity
-        </h1>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-5)" }}>
+        <h1 className="jl-h1">Activity</h1>
 
         {/* Filter bar */}
         <div
+          className="jl-card jl-card--pad-sm"
           style={{
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
-            gap: 12,
-            padding: 14,
-            background: "var(--jl-surface)",
-            boxShadow: "var(--jl-sh-sm)",
-            borderRadius: "var(--jl-r-lg)",
+            gap: "var(--s-3)",
           }}
         >
-          <div style={{ width: 200 }}>
-            <JlSelect value={store} onChange={setStore} options={STORE_OPTIONS} placeholder="All stores" />
-          </div>
-          <div style={{ width: 190 }}>
-            <JlDate value={from} onChange={setFrom} placeholder="From date" />
-          </div>
-          <div style={{ width: 190 }}>
-            <JlDate value={to} onChange={setTo} placeholder="To date" />
-          </div>
+          <JlSelect value={store} onChange={setStore} options={STORE_OPTIONS} placeholder="All stores" style={{ width: 200 }} />
+          <JlDate value={from} onChange={setFrom} placeholder="From date" style={{ width: 190 }} />
+          <JlDate value={to} onChange={setTo} placeholder="To date" style={{ width: 190 }} />
 
-          <div style={{ display: "inline-flex", gap: 6 }}>
-            {TYPE_BUTTONS.map((b) => {
-              const active = type === b.value;
-              return (
-                <button
-                  key={b.value}
-                  type="button"
-                  onClick={() => setType(b.value)}
-                  style={{
-                    height: 40,
-                    padding: "0 16px",
-                    borderRadius: "var(--jl-r-sm)",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    fontFamily: "var(--jl-font)",
-                    cursor: "pointer",
-                    border: active ? "1.5px solid var(--jl-red-500)" : "1.5px solid var(--jl-ink-200)",
-                    background: active ? "var(--jl-red-tint)" : "var(--jl-surface)",
-                    color: active ? "var(--jl-red-500)" : "var(--jl-ink-600)",
-                    transition: "all var(--jl-t-fast) var(--jl-ease)",
-                  }}
-                >
-                  {b.label}
-                </button>
-              );
-            })}
+          <div className="jl-segment" role="tablist" aria-label="Filter by type">
+            {TYPE_BUTTONS.map((b) => (
+              <button
+                key={b.value}
+                type="button"
+                role="tab"
+                aria-selected={type === b.value}
+                onClick={() => setType(b.value)}
+              >
+                {b.label}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Timeline */}
-        <div
-          style={{
-            background: "var(--jl-surface)",
-            boxShadow: "var(--jl-sh-sm)",
-            borderRadius: "var(--jl-r-lg)",
-            overflow: "hidden",
-          }}
-        >
+        <div className="jl-card jl-card--pad-sm" style={{ padding: 0, overflow: "hidden" }}>
           {loading && (
-            <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--jl-ink-400)" }}>
-              Loading activity…
+            <div style={{ padding: "var(--s-8)", textAlign: "center", fontSize: "var(--fs-sm)", color: "var(--ink-400)" }}>
+              Loading activity...
             </div>
           )}
           {error && !loading && (
-            <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--jl-red-700)" }}>
+            <div style={{ padding: "var(--s-8)", textAlign: "center", fontSize: "var(--fs-sm)", color: "var(--red-700)" }}>
               Failed to load activity
             </div>
           )}
           {!loading && !error && entries.length === 0 && (
-            <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--jl-ink-400)" }}>
+            <div style={{ padding: "var(--s-8)", textAlign: "center", fontSize: "var(--fs-sm)", color: "var(--ink-400)" }}>
               No changes match these filters
             </div>
           )}
@@ -232,13 +200,13 @@ export default function ActivityPage() {
                 <div
                   style={{
                     padding: "10px 18px",
-                    fontSize: 11,
+                    fontSize: "var(--fs-xs)",
                     fontWeight: 800,
-                    letterSpacing: "0.07em",
+                    letterSpacing: "var(--tracking-caps)",
                     textTransform: "uppercase",
-                    color: "var(--jl-ink-400)",
-                    background: "var(--jl-surface-sunken)",
-                    borderBottom: "1px solid var(--jl-ink-50)",
+                    color: "var(--ink-400)",
+                    background: "var(--surface-sunken)",
+                    borderBottom: "1px solid var(--ink-100)",
                   }}
                 >
                   {group}
@@ -249,9 +217,9 @@ export default function ActivityPage() {
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
-                      gap: 12,
+                      gap: "var(--s-3)",
                       padding: "12px 18px",
-                      borderBottom: "1px solid var(--jl-ink-50)",
+                      borderBottom: "1px solid var(--ink-100)",
                     }}
                   >
                     <span
@@ -265,8 +233,8 @@ export default function ActivityPage() {
                       }}
                     />
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13.5, color: "var(--jl-ink-800)", lineHeight: 1.5 }}>
-                        <span style={{ fontWeight: 700, color: "var(--jl-ink-900)" }}>{e.user_name}</span>
+                      <div style={{ fontSize: "var(--fs-sm)", color: "var(--ink-800)", lineHeight: 1.5 }}>
+                        <span style={{ fontWeight: 700, color: "var(--ink-900)" }}>{e.user_name}</span>
                         {" changed "}
                         <span style={{ fontWeight: 600 }}>{fieldLabel(e.field)}</span>
                         {" on "}
@@ -279,14 +247,14 @@ export default function ActivityPage() {
                         ) : null}
                       </div>
                       {(e.old_value || e.new_value) && (
-                        <div style={{ fontSize: 12, color: "var(--jl-ink-500)", marginTop: 2 }}>
+                        <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-500)", marginTop: 2 }}>
                           {e.old_value ?? "empty"}
                           {"  →  "}
                           {e.new_value ?? "empty"}
                         </div>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--jl-ink-400)", flexShrink: 0, whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-400)", flexShrink: 0, whiteSpace: "nowrap" }}>
                       {relativeTime(e.changed_at)}
                     </div>
                   </div>
@@ -295,26 +263,15 @@ export default function ActivityPage() {
             ))}
 
           {!loading && !error && hasMore && (
-            <div style={{ padding: 16, textAlign: "center" }}>
+            <div style={{ padding: "var(--s-4)", textAlign: "center" }}>
               <button
                 type="button"
+                className="jl-btn jl-btn--secondary jl-btn--sm"
                 onClick={loadMore}
                 disabled={loadingMore}
-                style={{
-                  height: 38,
-                  padding: "0 20px",
-                  borderRadius: "var(--jl-r-sm)",
-                  border: "1.5px solid var(--jl-ink-200)",
-                  background: "var(--jl-surface)",
-                  color: "var(--jl-ink-700)",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  fontFamily: "var(--jl-font)",
-                  cursor: loadingMore ? "default" : "pointer",
-                  opacity: loadingMore ? 0.6 : 1,
-                }}
+                data-loading={loadingMore ? "" : undefined}
               >
-                {loadingMore ? "Loading…" : "Load more"}
+                {loadingMore ? "Loading" : "Load more"}
               </button>
             </div>
           )}

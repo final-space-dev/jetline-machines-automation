@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { PrinterPageSkeleton } from "@/components/equipment/skeleton";
@@ -10,7 +10,7 @@ import { addRecentItem } from "@/lib/recently-viewed";
 import { useRole } from "@/lib/use-role";
 import { toast } from "sonner";
 import {
-  Save, Lock, AlertTriangle, BarChart2, Calendar, ClipboardCheck,
+  Save, Lock, AlertTriangle, BarChart2, Calendar, ClipboardCheck, Check,
 } from "lucide-react";
 import Link from "next/link";
 import { JlDate } from "@/components/ui/jl-date";
@@ -93,22 +93,30 @@ function fmtK(v: number): string {
 
 function ReadField({ label, value, mono }: { label: string; value: string | null | boolean; mono?: boolean }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span className="jl-eyebrow" style={{ fontSize: 11 }}>{label}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2)" }}>
       <span
         style={{
           fontSize: "var(--fs-sm)",
-          fontWeight: 600,
-          color: "var(--ink-800)",
+          fontWeight: "var(--fw-semibold)",
+          color: "var(--ink-700)",
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: "var(--fs-sm)",
+          fontWeight: "var(--fw-semibold)",
+          color: "var(--ink-900)",
           fontFamily: mono ? "var(--mono)" : "var(--font)",
         }}
       >
         {value === null || value === undefined || value === "" ? (
-          <span className="jl-faint" style={{ fontWeight: 500, fontStyle: "italic" }}>Not set</span>
+          <span className="jl-faint" style={{ fontWeight: "var(--fw-medium)", fontStyle: "italic" }}>Not set</span>
         ) : value === true ? (
-          <span style={{ color: "var(--green-700)", fontWeight: 700 }}>Yes</span>
+          <span style={{ color: "var(--green-700)", fontWeight: "var(--fw-bold)" }}>Yes</span>
         ) : value === false ? (
-          <span className="jl-muted" style={{ fontWeight: 500 }}>No</span>
+          <span className="jl-muted" style={{ fontWeight: "var(--fw-medium)" }}>No</span>
         ) : (
           String(value)
         )}
@@ -144,8 +152,11 @@ export default function PrinterDetailPage() {
   const [history, setHistory] = useState<MeterReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [counter, setCounter] = useState<CounterKey>("total");
+
+  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Role flag from the authenticated session. While the session loads,
   // isAdmin is false so admin-only cards stay hidden (least-privileged default).
@@ -196,6 +207,9 @@ export default function PrinterDetailPage() {
       const data = await res.json();
       if (data.feedback) setFeedback((f) => ({ ...f, ...data.feedback }));
       setDirty(false);
+      setSavedFlash(true);
+      clearTimeout(savedFlashTimer.current);
+      savedFlashTimer.current = setTimeout(() => setSavedFlash(false), 3000);
       toast.success("Printer record saved");
     } catch {
       toast.error("Failed to save");
@@ -203,6 +217,9 @@ export default function PrinterDetailPage() {
       setSaving(false);
     }
   }, [serialStr, feedback]);
+
+  // Clear the "Saved" flash timer on unmount.
+  useEffect(() => () => clearTimeout(savedFlashTimer.current), []);
 
   // ─── Volume: per-counter monthly deltas ─────────────────────────────────────
   // history is DESC (newest first). Delta of a reading = itself minus the next
@@ -278,17 +295,28 @@ export default function PrinterDetailPage() {
               )}
               <span className="sep">/</span>
               <span className="current jl-mono">{serialStr}</span>
-              {dirty && (
-                <span className="jl-badge jl-badge--amber" style={{ marginLeft: 8 }}>Unsaved changes</span>
+              {saving && (
+                <span className="jl-badge jl-badge--red" style={{ marginLeft: "var(--s-2)" }}>
+                  <span className="jl-dot jl-dot--red" style={{ boxShadow: "none" }} /> Saving
+                </span>
+              )}
+              {!saving && savedFlash && (
+                <span className="jl-badge jl-badge--green" style={{ marginLeft: "var(--s-2)" }}>
+                  <Check /> Saved
+                </span>
+              )}
+              {!saving && !savedFlash && dirty && (
+                <span className="jl-badge jl-badge--amber" style={{ marginLeft: "var(--s-2)" }}>Unsaved changes</span>
               )}
             </nav>
             <button
+              type="button"
               className="jl-btn jl-btn--primary"
               onClick={save}
               disabled={saving || !dirty}
-              {...(saving ? { "data-loading": true } : {})}
+              data-loading={saving ? true : undefined}
             >
-              <Save /> {saving ? "Saving" : "Save Changes"}
+              <Save /> Save
             </button>
           </div>
 
@@ -318,7 +346,7 @@ export default function PrinterDetailPage() {
               </div>
             </div>
 
-            {/* Machine identity — READ ONLY, visually locked (sunken card) */}
+            {/* Machine identity - READ ONLY, visually locked (sunken card) */}
             <section className="jl-card jl-card--pad-lg" style={{ background: "var(--surface-sunken)" }}>
               <SectionHead icon={Lock} title="Machine Identity" neutral />
               <div style={{ display: "grid", gap: "var(--s-5)" }}>
@@ -342,7 +370,7 @@ export default function PrinterDetailPage() {
               </div>
             </section>
 
-            {/* Condition — editable, all users */}
+            {/* Condition - editable, all users */}
             <section className="jl-card">
               <SectionHead icon={ClipboardCheck} title="Condition" />
               <div style={{ display: "grid", gap: "var(--s-5)" }}>
@@ -399,7 +427,7 @@ export default function PrinterDetailPage() {
               </div>
             </section>
 
-            {/* Contract & Lifecycle — admin only */}
+            {/* Contract and Lifecycle - admin only */}
             {isAdmin && (
               <section className="jl-card">
                 <SectionHead icon={Calendar} title="Contract and Lifecycle" />
@@ -443,7 +471,7 @@ export default function PrinterDetailPage() {
               </section>
             )}
 
-            {/* Volume History — recharts inside a card */}
+            {/* Volume History - recharts inside a card */}
             {history.length > 1 && (
               <section className="jl-card">
                 <SectionHead icon={BarChart2} title="Volume History" />
@@ -521,7 +549,7 @@ export default function PrinterDetailPage() {
                   </div>
                 )}
 
-                {/* Reading table — last 8 readings, all counter columns */}
+                {/* Reading table - last 8 readings, all counter columns */}
                 <div className="jl-table-wrap">
                   <table className="jl-table">
                     <thead>

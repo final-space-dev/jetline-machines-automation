@@ -388,7 +388,7 @@ export default function FleetHealthPage() {
                 <YAxis type="category" dataKey="name" hide />
                 <Tooltip
                   cursor={{ fill: "var(--ink-50)" }}
-                  contentStyle={{ borderRadius: 10, border: "none", boxShadow: "var(--sh-lg)", fontSize: 12, fontFamily: "var(--font)" }}
+                  contentStyle={{ background: "var(--surface)", borderRadius: 10, border: "none", boxShadow: "var(--sh-lg)", fontSize: 12, fontFamily: "var(--font)", color: "var(--ink-900)" }}
                 />
                 <Bar dataKey="good" stackId="c" name="Good" fill={COND_COLORS.good} radius={[6, 0, 0, 6]} cursor="pointer" onClick={() => setActiveTab(CONDITION_TO_TAB.poor)}>
                   <Cell fill={COND_COLORS.good} />

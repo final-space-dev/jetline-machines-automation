@@ -174,18 +174,8 @@ export default function StoreCompletenessPage() {
               <p className="jl-kpi__label">Printers</p>
             </div>
             <div className="jl-kpi">
-              <div className="jl-kpi__top">
-                <span className={`jl-badge ${incompleteCount > 0 ? "jl-badge--amber" : "jl-badge--green"}`}>
-                  {incompleteCount > 0
-                    ? `${incompleteCount} incomplete`
-                    : "All complete"}
-                </span>
-              </div>
-              <p className="jl-kpi__label">
-                {incompleteCount > 0
-                  ? `${incompleteCount} item${incompleteCount !== 1 ? "s" : ""} need attention`
-                  : "Every item is fully captured"}
-              </p>
+              <p className="jl-kpi__value" style={{ color: incompleteCount > 0 ? "var(--amber-700)" : "var(--green-700)" }}>{incompleteCount}</p>
+              <p className="jl-kpi__label">Incomplete</p>
             </div>
           </div>
 

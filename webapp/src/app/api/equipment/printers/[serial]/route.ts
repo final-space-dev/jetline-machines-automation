@@ -107,10 +107,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ ser
 
     if (dim.rows.length === 0 && map.rows.length === 0) return notFound();
 
-    // Store staff may only view printers in their own store, when resolvable.
+    // Store staff may only view printers in their OWN store. Fail closed: if the
+    // printer's store cannot be resolved to the caller's store, deny.
     if (user.role !== "admin") {
       const store = map.rows[0]?.store ?? null;
-      if (store && store !== user.store) {
+      if (!store || store !== user.store) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
@@ -151,7 +152,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ se
   }
 
   return withClient(xeroxPool, async (client) => {
-    // Enforce store ownership for store_staff when the printer's store is resolvable.
+    // Enforce store ownership for store_staff. Fail closed: deny if the printer's
+    // store cannot be resolved to the caller's own store.
     let resolvedStore: string | null = null;
     if (user.role !== "admin") {
       const storeRes = await client.query(
@@ -159,7 +161,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ se
         [sn]
       );
       resolvedStore = storeRes.rows[0]?.store ?? null;
-      if (resolvedStore && resolvedStore !== user.store) {
+      if (!resolvedStore || resolvedStore !== user.store) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }

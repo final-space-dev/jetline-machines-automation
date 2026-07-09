@@ -324,12 +324,7 @@ function UserModal({
         aria-label={isEdit ? "Edit user" : "Add user"}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-          <div>
-            <div className="jl-modal__title">{isEdit ? "Edit user" : "Add user"}</div>
-            <div className="jl-modal__text">
-              {isEdit ? "Update the details for this user." : "Create a new user account."}
-            </div>
-          </div>
+          <div className="jl-modal__title">{isEdit ? "Edit user" : "Add user"}</div>
           <button
             className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
             onClick={onClose}

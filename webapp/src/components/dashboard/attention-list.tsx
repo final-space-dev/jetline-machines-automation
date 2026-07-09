@@ -92,7 +92,16 @@ export function AttentionList({ tabs, activeKey, onTabChange }: AttentionListPro
 
       {/* Table — kit banded table inside an elevated wrap */}
       {sortedRows.length === 0 ? (
-        <div className="jl-card jl-card--pad-lg" style={{ textAlign: "center", color: "var(--ink-400)" }}>
+        <div
+          style={{
+            textAlign: "center",
+            color: "var(--ink-400)",
+            padding: "var(--s-7)",
+            borderRadius: "var(--r-lg)",
+            background: "var(--surface-sunken)",
+            boxShadow: "var(--sh-inset)",
+          }}
+        >
           <p className="jl-sm">Nothing needs attention here right now</p>
         </div>
       ) : (

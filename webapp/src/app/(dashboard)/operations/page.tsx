@@ -5,7 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { useRole } from "@/lib/use-role";
 import {
   RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock,
-  Wifi, WifiOff, GitMerge, Printer, Activity,
+  Wifi, WifiOff,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -60,38 +60,7 @@ function formatTime(iso: string | null): string {
   return new Date(iso).toLocaleString("en-ZA", { dateStyle: "short", timeStyle: "short" });
 }
 
-type KpiTone = "green" | "amber" | "red" | "blue" | "neutral";
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function Kpi({
-  label, value, foot, tone, icon: Icon,
-}: {
-  label: string;
-  value: number | string;
-  foot?: string;
-  tone: KpiTone;
-  icon: React.ElementType;
-}) {
-  const chipTone =
-    tone === "green" ? "jl-chip--green"
-    : tone === "amber" ? "jl-chip--amber"
-    : tone === "red" ? "" // red is the chip default tint
-    : tone === "blue" ? "jl-chip--blue"
-    : "jl-chip--neutral";
-  return (
-    <div className="jl-kpi">
-      <div className="jl-kpi__top">
-        <span className="jl-kpi__label">{label}</span>
-        <span className={`jl-chip jl-chip--sm ${chipTone}`}>
-          <Icon />
-        </span>
-      </div>
-      <div className="jl-kpi__value">{value}</div>
-      {foot && <div className="jl-kpi__foot">{foot}</div>}
-    </div>
-  );
-}
 
 function StatusPill({ ok, okText, warnText, tone = "amber" }: {
   ok: boolean; okText: string; warnText: string; tone?: "amber" | "red";
@@ -161,11 +130,13 @@ function SyncRow({ sync }: { sync: OpsData["sync"]["recentSyncs"][0] }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="jl-sm" style={{ fontWeight: "var(--fw-semibold)" }}>
           {sync.company_id ?? "All companies"}
-          {sync.triggered_by && <span className="jl-muted" style={{ fontWeight: "var(--fw-regular)" }}> · {sync.triggered_by}</span>}
+          {sync.triggered_by && (
+            <span className="jl-muted" style={{ fontWeight: "var(--fw-regular)" }}> ({sync.triggered_by})</span>
+          )}
         </div>
         {failed && sync.error_detail && (
           <p className="jl-xs" style={{ color: "var(--red-600)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sync.error_detail}>
-            {sync.error_detail.slice(0, 80)}{sync.error_detail.length > 80 ? "…" : ""}
+            {sync.error_detail.slice(0, 80)}{sync.error_detail.length > 80 ? "..." : ""}
           </p>
         )}
         {ok && sync.machines_synced != null && (
@@ -184,11 +155,9 @@ export default function OperationsPage() {
   const [data, setData] = useState<OpsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
-    else setRefreshing(true);
     setError(null);
     try {
       const res = await fetch("/api/operations");
@@ -198,7 +167,6 @@ export default function OperationsPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -223,17 +191,15 @@ export default function OperationsPage() {
   if (error || !data) {
     return (
       <AppShell>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <div className="jl-alert jl-alert--red">
-            <span className="jl-chip"><XCircle /></span>
-            <div className="jl-alert__body">
-              <div className="jl-alert__title">Could not load operations data</div>
-              <div className="jl-alert__text">{error ?? "No data returned from the server."}</div>
-            </div>
-            <button className="jl-btn jl-btn--soft jl-btn--sm" onClick={() => fetchData(false)}>
-              <RefreshCw /> Retry
-            </button>
+        <div className="jl-alert jl-alert--red">
+          <span className="jl-chip"><XCircle /></span>
+          <div className="jl-alert__body">
+            <div className="jl-alert__title">Could not load operations data</div>
+            <div className="jl-alert__text">{error ?? "No data returned from the server."}</div>
           </div>
+          <button className="jl-btn jl-btn--soft jl-btn--sm" onClick={() => fetchData(false)}>
+            <RefreshCw /> Retry
+          </button>
         </div>
       </AppShell>
     );
@@ -256,49 +222,40 @@ export default function OperationsPage() {
     { label: "Never", value: staleness.never, tone: "var(--ink-300)" },
   ];
 
+  const kpis: { label: string; value: number | string; color: string }[] = [
+    { label: "Total Fleet", value: totalMachines, color: "var(--ink-900)" },
+    {
+      label: "Reporting OK",
+      value: `${reportingPct}%`,
+      color: reportingPct >= 80 ? "var(--green-700)" : reportingPct >= 60 ? "var(--amber-700)" : "var(--red-600)",
+    },
+    {
+      label: "Unmapped",
+      value: mapping.unmapped,
+      color: mapping.unmapped === 0 ? "var(--green-700)" : mapping.unmapped < 10 ? "var(--amber-700)" : "var(--red-600)",
+    },
+    {
+      label: "Not in BMS",
+      value: crossRef.notInBms,
+      color: crossRef.notInBms === 0 ? "var(--green-700)" : "var(--amber-700)",
+    },
+  ];
+
   return (
     <AppShell>
-      <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--s-6)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-6)" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-4)" }}>
-          <h1 className="jl-h1">Operations</h1>
-          <button
-            className="jl-btn jl-btn--secondary jl-btn--sm"
-            onClick={() => fetchData(true)}
-            aria-disabled={refreshing}
-            disabled={refreshing}
-          >
-            <RefreshCw style={refreshing ? { animation: "jl-spin .8s linear infinite" } : undefined} />
-            Refresh
-          </button>
-        </div>
+        <h1 className="jl-h1">Operations</h1>
 
         {/* ── Top KPI row ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "var(--s-4)" }}>
-          <Kpi
-            label="Total Fleet" value={totalMachines}
-            foot={`${fleet.present} on Xerox · ${fleet.missing} missing`}
-            icon={Printer} tone="blue"
-          />
-          <Kpi
-            label="Reporting OK" value={`${reportingPct}%`}
-            foot={`${reportingOk} of ${totalMachines} within 14 days`}
-            icon={Activity}
-            tone={reportingPct >= 80 ? "green" : reportingPct >= 60 ? "amber" : "red"}
-          />
-          <Kpi
-            label="Unmapped" value={mapping.unmapped}
-            foot="No store or group assigned"
-            icon={GitMerge}
-            tone={mapping.unmapped === 0 ? "green" : mapping.unmapped < 10 ? "amber" : "red"}
-          />
-          <Kpi
-            label="Not in BMS" value={crossRef.notInBms}
-            foot="On Xerox, missing from BMS"
-            icon={WifiOff}
-            tone={crossRef.notInBms === 0 ? "green" : "amber"}
-          />
+          {kpis.map((k) => (
+            <div key={k.label} className="jl-kpi">
+              <div className="jl-kpi__value" style={{ color: k.color }}>{k.value}</div>
+              <div className="jl-kpi__label">{k.label}</div>
+            </div>
+          ))}
         </div>
 
         {/* ── Data pipeline + Sync health ── */}
@@ -330,7 +287,7 @@ export default function OperationsPage() {
               <DetailRow label="Last successful full sync" value={timeAgo(sync.lastSuccess)} />
               <DetailRow label="Last sync time" value={formatTime(sync.lastSuccess)} />
             </div>
-            <div className="jl-eyebrow" style={{ marginBottom: "var(--s-2)" }}>Recent runs</div>
+            <div className="jl-h3" style={{ marginBottom: "var(--s-3)" }}>Recent runs</div>
             <div>
               {sync.recentSyncs.length === 0 ? (
                 <p className="jl-sm jl-muted" style={{ padding: "var(--s-3) 0" }}>No sync runs recorded yet.</p>
@@ -346,11 +303,8 @@ export default function OperationsPage() {
 
           {/* Reading health */}
           <div className="jl-card">
-            <div className="jl-card__head" style={{ marginBottom: "var(--s-5)" }}>
-              <div>
-                <div className="jl-card__title">Reading Health</div>
-                <div className="jl-card__sub">How recently machines sent data to Xerox</div>
-              </div>
+            <div className="jl-card__head">
+              <div className="jl-card__title">Reading Health</div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-3)" }}>
               {stalenessRows.map(({ label, value, tone }) => (
@@ -374,7 +328,7 @@ export default function OperationsPage() {
 
             {/* Mapping health */}
             <hr className="jl-soft-divider" />
-            <div className="jl-eyebrow" style={{ marginBottom: "var(--s-4)" }}>Mapping</div>
+            <div className="jl-h3" style={{ marginBottom: "var(--s-4)" }}>Mapping</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--s-3)", textAlign: "center" }}>
               <div>
                 <div className="jl-h2" style={{ color: "var(--green-700)" }}>{mapping.mapped}</div>
@@ -396,10 +350,7 @@ export default function OperationsPage() {
           {/* Alert feed */}
           <div className="jl-card">
             <div className="jl-card__head">
-              <div>
-                <div className="jl-card__title">Alert Feed</div>
-                <div className="jl-card__sub">Machines that need attention</div>
-              </div>
+              <div className="jl-card__title">Alert Feed</div>
               {alerts.length > 0 && (
                 <span className="jl-badge jl-badge--red">{alerts.length} alerts</span>
               )}
@@ -423,7 +374,7 @@ export default function OperationsPage() {
         {isAdmin && sync.recentSyncs.length > 0 && (
           <div>
             <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Recent Sync Runs</h2>
-            <div className="jl-table-wrap">
+            <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
               <table className="jl-table">
                 <thead>
                   <tr>
@@ -461,36 +412,29 @@ export default function OperationsPage() {
 
         {/* ── Xerox fleet breakdown ── */}
         <div className="jl-card">
-          <div className="jl-card__head" style={{ marginBottom: "var(--s-5)" }}>
-            <div>
-              <div className="jl-card__title">Xerox Fleet Breakdown</div>
-              <div className="jl-card__sub">Status of all machines in the Xerox database</div>
-            </div>
+          <div className="jl-card__head">
+            <div className="jl-card__title">Xerox Fleet Breakdown</div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--s-5)", textAlign: "center" }}>
             <div>
               <div className="jl-display" style={{ color: "var(--green-700)" }}>{fleet.present}</div>
               <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Present on Xerox</div>
-              <div className="jl-xs jl-faint">Seen in last 7 days</div>
             </div>
             <div>
               <div className="jl-display" style={{ color: "var(--red-600)" }}>{fleet.missing}</div>
               <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Missing from Xerox</div>
-              <div className="jl-xs jl-faint">Not in latest file</div>
             </div>
             <div>
               <div className="jl-display" style={{ color: mapping.unmapped > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
                 {mapping.unmapped}
               </div>
               <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Unmapped machines</div>
-              <div className="jl-xs jl-faint">No store assigned</div>
             </div>
             <div>
               <div className="jl-display" style={{ color: crossRef.notInBms > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
                 {crossRef.notInBms}
               </div>
               <div className="jl-sm jl-muted" style={{ fontWeight: "var(--fw-semibold)" }}>Present, not in BMS</div>
-              <div className="jl-xs jl-faint">Needs BMS entry</div>
             </div>
           </div>
         </div>

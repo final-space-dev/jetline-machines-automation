@@ -1,16 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { ArrowLeft } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/ui/page-header";
 
-// Account stub (this phase). Shows the signed-in user and a change-password
-// form shell built from the Jetline UI kit. The submit is wired in a later
-// phase together with the backend endpoint — the button stays disabled here
-// rather than pretending to change a password.
+// Account page. Shows the signed-in user and a change-password form shell
+// built from the Jetline UI kit. The submit is wired in a later phase together
+// with the backend endpoint, so the button stays disabled here rather than
+// pretending to change a password.
 export default function AccountPage() {
   // useSession() can return undefined during static prerender (no SessionProvider
-  // in the tree at build time) — guard the same way lib/use-role.ts does.
+  // in the tree at build time), so guard the same way lib/use-role.ts does.
   const session = useSession();
   const user = session?.data?.user;
   const name = user?.name || "";
@@ -20,7 +21,16 @@ export default function AccountPage() {
   return (
     <AppShell>
       <div style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: "var(--s-6)" }}>
-        <PageHeader title="Account" backHref="/stores" />
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--s-3)" }}>
+          <Link
+            href="/stores"
+            className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
+            aria-label="Back to stores"
+          >
+            <ArrowLeft />
+          </Link>
+          <h1 className="jl-h1">Account</h1>
+        </div>
 
         <div className="jl-card">
           <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)" }}>

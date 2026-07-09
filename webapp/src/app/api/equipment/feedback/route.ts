@@ -29,14 +29,15 @@ export async function PATCH(req: NextRequest) {
   if (Object.keys(updates).length === 0) return badRequest("No valid fields");
 
   return withClient(xeroxPool, async (client) => {
-    // Enforce store ownership for store_staff when the printer's store is resolvable.
+    // Enforce store ownership for store_staff. Fail closed: deny if the printer's
+    // store cannot be resolved to the caller's own store.
     if (user.role !== "admin") {
       const storeRes = await client.query(
         `SELECT store FROM xerox.printer_store_map WHERE UPPER(TRIM(serial_number)) = $1 LIMIT 1`,
         [sn]
       );
       const store = storeRes.rows[0]?.store ?? null;
-      if (store && store !== user.store) {
+      if (!store || store !== user.store) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }

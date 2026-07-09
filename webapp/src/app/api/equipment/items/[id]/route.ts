@@ -110,8 +110,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       [...Object.values(updates), id]
     );
 
-    // Audit log — one row per changed field
-    const changed_by = body._changed_by ?? user.email ?? "user";
+    // Audit log — one row per changed field. Attribution comes ONLY from the
+    // authenticated session, never the request body, so it cannot be spoofed.
+    const changed_by = user.email ?? user.name ?? String(user.id);
     for (const [field, newVal] of Object.entries(updates)) {
       const oldVal = old[field] ?? null;
       if (JSON.stringify(oldVal) !== JSON.stringify(newVal ?? null)) {

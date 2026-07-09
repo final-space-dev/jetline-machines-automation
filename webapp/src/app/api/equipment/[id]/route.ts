@@ -70,12 +70,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       [...setValues, id]
     );
 
+    // Attribution comes ONLY from the authenticated session, never the request
+    // body, so audit entries cannot be spoofed.
+    const changed_by = user.email ?? user.name ?? String(user.id);
     for (const [field, newVal] of Object.entries(updates)) {
       const oldVal = old[field] ?? null;
       if (String(oldVal) !== String(newVal ?? "")) {
         await client.query(
           `INSERT INTO equipment.change_log (item_id, field, old_value, new_value, changed_by) VALUES ($1,$2,$3,$4,$5)`,
-          [id, field, oldVal, newVal, body.changed_by ?? user.email ?? "user"]
+          [id, field, oldVal, newVal, changed_by]
         );
       }
     }
