@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
 import { randomUUID } from "crypto";
+import { put, del } from "@vercel/blob";
 import { bmsPool } from "@/lib/bms-pool";
 import { withClient, notFound, badRequest, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
@@ -21,12 +20,8 @@ const EXT_BY_MIME: Record<string, string> = {
 };
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB per file
 
-function uploadDir(id: string): string {
-  return path.join(process.cwd(), "public", "uploads", "equipment", id);
-}
-
-// POST — multipart form-data with one or more "files"; saves to disk and appends
-// public URLs to equipment.items.photos (TEXT[]).
+// POST — multipart form-data with one or more "files". Uploads to Vercel Blob
+// and appends the public Blob URLs to equipment.items.photos (TEXT[]).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!validId(id)) return notFound();
@@ -54,18 +49,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const dir = uploadDir(id);
-    await fs.mkdir(dir, { recursive: true });
-
     const newUrls: string[] = [];
     for (const file of files) {
       if (!ALLOWED_MIME.has(file.type)) continue;
       if (file.size === 0 || file.size > MAX_BYTES) continue;
       const ext = EXT_BY_MIME[file.type] ?? ".bin";
-      const filename = `${randomUUID()}${ext}`;
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(path.join(dir, filename), buffer);
-      newUrls.push(`/uploads/equipment/${id}/${filename}`);
+      const key = `equipment/${id}/${randomUUID()}${ext}`;
+      const blob = await put(key, file, { access: "public", contentType: file.type });
+      newUrls.push(blob.url);
     }
 
     if (newUrls.length === 0) return badRequest("No valid image files");
@@ -84,8 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }).catch((err) => { timer.error(err); return serverError(err, `POST /api/equipment/items/${id}/photos`); });
 }
 
-// DELETE — body { url }; removes url from photos array and unlinks the file if it
-// lives under this item's upload directory.
+// DELETE — body { url }; removes the url from photos[] and deletes the Blob.
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!validId(id)) return notFound();
@@ -121,12 +111,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     );
     if (updated.rows.length === 0) return notFound();
 
-    // Unlink the physical file only if it belongs to this item's upload dir.
-    const prefix = `/uploads/equipment/${id}/`;
-    if (url.startsWith(prefix)) {
-      const filename = path.basename(url);
-      const filePath = path.join(uploadDir(id), filename);
-      await fs.unlink(filePath).catch(() => {});
+    // Delete the underlying Blob (only our own Blob URLs; ignore legacy/local paths).
+    if (url.includes(".blob.vercel-storage.com/")) {
+      await del(url).catch(() => {});
     }
 
     timer.done({ id });

@@ -25,7 +25,6 @@ model Company {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   machines          Machine[]
-  scenarioCompanies ScenarioCompany[]
 
   @@map("companies")
 }
@@ -157,7 +156,6 @@ model Machine {
   readings              MeterReading[]
   rates                 MachineRate[]
   xeroxBillings         XeroxBilling[]
-  scenarioMachines      ScenarioMachine[]
 
   @@index([companyId])
   @@index([serialNumber])
@@ -236,60 +234,6 @@ model MeterReading {
 }
 
 // =============================================================================
-// WAR ROOM - Scenario Planning
-// =============================================================================
-
-model Scenario {
-  id          String         @id @default(cuid())
-  name        String
-  description String?
-  status      ScenarioStatus @default(DRAFT)
-  createdBy   String?        @map("created_by")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
-
-  companies   ScenarioCompany[]
-  machines    ScenarioMachine[]
-
-  @@map("scenarios")
-}
-
-enum ScenarioStatus {
-  DRAFT
-  PROPOSED
-  APPROVED
-  IMPLEMENTED
-  ARCHIVED
-}
-
-model ScenarioCompany {
-  id          String    @id @default(cuid())
-  scenarioId  String    @map("scenario_id")
-  companyId   String    @map("company_id")
-
-  scenario    Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  company     Company   @relation(fields: [companyId], references: [id])
-
-  @@unique([scenarioId, companyId])
-  @@map("scenario_companies")
-}
-
-model ScenarioMachine {
-  id              String    @id @default(cuid())
-  scenarioId      String    @map("scenario_id")
-  machineId       String    @map("machine_id")
-  fromCompanyId   String    @map("from_company_id")
-  toCompanyId     String    @map("to_company_id")
-  notes           String?
-
-  scenario        Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  machine         Machine   @relation(fields: [machineId], references: [id])
-
-  @@unique([scenarioId, machineId])
-  @@map("scenario_machines")
-}
-
-// =============================================================================
 // SYNC & AUDIT
 // =============================================================================
 
@@ -318,24 +262,6 @@ enum SyncStatus {
   RUNNING
   COMPLETED
   FAILED
-}
-
-// =============================================================================
-// BMS CONNECTION CONFIG
-// =============================================================================
-
-model BmsConnection {
-  id          String    @id @default(cuid())
-  schema      String    @unique // e.g., "menlynbms2"
-  host        String    // hostname
-  port        Int       @default(3306)
-  isActive    Boolean   @default(true) @map("is_active")
-  lastChecked DateTime? @map("last_checked")
-  lastError   String?   @map("last_error")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  @@map("bms_connections")
 }
 
 // =============================================================================
@@ -451,18 +377,4 @@ model XeroxBilling {
   @@index([billingMonth])
   @@index([machineId])
   @@map("xerox_billings")
-}
-
-// =============================================================================
-// PIVOT VIEWS (shared across all users)
-// =============================================================================
-
-model PivotView {
-  id         String   @id @default(cuid())
-  name       String
-  pivotState Json     @map("pivot_state")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  @@map("pivot_views")
 }

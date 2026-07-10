@@ -312,11 +312,10 @@ export default function StoreDetailPage() {
                           <tr
                             key={machine.id}
                             className={cn(
-                              "hover:bg-muted/50 cursor-pointer",
+                              "hover:bg-muted/50",
                               util?.utilizationStatus === "critical" && "bg-red-50/30",
                               util && util.liftScore >= 80 && "bg-orange-50/30"
                             )}
-                            onClick={() => router.push(`/machines/${machine.id}`)}
                           >
                             <td className="px-3 py-1.5 font-mono">{machine.serialNumber}</td>
                             <td className="px-3 py-1.5 truncate max-w-[120px]">{machine.modelName || "-"}</td>
