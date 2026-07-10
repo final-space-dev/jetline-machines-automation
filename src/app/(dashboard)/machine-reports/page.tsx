@@ -591,7 +591,7 @@ interface ApiPayload {
 const DEFAULT_FILTERS: Filters = { search: "", store: "all", group: "all", type: "all", model: "all" };
 
 export default function MachineReportsPage() {
-  useAdminGuard(); // admin-only; store staff are redirected to their store
+  const { allowed, loading: guardLoading } = useAdminGuard(); // admin-only
   const [activeTab, setActiveTab] = useState<TabType>("summary");
   const [cache, setCache] = useState<Partial<Record<TabType, ApiPayload>>>({});
   const [loading, setLoading] = useState(false);
@@ -622,6 +622,17 @@ export default function MachineReportsPage() {
   }
 
   const current = cache[activeTab];
+
+  // Block non-admins from the render path (they're being redirected to their store).
+  if (guardLoading || !allowed) {
+    return (
+      <AppShell>
+        <div style={{ display: "grid", placeItems: "center", height: 160 }}>
+          <div className="jl-spinner jl-spinner--lg" />
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>

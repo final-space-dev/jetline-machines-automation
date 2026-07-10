@@ -152,7 +152,7 @@ function SyncRow({ sync }: { sync: OpsData["sync"]["recentSyncs"][0] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OperationsPage() {
-  useAdminGuard(); // admin-only; store staff are redirected to their store
+  const { allowed, loading: guardLoading } = useAdminGuard(); // admin-only
   const { isAdmin } = useRole();
   const [data, setData] = useState<OpsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -179,6 +179,17 @@ export default function OperationsPage() {
     const t = setInterval(() => fetchData(true), 300_000);
     return () => clearInterval(t);
   }, [fetchData]);
+
+  // Block non-admins from the render path (they're being redirected to their store).
+  if (guardLoading || !allowed) {
+    return (
+      <AppShell>
+        <div style={{ display: "grid", placeItems: "center", height: 160 }}>
+          <div className="jl-spinner jl-spinner--lg" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (loading) {
     return (

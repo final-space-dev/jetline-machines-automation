@@ -187,7 +187,9 @@ function CompletenessLeaderboard({ rows }: { rows: DataQualityRow[] }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function FleetHealthPage() {
-  useAdminGuard(); // admin-only; store staff are redirected to their store
+  // admin-only; store staff are redirected to their store. Gate rendering on it
+  // so staff never hit the fleet render path (the API 403s them).
+  const { allowed, loading: guardLoading } = useAdminGuard();
   const [data, setData] = useState<FleetHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("poorCondition");
@@ -335,6 +337,17 @@ export default function FleetHealthPage() {
       },
     ] as AttentionTab[];
   }, [data]);
+
+  // Block non-admins from the fleet render path entirely (they're being redirected).
+  if (guardLoading || !allowed) {
+    return (
+      <AppShell>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+          <p className="jl-sm jl-faint">Loading…</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (loading) {
     return (
