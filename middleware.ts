@@ -172,6 +172,9 @@ export default auth((req) => {
 });
 
 export const config = {
+  // Node.js runtime (not Edge): the auth wrapper imports @/lib/auth (NextAuth v5
+  // + bcrypt) and @/lib/rate-limit, which use Node APIs unavailable on Edge.
+  runtime: "nodejs",
   // Run on all routes except Next internals and static assets.
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|css|js)$).*)",
