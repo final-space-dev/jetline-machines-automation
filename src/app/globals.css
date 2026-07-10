@@ -1,0 +1,399 @@
+/* Layer order — earlier = lower priority. jlkit sits ABOVE Tailwind's `base`
+   (so the kit's component styles like `.jl-table thead th { padding }` beat
+   Tailwind preflight's `* { padding:0 }` reset) but BELOW `utilities` (so
+   Tailwind utility classes still win where a page uses them). Getting this
+   wrong is what made kit tables render with zero padding / as plain text. */
+@layer theme, base, jlkit, components, utilities;
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ── Jetline UI Kit (ground truth) — imported into the low-priority jlkit layer.
+   Provides tokens (--red-500, --canvas …), base styles, and all jl-* component
+   classes. Font is loaded via next/font in layout.tsx. */
+@import "../styles/jl/tokens.css" layer(jlkit);
+@import "../styles/jl/controls.css" layer(jlkit);
+@import "../styles/jl/surfaces.css" layer(jlkit);
+@import "../styles/jl/overlays.css" layer(jlkit);
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ── App-level token supplements ──────────────────────────────────────────────
+   The kit tokens.css owns all colour/shadow/radius tokens. Only app-specific
+   values that the kit does not define live here. color-scheme: only light MUST
+   stay — no dark mode anywhere. */
+:root {
+  color-scheme: only light;
+
+  /* Wire the kit font var onto the next/font family so both names resolve. */
+  --font: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --jl-font: var(--font);
+
+  /* Spacing scale kept under the legacy --jl-s* names used by inline styles. */
+  --jl-s1: 4px; --jl-s2: 8px; --jl-s3: 12px; --jl-s4: 16px; --jl-s5: 20px;
+  --jl-s6: 24px; --jl-s7: 32px; --jl-s8: 40px; --jl-s9: 48px; --jl-s10: 64px;
+
+  /* Mobile bottom-nav height (used to pad main content so nothing hides under it) */
+  --jl-bottom-nav-h: 60px;
+}
+
+
+/* JetlineUI surface utility — used by Equipment CRM components */
+.jl-surface {
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  border-radius: var(--r-lg);
+  font-family: var(--font);
+}
+.jl-page {
+  background: var(--canvas);
+  font-family: var(--font);
+  color: var(--ink-900);
+  min-height: 100%;
+}
+
+
+:root {
+  --radius: 0.375rem;
+
+  /* White base */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.13 0 0);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.13 0 0);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.13 0 0);
+
+  /* Blue primary — Tailwind blue-600 */
+  --primary: oklch(0.546 0.215 261.3);
+  --primary-foreground: oklch(1 0 0);
+
+  /* Light grey secondary */
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.2 0 0);
+
+  /* Subtle muted */
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+
+  /* Accent — blue-50 tint */
+  --accent: oklch(0.965 0.02 261.3);
+  --accent-foreground: oklch(0.546 0.215 261.3);
+
+  /* Destructive — red-600 */
+  --destructive: oklch(0.577 0.245 27.325);
+
+  /* Borders and inputs — clean grey */
+  --border: oklch(0.91 0 0);
+  --input: oklch(0.91 0 0);
+  --ring: oklch(0.546 0.215 261.3);
+
+  /* Sidebar — white with subtle border */
+  --sidebar: oklch(0.99 0 0);
+  --sidebar-foreground: oklch(0.13 0 0);
+  --sidebar-primary: oklch(0.546 0.215 261.3);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.965 0.02 261.3);
+  --sidebar-accent-foreground: oklch(0.546 0.215 261.3);
+  --sidebar-border: oklch(0.91 0 0);
+  --sidebar-ring: oklch(0.546 0.215 261.3);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Consistent heading scale */
+  h1 { @apply text-xl font-semibold tracking-tight text-foreground; }
+  h2 { @apply text-lg font-semibold tracking-tight text-foreground; }
+  h3 { @apply text-base font-semibold text-foreground; }
+
+  /* Clean table defaults */
+  table { @apply text-xs; }
+  th { @apply font-medium text-muted-foreground text-xs; }
+}
+
+@keyframes jl-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Consistent keyboard focus ring for all JL interactive elements */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--jl-sh-focus, 0 0 0 3px rgba(230,18,31,0.25)) !important;
+}
+
+/* ── Phase 16 — Mobile Responsive helpers ─────────────────────────────────────
+   Breakpoints: mobile-first, md = 768px is the primary sidebar / bottom-nav
+   switch. Many pages use inline style={{}} with JL tokens, so responsive
+   overrides here use !important to win over inline base values. Desktop
+   behaviour is unchanged (rules only apply below the breakpoint). */
+
+/* Store grid: 1 col mobile → 2 (sm) → 3 (md) → 4-5 auto-fill (lg). The base
+   (desktop) grid uses auto-fill/minmax inline; we override columns below lg.
+   Blocks are ordered narrow→wide so the wider range wins in overlap. */
+@media (max-width: 639px) {
+  .jl-grid-stores { grid-template-columns: 1fr !important; }
+}
+@media (min-width: 640px) and (max-width: 767px) {
+  .jl-grid-stores { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .jl-grid-stores { grid-template-columns: repeat(3, 1fr) !important; }
+}
+
+/* KPI strip: 4 cols desktop → 2 cols mobile. */
+@media (max-width: 639px) {
+  .jl-grid-kpi { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Bottom nav bar (mobile only). Fixed to the bottom of the viewport. */
+.jl-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  height: var(--jl-bottom-nav-h);
+  display: none;
+  align-items: stretch;
+  background: var(--jl-surface);
+  border-top: 1.5px solid var(--jl-ink-100);
+  box-shadow: 0 -2px 10px rgba(16, 24, 40, 0.06);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  font-family: var(--jl-font);
+}
+@media (max-width: 767px) {
+  .jl-bottom-nav { display: flex; }
+  /* Give scrollable main content room so the fixed nav never covers the last row */
+  .jl-main-scroll { padding-bottom: calc(var(--jl-bottom-nav-h) + 12px) !important; }
+}
+
+.jl-bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--jl-font);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--jl-ink-500);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.jl-bottom-nav-btn[data-active="true"] {
+  color: var(--jl-red-500);
+}
+
+/* Generic show/hide helpers keyed to the md breakpoint. */
+@media (max-width: 767px) {
+  .jl-hide-mobile { display: none !important; }
+}
+@media (min-width: 768px) {
+  .jl-show-mobile { display: none !important; }
+}
+
+/* Sidebar: hidden below md, restored (flex) at md+. Overrides inline layout. */
+@media (max-width: 767px) {
+  .jl-sidebar { display: none !important; }
+}
+
+/* Card-stack for the equipment table on mobile. The <table> is hidden and a
+   card list is shown instead (both live in the DOM; CSS chooses which). */
+@media (max-width: 767px) {
+  .jl-table-desktop { display: none !important; }
+}
+@media (min-width: 768px) {
+  .jl-cards-mobile { display: none !important; }
+}
+
+/* Add-equipment form grids collapse to a single column on mobile. */
+@media (max-width: 767px) {
+  .jl-add-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+}
+
+/* Touch targets: bump interactive controls to min 44px on mobile. Condition /
+   status toggle buttons (36px base) grow to 48px; health bars from 8px to 12px. */
+@media (max-width: 767px) {
+  .jl-touch-toggle { height: 48px !important; min-height: 48px !important; }
+  .jl-touch-btn { min-height: 44px !important; }
+  .jl-health-bar { height: 12px !important; }
+  /* JlDate day cells → 44px tap targets on mobile */
+  .jl-date-cell { height: 44px !important; }
+  .jl-date-empty { height: 44px !important; }
+}
+
+/* Mobile page padding: the equipment pages use large inline horizontal
+   padding (32-40px). Tighten it below md so content isn't cramped. */
+@media (max-width: 767px) {
+  .jl-page-pad { padding-left: 16px !important; padding-right: 16px !important; padding-top: 20px !important; }
+}
+
+/* Hamburger overlay menu (mobile). Slides over the canvas from the left. */
+.jl-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+}
+.jl-mobile-drawer {
+  width: 80%;
+  max-width: 300px;
+  height: 100%;
+  background: var(--jl-surface);
+  box-shadow: var(--jl-sh-xl);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  font-family: var(--jl-font);
+}
+
+/* Command palette: full-screen on mobile (edge-to-edge, top-anchored). */
+@media (max-width: 767px) {
+  .jl-cmd-overlay { padding-top: 0 !important; align-items: stretch !important; }
+  .jl-cmd-panel {
+    max-width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  /* Let the results area grow to fill the screen on mobile */
+  .jl-cmd-panel > div:nth-child(2) { max-height: none !important; flex: 1 !important; }
+}
+
+/* ─── Tailwind color overrides — map gray-* to ink-* tokens ─────────── */
+/* Ensures Tailwind gray-* utilities (used by the courier-style table/form
+   pattern) pick up the cool-slate ink palette instead of Tailwind defaults. */
+:root {
+  --color-gray-50:  var(--ink-50);
+  --color-gray-100: var(--ink-100);
+  --color-gray-200: var(--ink-200);
+  --color-gray-300: var(--ink-300);
+  --color-gray-400: var(--ink-400);
+  --color-gray-500: var(--ink-500);
+  --color-gray-600: var(--ink-600);
+  --color-gray-700: var(--ink-700);
+  --color-gray-800: var(--ink-800);
+  --color-gray-900: var(--ink-900);
+}
+
+@media print {
+  /* Hide chrome when printing equipment pages */
+  nav, aside, header, [data-sidebar], .sync-panel, .jl-bottom-nav { display: none !important; }
+  /* Remove sticky positioning so top bar doesn't float */
+  [style*="position: sticky"], [style*="position:sticky"] { position: static !important; }
+  /* Ensure surface cards have borders in print */
+  [style*="box-shadow"] { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+  body { background: white !important; }
+  a { color: inherit !important; text-decoration: none !important; }
+}
+
+/* ── All-Stores grouped view: columns of groups, stores stacked below ──────────
+   5 group-columns across on wide screens, each column = a header + its stores
+   stacked vertically. Responsive down to 1 column on mobile. */
+.jl-group-columns {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.jl-group-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.jl-group-col__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 2px 8px;
+  border: 0;
+  border-bottom: 2px solid var(--ink-100);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.jl-group-col__head:hover .jl-group-col__title { color: var(--red-600); }
+.jl-group-col__head .jl-badge { margin-left: auto; }
+.jl-group-col__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jl-group-col__stores {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Store cards inside a column go full column width, stacked. */
+.jl-group-col__stores > * { width: 100%; }
+
+@media (max-width: 1400px) { .jl-group-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .jl-group-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 800px)  { .jl-group-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px)  { .jl-group-columns { grid-template-columns: 1fr; } }
