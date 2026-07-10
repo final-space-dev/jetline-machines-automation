@@ -102,15 +102,27 @@ export async function withClients<T>(
 }
 
 // ── Schema self-heal ──────────────────────────────────────────────────────────
-// The ERP/service-history columns were added to equipment.items after the table
-// first shipped, so a freshly-provisioned database (e.g. the Neon migration) can
-// lack them. Any query naming one then fails with 42703 "column does not exist"
-// (breaks item edit, item create, and CSV export). This idempotent guard heals
-// the schema on first use — call it before touching the optional columns.
-// Types match prisma/schema: dates -> DATE, money -> NUMERIC(12,2).
+// equipment.items is managed via raw SQL (not Prisma), and the Neon migration
+// copied only a partial column set — core columns (notes, condition, located_at,
+// photos, …) AND the later ERP/service columns are missing. Any query naming a
+// missing column fails with 42703 "column does not exist", breaking item edit,
+// item create, and CSV export. This idempotent guard declares the FULL expected
+// shape (every column the API reads/writes) with ADD COLUMN IF NOT EXISTS, so it
+// heals whatever is absent in one shot on first use. Column set is the authoritative
+// contract from ALLOWED_FIELDS / the INSERT in /api/equipment. Runs before the
+// affected queries. (Mirrors ensureActivitySchema() in /api/activity.)
 export async function ensureItemColumns(client: PoolClient): Promise<void> {
   await client.query(`
     ALTER TABLE equipment.items
+      ADD COLUMN IF NOT EXISTS store            TEXT,
+      ADD COLUMN IF NOT EXISTS machine_type     TEXT,
+      ADD COLUMN IF NOT EXISTS make_model       TEXT,
+      ADD COLUMN IF NOT EXISTS serial           TEXT,
+      ADD COLUMN IF NOT EXISTS condition        TEXT,
+      ADD COLUMN IF NOT EXISTS located_at       TEXT,
+      ADD COLUMN IF NOT EXISTS status           TEXT DEFAULT 'active',
+      ADD COLUMN IF NOT EXISTS notes            TEXT,
+      ADD COLUMN IF NOT EXISTS photos           TEXT[],
       ADD COLUMN IF NOT EXISTS purchase_date    DATE,
       ADD COLUMN IF NOT EXISTS supplier         TEXT,
       ADD COLUMN IF NOT EXISTS purchase_price   NUMERIC(12,2),
@@ -119,6 +131,7 @@ export async function ensureItemColumns(client: PoolClient): Promise<void> {
       ADD COLUMN IF NOT EXISTS next_service_due DATE,
       ADD COLUMN IF NOT EXISTS service_provider TEXT,
       ADD COLUMN IF NOT EXISTS replace_flag     BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS created_at       TIMESTAMPTZ DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW()
   `);
 }
