@@ -196,11 +196,15 @@ export default function FleetHealthPage() {
   const [quality, setQuality] = useState<DataQualityRow[]>([]);
 
   useEffect(() => {
+    // Only fetch once we've confirmed admin — the API 403s staff and the error
+    // body would crash the breakdown render.
+    if (!allowed) return;
     fetch("/api/equipment/fleet-health")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then(setData)
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [allowed]);
 
   // P19 leaderboard source — single call, already sorted worst-first.
   useEffect(() => {
@@ -213,8 +217,8 @@ export default function FleetHealthPage() {
   }, []);
 
   const barData = useMemo(() => {
-    if (!data) return [];
-    const c = data.conditionBreakdown;
+    const c = data?.conditionBreakdown;
+    if (!c) return [];
     return [{ name: "Fleet", good: c.good, fair: c.fair, poor: c.poor, unknown: c.unknown }];
   }, [data]);
 
