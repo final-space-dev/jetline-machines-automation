@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Printer, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, LabelList,
 } from "recharts";
 
 // ─── API shape ────────────────────────────────────────────────────────────────
@@ -30,6 +30,8 @@ interface PrintMonth {
 
 interface PrintReport {
   store: string;
+  serial: string | null;
+  serials: { serial: string; model: string }[];
   months: PrintMonth[];
   thisMonthTotal: number;
   lastMonthTotal: number;
@@ -110,18 +112,28 @@ export function PrintSection({
   const [data, setData] = useState<PrintReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  // "" = All printers (whole store). Any other value filters to that serial.
+  const [selectedSerial, setSelectedSerial] = useState("");
+  // Printer list persists across filter changes (it's store-wide, not per-filter),
+  // so the dropdown never empties while a filtered fetch is in flight.
+  const [serials, setSerials] = useState<{ serial: string; model: string }[]>([]);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setUnavailable(false);
-    fetch(`/api/stores/${encodeURIComponent(store)}/print-report`)
+    const qs = selectedSerial ? `?serial=${encodeURIComponent(selectedSerial)}` : "";
+    fetch(`/api/stores/${encodeURIComponent(store)}/print-report${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: PrintReport) => { if (alive) setData(d); })
+      .then((d: PrintReport) => {
+        if (!alive) return;
+        setData(d);
+        if (Array.isArray(d.serials) && d.serials.length) setSerials(d.serials);
+      })
       .catch(() => { if (alive) setUnavailable(true); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [store]);
+  }, [store, selectedSerial]);
 
   const chartData =
     data?.months.map((m) => ({
@@ -130,11 +142,24 @@ export function PrintSection({
       colour: m.colour,
       a3: m.a3,
       a3colour: m.a3colour,
+      // total drives the value label above each stacked bar (#3).
+      total: m.total,
     })) ?? [];
 
   const pct = data?.pctChange ?? 0;
   const up = pct >= 0;
   const sync = syncBadge(data?.lastSync ?? null);
+
+  // Index of the last stacked series (top of the bar) that is non-zero across the
+  // whole dataset — the rounded top corners + total label attach to it. Falls back
+  // to the last series so a single-printer B&W machine (only "black") still rounds.
+  const seriesTotals = SERIES.map((s) =>
+    chartData.reduce((sum, d) => sum + (Number((d as unknown as Record<string, number>)[s.key]) || 0), 0)
+  );
+  let topSeriesIdx = SERIES.length - 1;
+  for (let i = SERIES.length - 1; i >= 0; i--) {
+    if (seriesTotals[i] > 0) { topSeriesIdx = i; break; }
+  }
 
   return (
     <div style={{ marginBottom: 32 }}>
@@ -168,8 +193,25 @@ export function PrintSection({
                 </div>
               </div>
 
-              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--jl-ink-500)" }}>
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
+                {/* Printer filter — "All printers" (whole store) or one serial (#4). */}
+                {serials.length > 0 && (
+                  <select
+                    value={selectedSerial}
+                    onChange={(e) => setSelectedSerial(e.target.value)}
+                    aria-label="Filter by printer"
+                    className="jl-select"
+                    style={{ width: "auto", minWidth: 150, height: 34, fontSize: 12, fontWeight: 700 }}
+                  >
+                    <option value="">All printers</option>
+                    {serials.map((p) => (
+                      <option key={p.serial} value={p.serial}>
+                        {p.serial}{p.model ? ` · ${p.model}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--jl-ink-500)", whiteSpace: "nowrap" }}>
                   {data.printers.active} active
                   {data.printers.replaceFlagged > 0 && (
                     <span style={{ color: "var(--jl-red-600)" }}>{" · "}{data.printers.replaceFlagged} replace</span>
@@ -181,7 +223,7 @@ export function PrintSection({
             {/* Stacked bar */}
             <div style={{ width: "100%", height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                <BarChart data={chartData} margin={{ top: 24, right: 8, bottom: 4, left: 0 }}>
                   <CartesianGrid vertical={false} stroke="var(--jl-ink-100)" />
                   <XAxis
                     dataKey="month"
@@ -212,8 +254,24 @@ export function PrintSection({
                       stackId="v"
                       name={s.label}
                       fill={s.color}
-                      radius={i === SERIES.length - 1 ? [4, 4, 0, 0] : undefined}
-                    />
+                      // Rounded top corners on the topmost non-zero series (#3).
+                      radius={i === topSeriesIdx ? [5, 5, 0, 0] : undefined}
+                    >
+                      {/* Monthly total label above each bar — attached to the top
+                          series so it sits at the very top of the stack (#3). */}
+                      {i === topSeriesIdx && (
+                        <LabelList
+                          dataKey="total"
+                          position="top"
+                          offset={8}
+                          formatter={(v: React.ReactNode) => {
+                            const n = Number(v);
+                            return n > 0 ? formatK(n) : "";
+                          }}
+                          style={{ fontSize: 11, fontWeight: 800, fill: "var(--jl-ink-700)" }}
+                        />
+                      )}
+                    </Bar>
                   ))}
                 </BarChart>
               </ResponsiveContainer>

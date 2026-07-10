@@ -68,7 +68,7 @@ export default function AddEquipmentPage() {
         style={{
           position: "sticky", top: 0, zIndex: 30,
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12, padding: "14px 40px", background: "var(--surface)",
+          gap: 12, height: 64, padding: "0 40px", background: "var(--surface)",
           boxShadow: "var(--sh-sm)",
         }}
       >

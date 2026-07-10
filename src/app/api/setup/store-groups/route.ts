@@ -56,6 +56,9 @@ async function ensureTable(client: PoolClient) {
   await client.query(`ALTER TABLE equipment.store_group_map ADD COLUMN IF NOT EXISTS store_group   TEXT`);
   await client.query(`ALTER TABLE equipment.store_group_map ADD COLUMN IF NOT EXISTS "group"       TEXT`);
   await client.query(`ALTER TABLE equipment.store_group_map ADD COLUMN IF NOT EXISTS active        BOOLEAN     DEFAULT true`);
+  // Per-store BMS connection link — the Company name this store reports through.
+  // Nullable; a store with no connection set simply shows "—" in the Stores tab.
+  await client.query(`ALTER TABLE equipment.store_group_map ADD COLUMN IF NOT EXISTS company       TEXT`);
   await client.query(`ALTER TABLE equipment.store_group_map ADD COLUMN IF NOT EXISTS updated_at    TIMESTAMPTZ DEFAULT NOW()`);
 
   // Backfill "group" from a legacy `main_group` column if it still exists.
@@ -93,6 +96,7 @@ const SELECT_COLS = `store,
                      holding_group AS "holdingGroup",
                      store_group   AS "storeGroup",
                      "group"       AS "group",
+                     company,
                      active`;
 
 export async function GET() {
@@ -126,10 +130,11 @@ export async function PATCH(req: NextRequest) {
   if (typeof body?.holdingGroup === "string") groupCols.push({ col: "holding_group", value: body.holdingGroup.trim() || null });
   if (typeof body?.storeGroup === "string") groupCols.push({ col: "store_group", value: body.storeGroup.trim() || null });
   if (typeof body?.group === "string") groupCols.push({ col: `"group"`, value: body.group.trim() || null });
+  if (typeof body?.company === "string") groupCols.push({ col: "company", value: body.company.trim() || null });
 
   const hasActive = typeof body?.active === "boolean";
   if (groupCols.length === 0 && !hasActive) {
-    return badRequest("No fields to update (holdingGroup, storeGroup, group, or active)");
+    return badRequest("No fields to update (holdingGroup, storeGroup, group, company, or active)");
   }
 
   return withClient(bmsPool, async (client) => {

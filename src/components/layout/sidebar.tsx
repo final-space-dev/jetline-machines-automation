@@ -43,16 +43,16 @@ const SECTIONS: Section[] = [
     title: "Operations",
     items: [
       { name: "Dashboard", href: "/operations", icon: LayoutDashboard },
-      { name: "Activity", href: "/activity", icon: Activity, badge: true },
       { name: "Machine Reports", href: "/machine-reports", icon: BarChart3 },
-      { name: "Machine Mapping", href: "/machine-mapping", icon: GitMerge },
     ],
   },
   {
-    key: "setup",
-    title: "Setup",
+    key: "config",
+    title: "Config",
     items: [
-      { name: "Setup", href: "/setup", icon: Settings },
+      { name: "Config", href: "/setup", icon: Settings },
+      // Activity sits below Config per the menu ordering. It keeps the today-count badge.
+      { name: "Activity", href: "/activity", icon: Activity, badge: true },
     ],
   },
 ];
@@ -86,11 +86,12 @@ function BrandBlock({ mark }: { mark?: boolean }) {
     </div>
   );
 
+  // Collapsed rail shows just the square F mark. The expanded brand shows the
+  // wordmark WITHOUT the mark (the mark now lives only in the rail + the favicon).
   if (mark) return markEl;
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-      {markEl}
       {brand.logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={brand.logoUrl} alt={brand.name} style={{ height: 24, width: "auto", display: "block" }} />

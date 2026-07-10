@@ -29,6 +29,9 @@ interface Machine {
   condition_notes: string | null;
   replace_flag: string | null;
   age: string | null;
+  install_date: string | null;
+  latest_balance: number | string | null;
+  latest_balance_date: string | null;
 }
 
 interface EquipmentItem {
@@ -379,7 +382,8 @@ export default function StoreDetailPage() {
         style={{
           position: "sticky", top: 0, zIndex: 30,
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12, padding: "14px 40px", background: "var(--surface)", boxShadow: "var(--sh-sm)",
+          // height matches the top header (64px) so the two bars read as one band.
+          gap: 12, height: 64, padding: "0 40px", background: "var(--surface)", boxShadow: "var(--sh-sm)",
         }}
       >
         <nav className="jl-breadcrumb">
@@ -636,15 +640,17 @@ export default function StoreDetailPage() {
                     <th>Serial</th>
                     <th>Model</th>
                     <th>Type</th>
+                    <th>Install Date</th>
+                    <th className="num">Balance</th>
                     <th>Last Seen</th>
                     <th>Replace?</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={5} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
+                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
                   ) : machines.length === 0 ? (
-                    <tr><td colSpan={5} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>No Xerox printers mapped to this store</td></tr>
+                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>No Xerox printers mapped to this store</td></tr>
                   ) : (
                     machines.map((m) => {
                       const flag = m.replace_flag;
@@ -653,6 +659,7 @@ export default function StoreDetailPage() {
                         : flag === "MAYBE" ? "jl-badge--amber"
                         : flag === "NO" ? "jl-badge--green"
                         : "";
+                      const balance = m.latest_balance != null ? Number(m.latest_balance) : null;
                       return (
                         <tr key={m.serial_number}
                           onClick={() => router.push(`/equipment/printers/${encodeURIComponent(m.serial_number)}`)}
@@ -661,6 +668,16 @@ export default function StoreDetailPage() {
                           <td><span className="jl-mono" style={{ color: "var(--ink-600)" }}>{m.serial_number}</span></td>
                           <td className="cell-strong">{m.model_name ?? <span className="jl-muted" style={{ fontStyle: "italic", fontWeight: 400 }}>Not set</span>}</td>
                           <td style={{ color: "var(--ink-500)" }}>{m.printer_type ?? "Not set"}</td>
+                          <td style={{ color: "var(--ink-500)" }}>
+                            {m.install_date
+                              ? new Date(m.install_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" })
+                              : <span className="jl-muted">Not set</span>}
+                          </td>
+                          <td className="num" style={{ color: "var(--ink-700)", fontVariantNumeric: "tabular-nums" }}
+                            title={m.latest_balance_date ? `as at ${new Date(m.latest_balance_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}` : undefined}
+                          >
+                            {balance != null ? balance.toLocaleString("en-ZA") : <span className="jl-muted">—</span>}
+                          </td>
                           <td style={{ color: "var(--ink-500)" }}>
                             {m.last_seen ? new Date(m.last_seen).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" }) : "Never"}
                           </td>

@@ -34,10 +34,33 @@ export async function GET(
       xClient.query(
         `SELECT pd.serial_number, COALESCE(psm.model_name, pd.model) AS model_name,
                 psm.printer_type, pd.last_seen::text,
-                mf.condition_notes, mf.replace_flag, mf.age
+                mf.condition_notes, mf.replace_flag, mf.age,
+                mf.install_date::text AS install_date,
+                bal.latest_balance,
+                bal.latest_balance_date::text AS latest_balance_date
          FROM xerox.printer_dimensions pd
          JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
          LEFT JOIN xerox.machine_feedback mf ON UPPER(TRIM(mf.serial_number)) = UPPER(TRIM(pd.serial_number))
+         -- Latest meter balance: sum of the real meters at the most recent
+         -- report_date for this printer (its current running total).
+         LEFT JOIN LATERAL (
+           SELECT r.report_date AS latest_balance_date,
+                  SUM(r.reading)::bigint AS latest_balance
+           FROM xerox.meter_readings_normalised r
+           WHERE r.printer_id = pd.printer_id
+             AND r.meter_type IN
+               ('black_impressions','color_impressions','black_large_impressions','color_large_impressions')
+             AND r.reading IS NOT NULL
+             AND r.report_date = (
+               SELECT MAX(r2.report_date)
+               FROM xerox.meter_readings_normalised r2
+               WHERE r2.printer_id = pd.printer_id
+                 AND r2.meter_type IN
+                   ('black_impressions','color_impressions','black_large_impressions','color_large_impressions')
+                 AND r2.reading IS NOT NULL
+             )
+           GROUP BY r.report_date
+         ) bal ON TRUE
          WHERE psm.store = $1
            AND pd.manufacturer = 'Xerox'
            AND psm.reporting_enabled = true

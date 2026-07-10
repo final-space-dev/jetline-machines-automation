@@ -146,26 +146,9 @@ export function Header() {
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Mobile: brand mark + Fleet wordmark (matches sidebar brand block) */}
+        {/* Mobile: Fleet wordmark only (the square mark now lives in the collapsed
+            rail + the browser-tab favicon, not next to the wordmark). */}
         <div className="jl-show-mobile" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              flex: "none",
-              borderRadius: "var(--r-sm)",
-              background:
-                "linear-gradient(160deg, var(--red-400), var(--red-500) 55%, var(--red-600))",
-              boxShadow: "var(--sh-red)",
-              display: "grid",
-              placeItems: "center",
-              color: "#fff",
-              fontWeight: 800,
-              fontSize: 15,
-            }}
-          >
-            J
-          </div>
           <div style={{ display: "flex", alignItems: "center" }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: "var(--ink-900)", letterSpacing: "-0.03em", lineHeight: 1 }}>
               Jetline

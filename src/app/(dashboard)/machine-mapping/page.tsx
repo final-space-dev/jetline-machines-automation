@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import { useRole } from "@/lib/use-role";
 import {
   ArrowUpDown,
   ArrowUp,
@@ -192,6 +194,14 @@ function SortHeader({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MachineMappingPage() {
+  const router = useRouter();
+  // Machine mapping is an admin-only data-capture tool (it's under Config, not in
+  // the main menu). Non-admins are redirected home; the data API also 403s them.
+  const { isAdmin, loading: roleLoading } = useRole();
+  useEffect(() => {
+    if (!roleLoading && !isAdmin) router.replace("/");
+  }, [roleLoading, isAdmin, router]);
+
   const [machines, setMachines] = useState<XeroxMachine[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [groups, setGroups] = useState<string[]>([]);

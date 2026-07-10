@@ -338,7 +338,7 @@ export default function EquipmentItemPage() {
           background: "var(--surface)", boxShadow: "var(--sh-sm)",
           padding: "0 var(--s-8)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: "var(--s-4)", height: 60,
+          gap: "var(--s-4)", height: 64,
         }}>
           <nav className="jl-breadcrumb" style={{ minWidth: 0 }}>
             <Link href={`/equipment/stores/${encodeURIComponent(item.store)}`}>{item.store}</Link>

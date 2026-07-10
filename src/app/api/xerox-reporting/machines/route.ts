@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { bmsPool } from "@/lib/bms-pool";
+import { requireAdmin, AuthError } from "@/lib/auth";
 
 export async function GET() {
+  // Machine mapping is an admin data-capture exercise — not for store staff.
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   const xeroxClient = await xeroxPool.connect();
   const bmsClient = await bmsPool.connect();
   try {
@@ -89,6 +97,12 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   const body = await request.json() as {
     rows: Array<{
       serial: string;
@@ -136,6 +150,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   const body = await request.json() as {
     serial_number: string;
     store?: string | null;

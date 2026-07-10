@@ -49,6 +49,26 @@ const STORE_MACHINE_CTE = `
   )
 `;
 
+// Same CTE, optionally narrowed to a single serial ($2). Used only for the monthly
+// volume breakdown so the chart's printer filter works; store-wide stats (top
+// printer, active counts, last sync) keep using STORE_MACHINE_CTE unfiltered.
+const STORE_MACHINE_CTE_SERIAL = `
+  machines AS (
+    SELECT DISTINCT ON (pd.serial_number)
+      pd.printer_id,
+      pd.serial_number,
+      COALESCE(psm.model_name, pd.model) AS model_name
+    FROM xerox.printer_dimensions pd
+    JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+    WHERE pd.manufacturer = 'Xerox'
+      AND pd.serial_number IS NOT NULL
+      AND psm.reporting_enabled = true
+      AND psm.store = $1
+      AND ($2::text IS NULL OR pd.serial_number = $2)
+    ORDER BY pd.serial_number
+  )
+`;
+
 const METER_MAP: Record<string, "black" | "colour" | "a3" | "a3colour"> = {
   black_impressions: "black",
   color_impressions: "colour",
@@ -72,7 +92,7 @@ interface MonthlyRow {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ store: string }> }
 ) {
   let user: SessionUser;
@@ -88,15 +108,19 @@ export async function GET(
   if (user.role !== "admin" && storeName !== user.store) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  // Optional printer filter for the monthly chart. Empty/absent = whole store.
+  const serialParam = new URL(req.url).searchParams.get("serial");
+  const serial = serialParam && serialParam.trim() ? serialParam.trim() : null;
   const timer = routeTimer(`GET /api/stores/${storeName}/print-report`);
 
   return withClient(xeroxPool, async (client) => {
     // ── 6-month volume broken down by counter type ────────────────────────────
     // Per printer + meter_type, diff consecutive readings, sum the positive
-    // deltas into the calendar month they land in.
+    // deltas into the calendar month they land in. When `serial` is set the CTE
+    // narrows to that one printer so the chart can show a single machine.
     const monthlyResult = await client.query<MonthlyRow>(
       `
-      WITH ${STORE_MACHINE_CTE},
+      WITH ${STORE_MACHINE_CTE_SERIAL},
       readings AS (
         SELECT r.printer_id, r.meter_type, r.report_date, r.reading
         FROM xerox.meter_readings_normalised r
@@ -124,7 +148,7 @@ export async function GET(
       GROUP BY TO_CHAR(report_date, 'YYYY-MM'), meter_type
       ORDER BY month
       `,
-      [storeName]
+      [storeName, serial]
     );
 
     // Build ordered month buckets (last 6 calendar months incl. current).
@@ -155,7 +179,7 @@ export async function GET(
         : null;
 
     // ── Top printer by 30-day volume + printer active/replace counts ──────────
-    const [topPrinterResult, printerCountResult, lastSyncResult] = await Promise.all([
+    const [topPrinterResult, printerCountResult, lastSyncResult, serialListResult] = await Promise.all([
       client.query<{ serial_number: string; model_name: string; volume: string }>(
         `
         WITH ${STORE_MACHINE_CTE},
@@ -212,6 +236,14 @@ export async function GET(
         `,
         [storeName]
       ),
+      // Printer list for the chart's filter dropdown (serial + model), store-wide.
+      client.query<{ serial_number: string; model_name: string }>(
+        `
+        WITH ${STORE_MACHINE_CTE}
+        SELECT serial_number, model_name FROM machines ORDER BY serial_number
+        `,
+        [storeName]
+      ),
     ]);
 
     const tp = topPrinterResult.rows[0];
@@ -242,9 +274,17 @@ export async function GET(
         ? Math.round(((bmsVolume - xeroxVolume) / xeroxVolume) * 1000) / 10
         : null;
 
+    const serials = serialListResult.rows.map((r) => ({
+      serial: r.serial_number,
+      model: r.model_name,
+    }));
+
     timer.done({ store: storeName, months: months.length, thisMonthTotal });
     return NextResponse.json({
       store: storeName,
+      // Echo back the active filter (null = whole store) + the selectable printers.
+      serial,
+      serials,
       months,
       thisMonthTotal,
       lastMonthTotal,

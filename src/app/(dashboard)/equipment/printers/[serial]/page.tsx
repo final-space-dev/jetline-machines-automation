@@ -281,7 +281,7 @@ export default function PrinterDetailPage() {
             style={{
               position: "sticky", top: 0, zIndex: 20,
               background: "var(--surface)", boxShadow: "var(--sh-sm)",
-              padding: "0 var(--s-7)", height: 60,
+              padding: "0 var(--s-7)", height: 64,
               display: "flex", alignItems: "center", justifyContent: "space-between",
             }}
           >
