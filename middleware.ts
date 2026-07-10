@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest, NextResponse as NextResponseType } from "next/server";
 import { getToken } from "next-auth/jwt";
-import {
-  checkRateLimit,
-  IP_LIMIT_PER_MIN,
-  USER_LIMIT_PER_MIN,
-} from "@/lib/rate-limit";
 
 /**
  * Phase 09 — Auth middleware (NextAuth v5).
@@ -94,34 +89,10 @@ export default async function middleware(req: NextRequest) {
       }
     : null;
 
-  // ── Phase 20: per-request trace id ────────────────────────────────────────
+  // ── Per-request trace id ──────────────────────────────────────────────────
+  // Rate limiting is handled at the platform level on Vercel (in-memory limits
+  // don't work across serverless isolates), so it's not done here.
   const traceId = crypto.randomUUID();
-
-  // ── Phase 20: rate limiting (API routes only) ─────────────────────────────
-  // Runs BEFORE the auth redirects so an abusive client is stopped regardless
-  // of auth state. Static/_next are excluded by the matcher below; we further
-  // limit to /api paths and skip the NextAuth handler so login/session polling
-  // is never blocked.
-  const isApi = path.startsWith("/api/") && !path.startsWith("/api/auth");
-  if (isApi) {
-    const ip = clientIp(req);
-    const ipCheck = checkRateLimit(`ip:${ip}`, IP_LIMIT_PER_MIN);
-
-    const userKey = session?.user?.id ?? session?.user?.email ?? null;
-    const userCheck = userKey
-      ? checkRateLimit(`user:${userKey}`, USER_LIMIT_PER_MIN)
-      : { allowed: true, retryAfter: 0, limit: USER_LIMIT_PER_MIN, remaining: USER_LIMIT_PER_MIN };
-
-    if (!ipCheck.allowed || !userCheck.allowed) {
-      const retryAfter = Math.max(ipCheck.retryAfter, userCheck.retryAfter);
-      const res = NextResponse.json(
-        { error: "Rate limit exceeded", retryAfter },
-        { status: 429 }
-      );
-      res.headers.set("Retry-After", String(retryAfter));
-      return harden(res, traceId);
-    }
-  }
 
   // Public paths that never require a session.
   const isPublic =
