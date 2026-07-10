@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import {
-  EQUIPMENT_TYPES, EQUIPMENT_STATUSES, STATUS_CONFIG,
+  EQUIPMENT_TYPES, EQUIPMENT_STATUSES, STATUS_CONFIG, ALL_XEROX_STORES,
   type EquipmentStatus,
 } from "@/lib/equipment-utils";
 import { JlSelect } from "@/components/ui/jl-select";
@@ -423,10 +423,15 @@ export default function EquipmentItemPage() {
               </div>
               <div className="jl-field">
                 <label>Store</label>
-                <input
-                  className="jl-input"
+                <JlSelect
                   value={form.store ?? ""}
-                  onChange={(e) => set("store", e.target.value)}
+                  onChange={(v) => set("store", v)}
+                  placeholder="Select store"
+                  // Real store list only — free text would create phantom stores.
+                  // Union with the current value so an existing off-list store still shows.
+                  options={Array.from(new Set([...ALL_XEROX_STORES, ...(form.store ? [form.store] : [])]))
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((s) => ({ value: s, label: s }))}
                   disabled={!isAdmin}
                 />
               </div>

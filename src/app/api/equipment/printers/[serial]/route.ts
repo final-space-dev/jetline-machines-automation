@@ -79,10 +79,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ ser
   const timer = routeTimer(`GET /api/equipment/printers/${sn}`);
 
   return withClient(xeroxPool, async (client) => {
+    // color_capable / duplex_capable aren't present in every printer_dimensions
+    // (the Neon ETL doesn't populate them) — selecting them directly 42703'd and
+    // bounced the whole page. Probe for them and fall back to NULL so the page
+    // shows those fields blank instead of erroring.
+    const capCols = await client.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'xerox' AND table_name = 'printer_dimensions'
+         AND column_name IN ('color_capable','duplex_capable')`
+    );
+    const hasCap = new Set(capCols.rows.map((r) => r.column_name as string));
+    const colorExpr = hasCap.has("color_capable") ? "pd.color_capable" : "NULL::boolean AS color_capable";
+    const duplexExpr = hasCap.has("duplex_capable") ? "pd.duplex_capable" : "NULL::boolean AS duplex_capable";
+
     const [dim, map, feedback, history] = await Promise.all([
       client.query(
         `SELECT pd.serial_number, pd.model, pd.manufacturer, pd.last_seen::text,
-                pd.color_capable, pd.duplex_capable
+                ${colorExpr}, ${duplexExpr}
          FROM xerox.printer_dimensions pd
          WHERE UPPER(TRIM(pd.serial_number)) = $1`,
         [sn]
