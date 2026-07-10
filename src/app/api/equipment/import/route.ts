@@ -1,27 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bmsPool } from "@/lib/bms-pool";
-import { withClient, badRequest, serverError } from "@/lib/api-utils";
+import { withClient, badRequest, serverError, ensureItemColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireAdmin, AuthError } from "@/lib/auth";
 
 /**
- * Phase 13 — CSV Import.
+ * Equipment mass-import (ADMIN ONLY) — the CRM bulk-load tool under Config.
  *
- * POST /api/equipment/import (ADMIN ONLY)
- * Body: array of item objects (parsed client-side from CSV).
+ * POST /api/equipment/import
+ * Body: { rows: item[], mode?: "create" | "upsert" }
+ *   (a bare array is also accepted and treated as create mode, for back-compat)
  *
- * Validates each row (store + machine_type required), inserts valid rows into
- * equipment.items, and writes a change_log 'created' row per insert with
- * changed_by = "csv_import".
+ * Every equipment attribute is importable EXCEPT images. In "upsert" mode a row
+ * whose `serial` matches an existing item UPDATES it; otherwise it's created.
+ * Each write logs a change_log row with changed_by = "csv_import".
  *
- * Returns: { imported: number, skipped: number, errors: [{ row, reason }] }
+ * Returns: { imported, updated, skipped, errors: [{ row, reason }] }
  */
 
-// Columns accepted from an import row and inserted into equipment.items.
-const INSERT_COLUMNS = [
+// Every writable equipment.items attribute (matches the create route / template).
+const IMPORT_COLUMNS = [
   "store", "machine_type", "make_model", "serial", "condition",
-  "located_at", "status", "purchase_date", "supplier",
-  "purchase_price", "warranty_expiry",
+  "located_at", "status", "purchase_date", "supplier", "purchase_price",
+  "warranty_expiry", "last_serviced", "next_service_due", "service_provider", "notes",
 ] as const;
 
 type ImportRow = Record<string, unknown>;
@@ -73,21 +74,45 @@ export async function POST(req: NextRequest) {
 
   const timer = routeTimer("POST /api/equipment/import");
   const body = await req.json().catch(() => null);
-  if (!Array.isArray(body)) return badRequest("Body must be an array of item objects");
-
-  const rows = body as ImportRow[];
+  // Accept { rows, mode } or a bare array (legacy) treated as create mode.
+  const rows: ImportRow[] = Array.isArray(body) ? body : Array.isArray(body?.rows) ? body.rows : [];
+  const mode: "create" | "upsert" = body?.mode === "upsert" ? "upsert" : "create";
   if (rows.length === 0) return badRequest("No rows to import");
   if (rows.length > 2000) return badRequest("Too many rows (max 2000 per import)");
 
+  // Normalize one import row into { column: value } for all IMPORT_COLUMNS.
+  const normalizeRow = (raw: ImportRow): Record<string, unknown> => ({
+    store: str(raw.store),
+    machine_type: str(raw.machine_type),
+    make_model: str(raw.make_model) || null,
+    serial: str(raw.serial) || null,
+    condition: normCondition(raw.condition),
+    located_at: str(raw.located_at) || null,
+    status: normStatus(raw.status),
+    purchase_date: normDate(raw.purchase_date),
+    supplier: str(raw.supplier) || null,
+    purchase_price: normPrice(raw.purchase_price),
+    warranty_expiry: normDate(raw.warranty_expiry),
+    last_serviced: normDate(raw.last_serviced),
+    next_service_due: normDate(raw.next_service_due),
+    service_provider: str(raw.service_provider) || null,
+    notes: str(raw.notes) || null,
+  });
+
   return withClient(bmsPool, async (client) => {
+    // Self-heal the schema so a freshly-provisioned DB has every column.
+    await ensureItemColumns(client);
+
     let imported = 0;
+    let updated = 0;
     let skipped = 0;
     const errors: { row: number; reason: string }[] = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const raw = rows[i];
-      const store = str(raw.store);
-      const machine_type = str(raw.machine_type);
+      const v = normalizeRow(rows[i]);
+      const store = v.store as string;
+      const machine_type = v.machine_type as string;
+      const serial = v.serial as string | null;
 
       if (!store || !machine_type) {
         skipped++;
@@ -95,42 +120,55 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const values = [
-        store,
-        machine_type,
-        str(raw.make_model) || null,
-        str(raw.serial) || null,
-        normCondition(raw.condition),
-        str(raw.located_at) || null,
-        normStatus(raw.status),
-        normDate(raw.purchase_date),
-        str(raw.supplier) || null,
-        normPrice(raw.purchase_price),
-        normDate(raw.warranty_expiry),
-      ];
-
       try {
-        const inserted = await client.query(
-          `INSERT INTO equipment.items (${INSERT_COLUMNS.join(", ")})
-           VALUES (${INSERT_COLUMNS.map((_, idx) => `$${idx + 1}`).join(", ")})
-           RETURNING id`,
-          values
-        );
-        const id = Number(inserted.rows[0].id);
-        await client.query(
-          `INSERT INTO equipment.change_log (item_id, field, old_value, new_value, changed_by)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [id, "created", null, `${machine_type} @ ${store}`, "csv_import"]
-        );
-        imported++;
+        // Upsert: if a serial is given and matches an existing item, UPDATE it;
+        // otherwise INSERT. Serial is not a DB unique key, so match explicitly.
+        let existingId: number | null = null;
+        if (mode === "upsert" && serial) {
+          const found = await client.query(
+            `SELECT id FROM equipment.items WHERE serial = $1 ORDER BY id LIMIT 1`,
+            [serial]
+          );
+          existingId = found.rows[0]?.id ?? null;
+        }
+
+        if (existingId != null) {
+          const cols = [...IMPORT_COLUMNS];
+          const setSql = cols.map((c, idx) => `${c} = $${idx + 1}`).join(", ");
+          await client.query(
+            `UPDATE equipment.items SET ${setSql}, updated_at = NOW() WHERE id = $${cols.length + 1}`,
+            [...cols.map((c) => v[c]), existingId]
+          );
+          await client.query(
+            `INSERT INTO equipment.change_log (item_id, field, old_value, new_value, changed_by)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [existingId, "updated", null, `${machine_type} @ ${store}`, "csv_import"]
+          );
+          updated++;
+        } else {
+          const cols = [...IMPORT_COLUMNS];
+          const inserted = await client.query(
+            `INSERT INTO equipment.items (${cols.join(", ")})
+             VALUES (${cols.map((_, idx) => `$${idx + 1}`).join(", ")})
+             RETURNING id`,
+            cols.map((c) => v[c])
+          );
+          const id = Number(inserted.rows[0].id);
+          await client.query(
+            `INSERT INTO equipment.change_log (item_id, field, old_value, new_value, changed_by)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [id, "created", null, `${machine_type} @ ${store}`, "csv_import"]
+          );
+          imported++;
+        }
       } catch (rowErr) {
         skipped++;
-        const reason = rowErr instanceof Error ? rowErr.message : "insert failed";
+        const reason = rowErr instanceof Error ? rowErr.message : "write failed";
         errors.push({ row: i + 1, reason });
       }
     }
 
-    timer.done({ imported, skipped, total: rows.length });
-    return NextResponse.json({ imported, skipped, errors });
+    timer.done({ imported, updated, skipped, total: rows.length });
+    return NextResponse.json({ imported, updated, skipped, errors });
   }).catch((err) => { timer.error(err); return serverError(err, "POST /api/equipment/import"); });
 }

@@ -14,13 +14,19 @@ interface ModelSuggestProps {
    * When omitted, behaves exactly as before (all models).
    */
   equipmentType?: string;
+  /**
+   * Data source. Defaults to the models catalogue. Set `source="suppliers"` to
+   * autosuggest from /api/setup/suppliers instead (same UX; used by the supplier
+   * fields on equipment + printer pages). Keeps free text via "Add new …".
+   */
+  source?: "models" | "suppliers";
 }
 
 /**
- * Make/Model autosuggest. Debounces 300ms and queries
- * GET /api/equipment/models?q=term[&type=equipmentType] -> { models: string[] }.
- * Shows matching existing models; if the typed term isn't an exact match,
- * offers "Add new model: <term>" at the bottom to accept free text.
+ * Autosuggest combobox. Debounces 300ms and queries a list endpoint; shows
+ * matching existing values, and if the typed term isn't an exact match offers
+ * "Add new …: <term>" to accept free text. Defaults to the make/model catalogue
+ * (GET /api/equipment/models?q=…); `source="suppliers"` uses the suppliers list.
  */
 export function ModelSuggest({
   value,
@@ -28,7 +34,9 @@ export function ModelSuggest({
   placeholder = "Make / Model…",
   style,
   equipmentType,
+  source = "models",
 }: ModelSuggestProps) {
+  const noun = source === "suppliers" ? "supplier" : "model";
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,21 +56,35 @@ export function ModelSuggest({
     ...(showAddNew ? [{ value: term, isNew: true }] : []),
   ];
 
-  // Debounced fetch (300ms)
+  // Debounced fetch (300ms). Models endpoint returns { models: string[] };
+  // suppliers endpoint returns { rows: [{ name }] } — normalise both to names,
+  // then filter client-side by the term (suppliers list is small).
   useEffect(() => {
     if (!open) return;
     const handle = setTimeout(() => {
       setLoading(true);
-      const params = new URLSearchParams({ q: term });
-      if (type) params.set("type", type);
-      fetch(`/api/equipment/models?${params.toString()}`)
-        .then((r) => (r.ok ? r.json() : { models: [] }))
-        .then((d: { models?: string[] }) => setModels(Array.isArray(d.models) ? d.models : []))
-        .catch(() => setModels([]))
-        .finally(() => setLoading(false));
+      if (source === "suppliers") {
+        fetch(`/api/setup/suppliers`)
+          .then((r) => (r.ok ? r.json() : { rows: [] }))
+          .then((d: { rows?: { name: string }[] }) => {
+            const names = Array.isArray(d.rows) ? d.rows.map((x) => x.name).filter(Boolean) : [];
+            const t = term.toLowerCase();
+            setModels(t ? names.filter((n) => n.toLowerCase().includes(t)) : names);
+          })
+          .catch(() => setModels([]))
+          .finally(() => setLoading(false));
+      } else {
+        const params = new URLSearchParams({ q: term });
+        if (type) params.set("type", type);
+        fetch(`/api/equipment/models?${params.toString()}`)
+          .then((r) => (r.ok ? r.json() : { models: [] }))
+          .then((d: { models?: string[] }) => setModels(Array.isArray(d.models) ? d.models : []))
+          .catch(() => setModels([]))
+          .finally(() => setLoading(false));
+      }
     }, 300);
     return () => clearTimeout(handle);
-  }, [term, type, open]);
+  }, [term, type, open, source]);
 
   // Click-outside to close
   useEffect(() => {
@@ -200,7 +222,7 @@ export function ModelSuggest({
             </div>
           ) : options.length === 0 ? (
             <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--jl-ink-400)", fontFamily: "var(--jl-font)" }}>
-              Type to search models
+              Type to search {noun}s
             </div>
           ) : (
             options.map((opt, idx) => {
@@ -234,7 +256,7 @@ export function ModelSuggest({
                 >
                   {opt.isNew && <Plus size={13} style={{ flexShrink: 0 }} />}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {opt.isNew ? `Add new model: ${opt.value}` : opt.value}
+                    {opt.isNew ? `Add new ${noun}: ${opt.value}` : opt.value}
                   </span>
                 </div>
               );

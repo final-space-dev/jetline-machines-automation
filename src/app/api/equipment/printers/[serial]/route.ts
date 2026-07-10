@@ -8,6 +8,7 @@ import { requireUser, AuthError, getSessionUser, type SessionUser } from "@/lib/
 const FEEDBACK_FIELDS = [
   "condition", "condition_notes", "replace_flag", "age",
   "install_date", "contract_end", "technician_notes", "last_visit",
+  "supplier",
 ];
 
 // Subset a store_staff user may set (feedback edits only).
@@ -95,12 +96,28 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ ser
       client.query(
         `SELECT * FROM xerox.machine_feedback WHERE UPPER(TRIM(serial_number)) = $1`, [sn]
       ),
+      // meter_readings_normalised is long-format (printer_id, report_date,
+      // meter_type, reading) — NOT wide. Join via printer_id (the table has no
+      // serial_number) and pivot the meter types into the total/black/colour/a3/
+      // large columns the printer page expects. This is the fix for the 500 that
+      // was bouncing the printer page back to /equipment.
       client.query(
-        `SELECT report_date::text, total, black, colour, a3, large
-         FROM xerox.meter_readings_normalised
-         WHERE UPPER(TRIM(serial_number)) = $1
-           AND report_date >= CURRENT_DATE - INTERVAL '6 months'
-         ORDER BY report_date DESC LIMIT 30`,
+        `SELECT
+           r.report_date::text AS report_date,
+           SUM(r.reading)::bigint AS total,
+           SUM(r.reading) FILTER (WHERE r.meter_type = 'black_impressions')::bigint       AS black,
+           SUM(r.reading) FILTER (WHERE r.meter_type = 'color_impressions')::bigint       AS colour,
+           SUM(r.reading) FILTER (WHERE r.meter_type = 'black_large_impressions')::bigint AS a3,
+           SUM(r.reading) FILTER (WHERE r.meter_type = 'color_large_impressions')::bigint AS large
+         FROM xerox.meter_readings_normalised r
+         JOIN xerox.printer_dimensions pd ON pd.printer_id = r.printer_id
+         WHERE UPPER(TRIM(pd.serial_number)) = $1
+           AND r.meter_type IN
+             ('black_impressions','color_impressions','black_large_impressions','color_large_impressions')
+           AND r.reading IS NOT NULL
+           AND r.report_date >= CURRENT_DATE - INTERVAL '6 months'
+         GROUP BY r.report_date
+         ORDER BY r.report_date DESC LIMIT 30`,
         [sn]
       ),
     ]);

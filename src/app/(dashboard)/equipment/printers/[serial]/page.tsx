@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { PrinterPageSkeleton } from "@/components/equipment/skeleton";
 import { EquipmentErrorBoundary } from "@/components/equipment/error-boundary";
+import { ModelSuggest } from "@/components/equipment/model-suggest";
 import { useHotkeys } from "@/lib/use-hotkey";
 import { addRecentItem } from "@/lib/recently-viewed";
 import { useRole } from "@/lib/use-role";
@@ -45,6 +46,7 @@ interface PrinterFeedback {
   contract_end: string | null;
   technician_notes: string | null;
   last_visit: string | null;
+  supplier: string | null;
 }
 
 interface MeterReading {
@@ -148,6 +150,7 @@ export default function PrinterDetailPage() {
   const [feedback, setFeedback] = useState<PrinterFeedback>({
     condition: null, condition_notes: null, replace_flag: null, age: null,
     install_date: null, contract_end: null, technician_notes: null, last_visit: null,
+    supplier: null,
   });
   const [history, setHistory] = useState<MeterReading[]>([]);
   const [loading, setLoading] = useState(true);
@@ -444,6 +447,16 @@ export default function PrinterDetailPage() {
                     <div className="jl-field">
                       <label>Last Visit</label>
                       <JlDate value={feedback.last_visit ?? null} onChange={(v) => setF("last_visit", v)} placeholder="Select date" />
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "var(--s-5)" }}>
+                    <div className="jl-field">
+                      <label>Supplier</label>
+                      <ModelSuggest source="suppliers" value={feedback.supplier ?? ""} onChange={(v) => setF("supplier", v || null)} placeholder="Where it was bought" />
+                    </div>
+                    <div className="jl-field">
+                      <label>Age</label>
+                      <input className="jl-input" value={feedback.age ?? ""} onChange={(e) => setF("age", e.target.value || null)} placeholder="e.g. 3 years" />
                     </div>
                   </div>
                   {contractExpired && (

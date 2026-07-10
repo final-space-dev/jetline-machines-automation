@@ -508,11 +508,11 @@ export default function EquipmentItemPage() {
                 </div>
                 <div className="jl-field">
                   <label>Supplier</label>
-                  <input
-                    className="jl-input"
+                  <ModelSuggest
+                    source="suppliers"
                     value={form.supplier ?? ""}
-                    onChange={(e) => set("supplier", e.target.value)}
-                    placeholder="Supplier company name"
+                    onChange={(v) => set("supplier", v)}
+                    placeholder="Where it was bought"
                   />
                 </div>
                 <div className="jl-field">

@@ -163,6 +163,7 @@ export async function ensureFeedbackColumns(client: PoolClient): Promise<void> {
       ADD COLUMN IF NOT EXISTS technician_notes TEXT,
       ADD COLUMN IF NOT EXISTS last_visit       DATE,
       ADD COLUMN IF NOT EXISTS notes            TEXT,
+      ADD COLUMN IF NOT EXISTS supplier         TEXT,
       ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW()
   `);
   await coerceReplaceFlagToText(client, "xerox", "machine_feedback");

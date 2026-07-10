@@ -43,6 +43,14 @@ const SECTIONS: Section[] = [
     title: "Operations",
     items: [
       { name: "Dashboard", href: "/operations", icon: LayoutDashboard },
+    ],
+  },
+  {
+    key: "reports",
+    title: "Reports",
+    items: [
+      // Machine Reports is the first report; this section is the home for all
+      // future reporting (recon, volume, billing, …).
       { name: "Machine Reports", href: "/machine-reports", icon: BarChart3 },
     ],
   },

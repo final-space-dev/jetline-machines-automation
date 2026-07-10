@@ -18,6 +18,7 @@ import { useRole } from "@/lib/use-role";
 import { BulkActionBar } from "@/components/equipment/bulk-action-bar";
 import { PrintSection } from "@/components/equipment/print-section";
 import { CompletenessBadge, completenessColors } from "@/components/equipment/completeness-badge";
+import { PhotoButton } from "@/components/equipment/photo-button";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ interface EquipmentItem {
   located_at: string | null;
   status: EquipmentStatus;
   updated_at: string;
+  photos: string[] | null;
 }
 
 interface Identity {
@@ -372,7 +374,7 @@ export default function StoreDetailPage() {
     : [];
 
   // Base 6 columns + optional leading checkbox column for admins.
-  const EQ_COLS = isAdmin ? 6 : 5;
+  const EQ_COLS = isAdmin ? 7 : 6;
 
   return (
     <AppShell>
@@ -542,6 +544,7 @@ export default function StoreDetailPage() {
                     <th>Serial</th>
                     <th>Condition</th>
                     <th>Status</th>
+                    <th style={{ width: 64, textAlign: "center" }}>Photos</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -575,6 +578,9 @@ export default function StoreDetailPage() {
                           <td><span className="jl-mono" style={{ color: "var(--ink-600)" }}>{item.serial ?? "Not set"}</span></td>
                           <td><span className={`jl-badge ${CONDITION_BADGE[bucket]}`}>{CONDITION_CONFIG[bucket].label}</span></td>
                           <td><span className={`jl-badge ${STATUS_BADGE[status]}`}>{STATUS_CONFIG[status].label}</span></td>
+                          <td style={{ textAlign: "center" }}>
+                            <PhotoButton itemId={item.id} initialPhotos={item.photos} canEdit={isAdmin} />
+                          </td>
                         </tr>
                       );
                     })
@@ -621,10 +627,6 @@ export default function StoreDetailPage() {
                   );
                 })
               )}
-            </div>
-
-            <div style={{ padding: "10px 20px", background: "var(--surface-sunken)", fontSize: "var(--fs-xs)", color: "var(--ink-400)", fontWeight: 600 }}>
-              {filtered.length} of {items.length} items · Click any row to open full record
             </div>
           </div>
         </div>
@@ -693,11 +695,6 @@ export default function StoreDetailPage() {
                 </tbody>
               </table>
             </div>
-            {machines.length > 0 && (
-              <div style={{ padding: "10px 20px", background: "var(--surface-sunken)", fontSize: "var(--fs-xs)", color: "var(--ink-400)", fontWeight: 600 }}>
-                {machines.length} printer{machines.length !== 1 ? "s" : ""} · Click any row to open full record
-              </div>
-            )}
           </div>
         </div>
 
