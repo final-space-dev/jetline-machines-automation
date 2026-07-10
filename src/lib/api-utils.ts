@@ -100,3 +100,51 @@ export async function withClients<T>(
     for (const c of clients) c.release();
   }
 }
+
+// ── Schema self-heal ──────────────────────────────────────────────────────────
+// The ERP/service-history columns were added to equipment.items after the table
+// first shipped, so a freshly-provisioned database (e.g. the Neon migration) can
+// lack them. Any query naming one then fails with 42703 "column does not exist"
+// (breaks item edit, item create, and CSV export). This idempotent guard heals
+// the schema on first use — call it before touching the optional columns.
+// Types match prisma/schema: dates -> DATE, money -> NUMERIC(12,2).
+export async function ensureItemColumns(client: PoolClient): Promise<void> {
+  await client.query(`
+    ALTER TABLE equipment.items
+      ADD COLUMN IF NOT EXISTS purchase_date    DATE,
+      ADD COLUMN IF NOT EXISTS supplier         TEXT,
+      ADD COLUMN IF NOT EXISTS purchase_price   NUMERIC(12,2),
+      ADD COLUMN IF NOT EXISTS warranty_expiry  DATE,
+      ADD COLUMN IF NOT EXISTS last_serviced    DATE,
+      ADD COLUMN IF NOT EXISTS next_service_due DATE,
+      ADD COLUMN IF NOT EXISTS service_provider TEXT,
+      ADD COLUMN IF NOT EXISTS replace_flag     BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW()
+  `);
+}
+
+// Same self-heal for xerox.machine_feedback — the printer per-serial feedback
+// columns (condition history, service dates, technician notes) can be absent on
+// a freshly-provisioned database, so saving printer feedback would 42703. Creates
+// the table if wholly missing, then adds each writable column idempotently. The
+// column set mirrors FEEDBACK_FIELDS in /api/equipment/printers/[serial].
+export async function ensureFeedbackColumns(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS xerox.machine_feedback (
+      serial_number TEXT PRIMARY KEY
+    )
+  `);
+  await client.query(`
+    ALTER TABLE xerox.machine_feedback
+      ADD COLUMN IF NOT EXISTS condition        TEXT,
+      ADD COLUMN IF NOT EXISTS condition_notes  TEXT,
+      ADD COLUMN IF NOT EXISTS replace_flag     BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS age              TEXT,
+      ADD COLUMN IF NOT EXISTS install_date     DATE,
+      ADD COLUMN IF NOT EXISTS contract_end     DATE,
+      ADD COLUMN IF NOT EXISTS technician_notes TEXT,
+      ADD COLUMN IF NOT EXISTS last_visit       DATE,
+      ADD COLUMN IF NOT EXISTS notes            TEXT,
+      ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW()
+  `);
+}

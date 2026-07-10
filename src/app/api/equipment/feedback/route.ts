@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
-import { withClient, badRequest, serverError } from "@/lib/api-utils";
+import { withClient, badRequest, serverError, ensureFeedbackColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError, type SessionUser } from "@/lib/auth";
 
@@ -29,6 +29,8 @@ export async function PATCH(req: NextRequest) {
   if (Object.keys(updates).length === 0) return badRequest("No valid fields");
 
   return withClient(xeroxPool, async (client) => {
+    await ensureFeedbackColumns(client);
+
     // Enforce store ownership for store_staff. Fail closed: deny if the printer's
     // store cannot be resolved to the caller's own store.
     if (user.role !== "admin") {

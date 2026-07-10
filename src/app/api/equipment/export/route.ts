@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bmsPool } from "@/lib/bms-pool";
-import { withClient, serverError } from "@/lib/api-utils";
+import { withClient, serverError, ensureItemColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireAdmin, AuthError } from "@/lib/auth";
 
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const type = url.searchParams.get("type");
 
   return withClient(bmsPool, async (client) => {
+    await ensureItemColumns(client);
     const conditions: string[] = [];
     const values: string[] = [];
     if (store)  { values.push(store);  conditions.push(`store = $${values.length}`); }

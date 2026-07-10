@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bmsPool } from "@/lib/bms-pool";
-import { withClient, notFound, badRequest, serverError } from "@/lib/api-utils";
+import { withClient, notFound, badRequest, serverError, ensureItemColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, requireAdmin, AuthError, type SessionUser } from "@/lib/auth";
 
@@ -42,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!validId(id)) return notFound();
   const timer = routeTimer(`GET /api/equipment/items/${id}`);
   return withClient(bmsPool, async (client) => {
+    await ensureItemColumns(client);
     const [item, logRows] = await Promise.all([
       client.query(`SELECT * FROM equipment.items WHERE id = $1`, [id]),
       client.query(
@@ -85,6 +86,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   return withClient(bmsPool, async (client) => {
+    await ensureItemColumns(client);
+
     const updates: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(body)) {
       if (k === "_changed_by" || !ALLOWED_FIELDS.includes(k)) continue;

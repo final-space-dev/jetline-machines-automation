@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bmsPool } from "@/lib/bms-pool";
-import { withClient, badRequest, paginate, serverError } from "@/lib/api-utils";
+import { withClient, badRequest, paginate, serverError, ensureItemColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError } from "@/lib/auth";
 
@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
   }
 
   return withClient(bmsPool, async (client) => {
+    await ensureItemColumns(client);
     const result = await client.query(
       `INSERT INTO equipment.items
          (store, machine_type, make_model, serial, condition, located_at, status,

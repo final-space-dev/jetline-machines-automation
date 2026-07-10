@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { bmsPool } from "@/lib/bms-pool";
-import { withClient, notFound, badRequest, serverError } from "@/lib/api-utils";
+import { withClient, notFound, badRequest, serverError, ensureFeedbackColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError, getSessionUser, type SessionUser } from "@/lib/auth";
 
@@ -152,6 +152,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ se
   }
 
   return withClient(xeroxPool, async (client) => {
+    await ensureFeedbackColumns(client);
+
     // Enforce store ownership for store_staff. Fail closed: deny if the printer's
     // store cannot be resolved to the caller's own store.
     let resolvedStore: string | null = null;
