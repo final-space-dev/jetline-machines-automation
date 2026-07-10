@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextResponse as NextResponseType } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/auth-edge";
 import {
   checkRateLimit,
   IP_LIMIT_PER_MIN,
@@ -172,9 +172,9 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Node.js runtime (not Edge): the auth wrapper imports @/lib/auth (NextAuth v5
-  // + bcrypt) and @/lib/rate-limit, which use Node APIs unavailable on Edge.
-  runtime: "nodejs",
+  // Runs on the Edge runtime (default). Uses the Edge-safe auth instance
+  // (@/lib/auth-edge) which only reads the JWT cookie — no bcrypt/prisma — so
+  // there are no Node-only imports here.
   // Run on all routes except Next internals and static assets.
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|css|js)$).*)",

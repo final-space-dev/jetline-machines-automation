@@ -11,7 +11,9 @@ export const bmsPool =
   globalForBms.bmsPool ??
   new Pool({
     connectionString,
-    ssl: { rejectUnauthorized: false },
+    // Verify TLS against the system CA store. Neon's cert chains to a public CA
+    // (Let's Encrypt), so full verification works — no rejectUnauthorized:false.
+    ssl: { rejectUnauthorized: true },
     max: 10,
   });
 

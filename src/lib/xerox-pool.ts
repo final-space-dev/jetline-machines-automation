@@ -12,7 +12,8 @@ export const xeroxPool =
   globalForXerox.xeroxPool ??
   new Pool({
     connectionString,
-    ssl: { rejectUnauthorized: false },
+    // Verify TLS against the system CA store (Neon chains to a public CA).
+    ssl: { rejectUnauthorized: true },
     max: 5,
   });
 
