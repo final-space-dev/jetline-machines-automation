@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import type { NextResponse as NextResponseType } from "next/server";
-import { auth } from "@/lib/auth-edge";
+import type { NextRequest, NextResponse as NextResponseType } from "next/server";
+import { getToken } from "next-auth/jwt";
 import {
   checkRateLimit,
   IP_LIMIT_PER_MIN,
@@ -72,10 +72,27 @@ function clientIp(req: Request): string {
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 
-export default auth((req) => {
+export default async function middleware(req: NextRequest) {
   const { nextUrl } = req;
   const path = nextUrl.pathname;
-  const session = req.auth;
+
+  // Read the JWT session cookie directly — Edge-safe, no NextAuth core / bcrypt.
+  // The jwt callback stored role + store on the token; getToken decodes them.
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET,
+    secureCookie: nextUrl.protocol === "https:",
+  });
+  const session = token
+    ? {
+        user: {
+          id: token.sub,
+          email: typeof token.email === "string" ? token.email : undefined,
+          role: token.role as string | undefined,
+          store: token.store as string | undefined,
+        },
+      }
+    : null;
 
   // ── Phase 20: per-request trace id ────────────────────────────────────────
   const traceId = crypto.randomUUID();
@@ -169,7 +186,7 @@ export default auth((req) => {
   }
 
   return harden(NextResponse.next(), traceId);
-});
+}
 
 export const config = {
   // Runs on the Edge runtime (default). Uses the Edge-safe auth instance
