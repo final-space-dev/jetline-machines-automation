@@ -59,6 +59,10 @@ function harden(res: NextResponseType, traceId: string): NextResponseType {
   res.headers.set("Content-Security-Policy", CSP);
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // No-store on HTML documents so the browser can never serve a stale page that
+  // references an old CSS bundle. Hashed /_next/static/* assets are excluded by
+  // this middleware's matcher, so they keep their long-lived immutable caching.
+  res.headers.set("Cache-Control", "no-store, must-revalidate");
   return res;
 }
 
