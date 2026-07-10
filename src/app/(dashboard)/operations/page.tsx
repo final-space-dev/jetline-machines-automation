@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { useRole } from "@/lib/use-role";
+import { useAdminGuard } from "@/lib/use-admin-guard";
 import {
   RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock,
   Wifi, WifiOff,
@@ -151,6 +152,7 @@ function SyncRow({ sync }: { sync: OpsData["sync"]["recentSyncs"][0] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OperationsPage() {
+  useAdminGuard(); // admin-only; store staff are redirected to their store
   const { isAdmin } = useRole();
   const [data, setData] = useState<OpsData | null>(null);
   const [loading, setLoading] = useState(true);

@@ -167,7 +167,15 @@ export default function StoreDetailPage() {
   const params = useParams();
   const router = useRouter();
   const storeName = decodeURIComponent(params.store as string);
-  const { isAdmin } = useRole();
+  const { isAdmin, role, store: userStore, loading: roleLoading } = useRole();
+
+  // Store staff may only view their OWN store. If they land on another store's
+  // page, bounce them to their own (the APIs also 403 cross-store).
+  useEffect(() => {
+    if (!roleLoading && role === "store_staff" && userStore && userStore !== storeName) {
+      router.replace(`/equipment/stores/${encodeURIComponent(userStore)}`);
+    }
+  }, [roleLoading, role, userStore, storeName, router]);
 
   const [items, setItems] = useState<EquipmentItem[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -180,6 +188,9 @@ export default function StoreDetailPage() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+
+  // Store page tabs — keeps the page calm: one thing at a time.
+  const [tab, setTab] = useState<"equipment" | "printers" | "performance">("equipment");
 
   // Multi-select (admin only). Tracked by item id so selection survives filter changes.
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -476,11 +487,25 @@ export default function StoreDetailPage() {
           </div>
         </div>
 
-        {/* Equipment section */}
+        {/* Tabs — Equipment · Printers · Printer Performance. One at a time keeps
+            the page uncluttered. */}
+        <div className="jl-tabs" role="tablist" style={{ marginBottom: 20 }}>
+          <button type="button" role="tab" aria-selected={tab === "equipment"} onClick={() => setTab("equipment")}>
+            Equipment{items.length > 0 ? ` (${items.length})` : ""}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "printers"} onClick={() => setTab("printers")}>
+            Printers{machines.length > 0 ? ` (${machines.length})` : ""}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "performance"} onClick={() => setTab("performance")}>
+            Printer Performance
+          </button>
+        </div>
+
+        {/* Equipment tab */}
+        {tab === "equipment" && (
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-            <h2 className="jl-h2">Equipment</h2>
-            <div className="jl-search" style={{ flex: "1 1 180px", maxWidth: 260, marginLeft: 8 }}>
+            <div className="jl-search" style={{ flex: "1 1 180px", maxWidth: 260 }}>
               <Search />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search equipment…" />
             </div>
@@ -630,10 +655,11 @@ export default function StoreDetailPage() {
             </div>
           </div>
         </div>
+        )}
 
-        {/* Printers section */}
+        {/* Printers tab */}
+        {tab === "printers" && (
         <div>
-          <h2 className="jl-h2" style={{ marginBottom: 14 }}>Printers</h2>
           <div className="jl-table-wrap">
             <div style={{ overflowX: "auto" }}>
               <table className="jl-table">
@@ -697,12 +723,16 @@ export default function StoreDetailPage() {
             </div>
           </div>
         </div>
+        )}
 
-        {/* Print Volumes section (P18) — PrintSection renders its own titled
-            surface (its inner card is the .jl-card equivalent); do not nest. */}
-        <div style={{ marginTop: 32 }}>
+        {/* Printer Performance tab — the Print Volumes graph lives here so the
+            Equipment/Printers lists stay uncluttered. PrintSection renders its own
+            titled surface. */}
+        {tab === "performance" && (
+        <div>
           <PrintSection store={storeName} />
         </div>
+        )}
       </div>
     </AppShell>
   );

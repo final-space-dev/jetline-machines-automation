@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getBrand, splitBrandName } from "@/lib/brand";
+import { useRole } from "@/lib/use-role";
 import {
   ChevronLeft,
   Menu,
@@ -64,6 +65,28 @@ const SECTIONS: Section[] = [
     ],
   },
 ];
+
+/**
+ * Sections a user may see. Store staff are a single-store tenant: they only get
+ * their own store + Activity — no fleet-wide views, reports, or Config. Admins
+ * (and, while the session is still resolving, everyone) see the full menu so it
+ * never flashes an incomplete menu for the common admin case.
+ */
+function sectionsForRole(role: string | null, store: string | null, resolved: boolean): Section[] {
+  if (resolved && role === "store_staff") {
+    return [
+      {
+        key: "store",
+        title: "My Store",
+        items: [
+          { name: "My Store", href: store ? `/equipment/stores/${encodeURIComponent(store)}` : "/", icon: Store },
+          { name: "Activity", href: "/activity", icon: Activity, badge: true },
+        ],
+      },
+    ];
+  }
+  return SECTIONS;
+}
 
 /* Brand block — rounded red-gradient mark + two-tone wordmark, matching the
    reference .wa-brand / .wa-brand__mark. If a logo URL is configured it renders
@@ -195,11 +218,11 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const todayCount = useTodayCount();
 
-  // Show the full nav. Actual access to /setup/* is enforced server-side by the
-  // middleware, so we do NOT hide sections based on a client session check —
-  // that made the whole Setup section vanish whenever the session was slow to
-  // resolve, which read as a broken/incomplete menu.
-  const visibleSections = SECTIONS;
+  // Menu by role. While the session resolves we show the full menu (so the admin
+  // case never flashes an incomplete menu); once resolved, store staff get their
+  // restricted single-store menu. Server-side guards still enforce access.
+  const { role, store, loading } = useRole();
+  const visibleSections = sectionsForRole(role, store, !loading);
 
   function NavRow({ item }: { item: NavItem }) {
     const active = isItemActive(pathname, item.href);
@@ -330,6 +353,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 export function MobileNavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const todayCount = useTodayCount();
+  const { role, store, loading } = useRole();
 
   // Close automatically whenever the route changes.
   useEffect(() => {
@@ -339,7 +363,7 @@ export function MobileNavDrawer({ open, onClose }: { open: boolean; onClose: () 
 
   if (!open) return null;
 
-  const visibleSections = SECTIONS;
+  const visibleSections = sectionsForRole(role, store, !loading);
 
   return (
     <div className="jl-mobile-overlay" onClick={onClose} role="dialog" aria-label="Navigation menu">

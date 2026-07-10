@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { useAdminGuard } from "@/lib/use-admin-guard";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -590,6 +591,7 @@ interface ApiPayload {
 const DEFAULT_FILTERS: Filters = { search: "", store: "all", group: "all", type: "all", model: "all" };
 
 export default function MachineReportsPage() {
+  useAdminGuard(); // admin-only; store staff are redirected to their store
   const [activeTab, setActiveTab] = useState<TabType>("summary");
   const [cache, setCache] = useState<Partial<Record<TabType, ApiPayload>>>({});
   const [loading, setLoading] = useState(false);

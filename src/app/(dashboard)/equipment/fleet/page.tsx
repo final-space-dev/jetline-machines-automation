@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
+import { useAdminGuard } from "@/lib/use-admin-guard";
 import { AttentionList, type AttentionTab } from "@/components/dashboard/attention-list";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -186,6 +187,7 @@ function CompletenessLeaderboard({ rows }: { rows: DataQualityRow[] }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function FleetHealthPage() {
+  useAdminGuard(); // admin-only; store staff are redirected to their store
   const [data, setData] = useState<FleetHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("poorCondition");

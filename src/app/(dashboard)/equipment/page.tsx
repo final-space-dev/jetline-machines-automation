@@ -379,11 +379,13 @@ export default function EquipmentCRMPage() {
   const { isAdmin, role, store, loading: roleLoading } = useRole();
   const isStoreStaff = role === "store_staff";
 
+  // All Stores is admin-only. Store staff are redirected to their own store
+  // (defence-in-depth alongside the role-scoped APIs).
   useEffect(() => {
-    if (isStoreStaff && store) {
-      router.replace(`/stores/${encodeURIComponent(store)}`);
+    if (!roleLoading && isStoreStaff) {
+      router.replace(store ? `/equipment/stores/${encodeURIComponent(store)}` : "/");
     }
-  }, [isStoreStaff, store, router]);
+  }, [roleLoading, isStoreStaff, store, router]);
 
   // SSR-safe: read persisted toggle after mount (default "store" on first render → no hydration mismatch)
   useEffect(() => {
