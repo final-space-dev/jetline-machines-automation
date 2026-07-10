@@ -23,7 +23,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = (process.env.SEED_ADMIN_EMAIL || "admin@jetline.local")
+  const email = (process.env.SEED_ADMIN_EMAIL || "tech@jetline.co.za")
     .trim()
     .toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD || "ChangeMe123!";
