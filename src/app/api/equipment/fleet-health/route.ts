@@ -71,7 +71,10 @@ export async function GET() {
     ]);
 
     const updatedCol = hasUpdatedAt ? "updated_at::text" : "NULL::text";
-    const replaceExpr = hasReplaceFlag ? "replace_flag" : "NULL::text";
+    // Cast to text: replace_flag is free-text ("yes"/"no") in the data model, but a
+    // freshly-provisioned DB may type it as BOOLEAN. ::text makes the JS-side
+    // .toLowerCase().includes("yes") safe regardless of the underlying column type.
+    const replaceExpr = hasReplaceFlag ? "replace_flag::text" : "NULL::text";
 
     // ── Equipment rows with computed bucket ──────────────────────────────────
     const equipItems = await bms.query<EquipRow>(`
@@ -108,7 +111,7 @@ export async function GET() {
         mf.serial_number AS serial,
         psm.store AS store,
         psm.model_name AS model,
-        mf.replace_flag AS replace_flag,
+        mf.replace_flag::text AS replace_flag,
         ${contractSelect}
       FROM xerox.machine_feedback mf
       LEFT JOIN xerox.printer_store_map psm

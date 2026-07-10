@@ -130,10 +130,15 @@ export async function ensureItemColumns(client: PoolClient): Promise<void> {
       ADD COLUMN IF NOT EXISTS last_serviced    DATE,
       ADD COLUMN IF NOT EXISTS next_service_due DATE,
       ADD COLUMN IF NOT EXISTS service_provider TEXT,
-      ADD COLUMN IF NOT EXISTS replace_flag     BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS replace_flag     TEXT,
       ADD COLUMN IF NOT EXISTS created_at       TIMESTAMPTZ DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW()
   `);
+  // replace_flag is free-text ("yes"/"no") everywhere it's read (ILIKE '%yes%'
+  // in SQL, .includes("yes") in JS). Repair it to TEXT if an earlier heal (or any
+  // environment) created it as BOOLEAN — otherwise fleet-health's .toLowerCase()
+  // throws and 'yes' writes fail. Idempotent: only alters when the type is wrong.
+  await coerceReplaceFlagToText(client, "equipment", "items");
 }
 
 // Same self-heal for xerox.machine_feedback — the printer per-serial feedback
@@ -151,7 +156,7 @@ export async function ensureFeedbackColumns(client: PoolClient): Promise<void> {
     ALTER TABLE xerox.machine_feedback
       ADD COLUMN IF NOT EXISTS condition        TEXT,
       ADD COLUMN IF NOT EXISTS condition_notes  TEXT,
-      ADD COLUMN IF NOT EXISTS replace_flag     BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS replace_flag     TEXT,
       ADD COLUMN IF NOT EXISTS age              TEXT,
       ADD COLUMN IF NOT EXISTS install_date     DATE,
       ADD COLUMN IF NOT EXISTS contract_end     DATE,
@@ -160,4 +165,32 @@ export async function ensureFeedbackColumns(client: PoolClient): Promise<void> {
       ADD COLUMN IF NOT EXISTS notes            TEXT,
       ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW()
   `);
+  await coerceReplaceFlagToText(client, "xerox", "machine_feedback");
+}
+
+// Idempotently ensure <schema>.<table>.replace_flag is TEXT. If a prior heal
+// created it as BOOLEAN, convert in place (true->'yes', false->'no') and drop the
+// NOT NULL/DEFAULT that the boolean version carried. No-op when already TEXT.
+async function coerceReplaceFlagToText(client: PoolClient, schema: string, table: string): Promise<void> {
+  const t = await client.query(
+    `SELECT data_type FROM information_schema.columns
+     WHERE table_schema = $1 AND table_name = $2 AND column_name = 'replace_flag' LIMIT 1`,
+    [schema, table]
+  );
+  if (t.rows[0]?.data_type === "boolean") {
+    // ALTER … USING can't run inside a multi-statement string with the type probe,
+    // so issue the conversion statements individually. Quote identifiers are static
+    // (validated schema/table names from our own call sites), not user input.
+    await client.query(
+      `ALTER TABLE ${schema}.${table} ALTER COLUMN replace_flag DROP DEFAULT`
+    );
+    await client.query(
+      `ALTER TABLE ${schema}.${table}
+         ALTER COLUMN replace_flag TYPE TEXT
+         USING (CASE WHEN replace_flag THEN 'yes' ELSE 'no' END)`
+    );
+    await client.query(
+      `ALTER TABLE ${schema}.${table} ALTER COLUMN replace_flag DROP NOT NULL`
+    );
+  }
 }
