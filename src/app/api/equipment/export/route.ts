@@ -31,12 +31,12 @@ export async function GET(req: NextRequest) {
 
   return withClient(bmsPool, async (client) => {
     await ensureItemColumns(client);
-    const conditions: string[] = [];
+    const conditions: string[] = ["deleted_at IS NULL"];
     const values: string[] = [];
     if (store)  { values.push(store);  conditions.push(`store = $${values.length}`); }
     if (status) { values.push(status); conditions.push(`status = $${values.length}`); }
     if (type)   { values.push(type);   conditions.push(`machine_type = $${values.length}`); }
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const where = `WHERE ${conditions.join(" AND ")}`;
 
     const result = await client.query(
       `SELECT

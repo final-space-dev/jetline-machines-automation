@@ -33,6 +33,7 @@ export async function GET() {
            COUNT(*) FILTER (WHERE condition ILIKE ANY(ARRAY['%fair%','%old%','%average%','%okay%','%used%','%below%'])) AS fair,
            COUNT(*) FILTER (WHERE condition ILIKE ANY(ARRAY['%not working%','%broken%','%poor%','%not in use%','%repair%','%disposed%'])) AS poor
          FROM equipment.items
+         WHERE deleted_at IS NULL
          GROUP BY store`
       ),
       xero.query<{ store: string; count: string }>(

@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
   const { page, limit, offset } = paginate(url, 200);
 
   return withClient(bmsPool, async (client) => {
-    const conditions: string[] = [];
+    const conditions: string[] = ["deleted_at IS NULL"];
     const values: (string | number)[] = [];
 
     if (store)  { values.push(store);  conditions.push(`store = $${values.length}`); }
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const where = `WHERE ${conditions.join(" AND ")}`;
 
     const [rowsResult, countResult, storesResult, typesResult] = await Promise.all([
       client.query(
@@ -70,8 +70,8 @@ export async function GET(req: NextRequest) {
         [...values, limit, offset]
       ),
       client.query(`SELECT COUNT(*) AS total FROM equipment.items ${where}`, values),
-      client.query(`SELECT store, COUNT(*) AS count FROM equipment.items GROUP BY store ORDER BY store`),
-      client.query(`SELECT machine_type, COUNT(*) AS count FROM equipment.items GROUP BY machine_type ORDER BY machine_type`),
+      client.query(`SELECT store, COUNT(*) AS count FROM equipment.items WHERE deleted_at IS NULL GROUP BY store ORDER BY store`),
+      client.query(`SELECT machine_type, COUNT(*) AS count FROM equipment.items WHERE deleted_at IS NULL GROUP BY machine_type ORDER BY machine_type`),
     ]);
 
     const total = parseInt(countResult.rows[0].total);

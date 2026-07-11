@@ -28,7 +28,7 @@ export async function GET(
   return withClients([bmsPool, xeroxPool], async (eqClient, xClient) => {
     const [eqResult, machinesResult] = await Promise.all([
       eqClient.query(
-        `SELECT * FROM equipment.items WHERE store = $1 ORDER BY machine_type, id`,
+        `SELECT * FROM equipment.items WHERE store = $1 AND deleted_at IS NULL ORDER BY machine_type, id`,
         [storeName]
       ),
       xClient.query(

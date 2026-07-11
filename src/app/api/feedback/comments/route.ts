@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
 import { bmsPool } from "@/lib/bms-pool";
 import { xeroxPool } from "@/lib/xerox-pool";
-import { withClient, badRequest, serverError, ensureFeedbackTables } from "@/lib/api-utils";
+import { withClient, badRequest, serverError, ensureFeedbackTables, validateBody } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError, type SessionUser } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { z } from "zod";
+
+const CommentSchema = z.object({
+  type: z.enum(["equipment", "printer"]),
+  ref: z.string().trim().min(1, "ref is required").max(64),
+  body: z.string().trim().min(1, "comment body is required").max(4000, "comment is too long (max 4000 chars)"),
+});
 
 /**
  * Machine comment feed — an immutable, attributed, timestamped log shared by
@@ -81,13 +89,15 @@ export async function POST(req: NextRequest) {
   try { user = await requireUser(); }
   catch (e) { if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status }); throw e; }
 
-  const body = await req.json().catch(() => null);
-  const type = parseType(body?.type);
-  const ref = typeof body?.ref === "string" ? body.ref.trim() : "";
-  const text = typeof body?.body === "string" ? body.body.trim() : "";
-  if (!type || !ref) return badRequest("type (equipment|printer) and ref are required");
-  if (!text) return badRequest("comment body is required");
-  if (text.length > 4000) return badRequest("comment is too long (max 4000 chars)");
+  // Throttle comment spam: 30 comments / 5 min per user.
+  const rl = await rateLimit(`comment:${user.id}`, 30, 300);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many comments — please slow down." }, { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } });
+  }
+
+  const parsed = await validateBody(req, CommentSchema);
+  if (parsed.error) return parsed.error;
+  const { type, ref, body: text } = parsed.data;
 
   const timer = routeTimer("POST /api/feedback/comments");
   return withClient(bmsPool, async (client) => {

@@ -2,10 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
 import { bmsPool } from "@/lib/bms-pool";
 import { xeroxPool } from "@/lib/xerox-pool";
-import { withClient, badRequest, notFound, serverError, ensureFeedbackTables } from "@/lib/api-utils";
+import { withClient, badRequest, notFound, serverError, ensureFeedbackTables, validateBody } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, requireAdmin, AuthError, type SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+const CreateRequestSchema = z.object({
+  type: z.enum(["equipment", "printer"]),
+  ref: z.string().trim().min(1, "ref is required").max(64),
+  motivation: z.string().trim().min(1, "motivation is required").max(4000, "motivation is too long (max 4000 chars)"),
+  urgency: z.enum(["low", "medium", "high"]).default("medium"),
+});
+
+const PatchRequestSchema = z.object({
+  id: z.number().int().positive(),
+  status: z.enum(["open", "reviewing", "approved", "declined"]).optional(),
+  response_note: z.string().trim().max(4000).optional(),
+}).refine((v) => v.status !== undefined || v.response_note !== undefined, {
+  message: "nothing to update (status or response_note)",
+});
 
 /**
  * Replacement requests — replaces the old replace_flag entirely. A store REQUESTS
@@ -95,14 +111,9 @@ export async function POST(req: NextRequest) {
   try { user = await requireUser(); }
   catch (e) { if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status }); throw e; }
 
-  const body = await req.json().catch(() => null);
-  const type = parseType(body?.type);
-  const ref = typeof body?.ref === "string" ? body.ref.trim() : "";
-  const motivation = typeof body?.motivation === "string" ? body.motivation.trim() : "";
-  const urgency = URGENCIES.has(body?.urgency) ? body.urgency : "medium";
-  if (!type || !ref) return badRequest("type (equipment|printer) and ref are required");
-  if (!motivation) return badRequest("motivation is required");
-  if (motivation.length > 4000) return badRequest("motivation is too long (max 4000 chars)");
+  const parsed = await validateBody(req, CreateRequestSchema);
+  if (parsed.error) return parsed.error;
+  const { type, ref, motivation, urgency } = parsed.data;
 
   const timer = routeTimer("POST /api/feedback/replacement-requests");
   return withClient(bmsPool, async (client) => {
@@ -159,22 +170,20 @@ export async function PATCH(req: NextRequest) {
   try { admin = await requireAdmin(); }
   catch (e) { if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status }); throw e; }
 
-  const body = await req.json().catch(() => null);
-  const id = body?.id;
-  if (!Number.isInteger(id) || id <= 0) return badRequest("valid id is required");
+  const parsed = await validateBody(req, PatchRequestSchema);
+  if (parsed.error) return parsed.error;
+  const { id, status, response_note } = parsed.data;
 
   const sets: string[] = [];
   const params: unknown[] = [];
   let statusChanged = false;
-  if (typeof body?.status === "string") {
-    if (!STATUSES.has(body.status)) return badRequest("invalid status");
-    params.push(body.status); sets.push(`status = $${params.length}`);
+  if (status !== undefined) {
+    params.push(status); sets.push(`status = $${params.length}`);
     statusChanged = true;
   }
-  if (typeof body?.response_note === "string") {
-    params.push(body.response_note.trim() || null); sets.push(`response_note = $${params.length}`);
+  if (response_note !== undefined) {
+    params.push(response_note || null); sets.push(`response_note = $${params.length}`);
   }
-  if (sets.length === 0) return badRequest("nothing to update (status or response_note)");
 
   // Stamp responder when a status decision or note is recorded.
   params.push(admin.name || admin.email || "admin"); sets.push(`responded_by = $${params.length}`);

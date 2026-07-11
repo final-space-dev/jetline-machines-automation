@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { isLoginLocked, recordLoginFailure, clearLoginFailures } from "@/lib/rate-limit";
 
 /**
  * Phase 09 — Authentication & Roles (NextAuth v5 / Auth.js).
@@ -56,11 +57,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!email || !password) return null;
 
+        // Lockout: after too many recent failures for this email, refuse to even
+        // check the password until the window passes (brute-force protection).
+        if (await isLoginLocked(email)) return null;
+
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+        if (!user) {
+          await recordLoginFailure(email);
+          return null;
+        }
 
         const ok = await bcrypt.compare(password, user.password);
-        if (!ok) return null;
+        if (!ok) {
+          await recordLoginFailure(email);
+          return null;
+        }
+
+        // Success — clear the failure history for this account.
+        await clearLoginFailures(email);
 
         // Returned object shape must be compatible with the `User`
         // augmentation. `id` is a string here (NextAuth default).

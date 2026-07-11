@@ -129,7 +129,7 @@ export async function GET(
         [storeName]
       ),
       eqClient.query(
-        `SELECT * FROM equipment.items WHERE store = $1 ORDER BY machine_type, id`,
+        `SELECT * FROM equipment.items WHERE store = $1 AND deleted_at IS NULL ORDER BY machine_type, id`,
         [storeName]
       ),
       xClient.query(

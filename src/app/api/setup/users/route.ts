@@ -2,9 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { badRequest, serverError } from "@/lib/api-utils";
+import { badRequest, serverError, validateBody } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireAdmin, AuthError, type Role } from "@/lib/auth";
+import { z } from "zod";
+
+// Minimum password policy for new accounts: 8+ chars with at least one letter and
+// one number. Keeps it usable for shop-floor staff without being a nuisance.
+const CreateUserSchema = z.object({
+  email: z.string().trim().toLowerCase().email("a valid email is required"),
+  name: z.string().trim().min(1, "name is required").max(120),
+  role: z.enum(["admin", "store_staff"]),
+  store: z.string().trim().optional().default(""),
+  password: z.string()
+    .min(8, "password must be at least 8 characters")
+    .max(200)
+    .regex(/[A-Za-z]/, "password must contain a letter")
+    .regex(/[0-9]/, "password must contain a number"),
+}).refine((v) => v.role !== "store_staff" || v.store.length > 0, {
+  path: ["store"],
+  message: "store is required for store_staff",
+});
 
 /** Admin gate: returns a 401/403 response if not an admin, else null. */
 async function adminGate(): Promise<NextResponse | null> {
@@ -51,18 +69,9 @@ export async function POST(req: NextRequest) {
   if (gate) return gate;
   const timer = routeTimer("POST /api/setup/users");
 
-  const body = await req.json().catch(() => null);
-  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const role = body?.role;
-  const store = typeof body?.store === "string" ? body.store.trim() : "";
-  const password = typeof body?.password === "string" ? body.password : "";
-
-  if (!email) return badRequest("email is required");
-  if (!name) return badRequest("name is required");
-  if (!password) return badRequest("password is required");
-  if (!isValidRole(role)) return badRequest("role must be 'admin' or 'store_staff'");
-  if (role === "store_staff" && !store) return badRequest("store is required for store_staff");
+  const parsed = await validateBody(req, CreateUserSchema);
+  if (parsed.error) return parsed.error;
+  const { email, name, role, store, password } = parsed.data;
 
   try {
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);

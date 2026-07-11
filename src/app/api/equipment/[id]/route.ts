@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Object.keys(updates).length === 0) return badRequest("No valid fields to update");
 
     const current = await client.query(
-      `SELECT ${ALLOWED_FIELDS.join(", ")} FROM equipment.items WHERE id = $1`, [id]
+      `SELECT ${ALLOWED_FIELDS.join(", ")} FROM equipment.items WHERE id = $1 AND deleted_at IS NULL`, [id]
     );
     if (current.rows.length === 0) return notFound();
     const old = current.rows[0];
@@ -99,7 +99,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const timer = routeTimer(`DELETE /api/equipment/${id}`);
   return withClient(bmsPool, async (client) => {
-    const result = await client.query(`DELETE FROM equipment.items WHERE id = $1 RETURNING id`, [id]);
+    // Soft delete — recoverable, consistent with /api/equipment/items/[id].
+    const result = await client.query(
+      `UPDATE equipment.items SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
+      [id],
+    );
     if (result.rowCount === 0) return notFound();
     timer.done({ id });
     return NextResponse.json({ ok: true });

@@ -70,10 +70,11 @@ export async function GET(req: NextRequest) {
           bmsClient.query<ItemHit>(
             `SELECT id, make_model, machine_type, store, condition
              FROM equipment.items
-             WHERE make_model ILIKE $1
+             WHERE deleted_at IS NULL
+               AND (make_model ILIKE $1
                 OR serial ILIKE $1
                 OR store ILIKE $1
-                OR machine_type ILIKE $1
+                OR machine_type ILIKE $1)
              ORDER BY store, machine_type
              LIMIT 5`,
             [like]

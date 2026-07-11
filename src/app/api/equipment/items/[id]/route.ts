@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return withClient(bmsPool, async (client) => {
     await ensureItemColumns(client);
     const [item, logRows] = await Promise.all([
-      client.query(`SELECT * FROM equipment.items WHERE id = $1`, [id]),
+      client.query(`SELECT * FROM equipment.items WHERE id = $1 AND deleted_at IS NULL`, [id]),
       client.query(
         `SELECT field, old_value, new_value, changed_by, changed_at
          FROM equipment.change_log WHERE item_id = $1 ORDER BY changed_at DESC LIMIT 50`,
@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Object.keys(updates).length === 0) return badRequest("No valid fields");
 
     const current = await client.query(
-      `SELECT ${ALLOWED_FIELDS.join(", ")} FROM equipment.items WHERE id = $1`, [id]
+      `SELECT ${ALLOWED_FIELDS.join(", ")} FROM equipment.items WHERE id = $1 AND deleted_at IS NULL`, [id]
     );
     if (current.rows.length === 0) return notFound();
     const old = current.rows[0];
@@ -142,7 +142,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!validId(id)) return notFound();
   const timer = routeTimer(`DELETE /api/equipment/items/${id}`);
   return withClient(bmsPool, async (client) => {
-    const result = await client.query(`DELETE FROM equipment.items WHERE id = $1 RETURNING id`, [id]);
+    await ensureItemColumns(client);
+    // Soft delete — the row is retained (deleted_at stamped) and hidden from
+    // reads, so a mistaken delete is recoverable. Only affect a live row.
+    const result = await client.query(
+      `UPDATE equipment.items SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
+      [id],
+    );
     if (result.rowCount === 0) return notFound();
     timer.done({ id });
     return NextResponse.json({ ok: true });
