@@ -25,7 +25,7 @@ import {
  *   next_service_due  10  *optional column — guarded
  *
  * equipmentScore = avg item score.
- * printerScore   = % of printers with condition + age + replace_flag all set.
+ * printerScore   = % of printers with condition + age all set.
  * overallScore   = round(0.7 * equipmentScore + 0.3 * printerScore).
  *
  * Optional item columns and machine_feedback columns are probed via

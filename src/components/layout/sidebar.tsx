@@ -16,6 +16,7 @@ import {
   HeartPulse,
   Activity,
   Settings,
+  AlertOctagon,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -53,6 +54,7 @@ const SECTIONS: Section[] = [
       // Machine Reports is the first report; this section is the home for all
       // future reporting (recon, volume, billing, …).
       { name: "Machine Reports", href: "/machine-reports", icon: BarChart3 },
+      { name: "Replacement Requests", href: "/reports/replacements", icon: AlertOctagon },
     ],
   },
   {

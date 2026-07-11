@@ -27,7 +27,7 @@ const OPTIONAL_ITEM_COLUMNS = [
   "next_service_due",
 ] as const;
 
-const OPTIONAL_FEEDBACK_COLUMNS = ["condition_notes", "age", "replace_flag"] as const;
+const OPTIONAL_FEEDBACK_COLUMNS = ["condition_notes", "age"] as const;
 
 interface ItemRow {
   id: number;

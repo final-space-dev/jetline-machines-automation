@@ -8,13 +8,12 @@ const ALLOWED_FIELDS = [
   "store", "machine_type", "make_model", "serial", "condition", "located_at", "status",
   "purchase_date", "supplier", "purchase_price", "warranty_expiry",
   "last_serviced", "next_service_due", "service_provider", "notes", "photos",
-  // Optional column (present on prod; probed defensively by fleet-health). Kept
-  // whitelisted so the staff "replace" capability in STAFF_FIELDS actually persists.
-  "replace_flag",
 ];
 
-// Fields a store_staff user is permitted to patch on their own store's items.
-const STAFF_FIELDS = new Set(["condition", "notes", "replace_flag"]);
+// Store staff get FULL editing on their OWN store's equipment — every allowed
+// field except `store` (moving an item to another store is admin-only, so staff
+// can't push equipment out of their tenant).
+const STAFF_FIELDS = new Set(ALLOWED_FIELDS.filter((f) => f !== "store"));
 
 // Condition is stored as a bucket string. Accept the enum directly; normalize
 // casing so "Good"/"good"/"GOOD" all persist as "Good".

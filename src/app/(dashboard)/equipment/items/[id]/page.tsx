@@ -21,6 +21,7 @@ import {
 import { JlSelect } from "@/components/ui/jl-select";
 import { JlDate } from "@/components/ui/jl-date";
 import { ModelSuggest } from "@/components/equipment/model-suggest";
+import { FeedbackPanel } from "@/components/equipment/feedback-panel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -622,6 +623,9 @@ export default function EquipmentItemPage() {
               )}
             </Section>
           )}
+
+          {/* ── Feedback & replacement requests (store + admin) ── */}
+          <FeedbackPanel type="equipment" refId={String(id)} />
 
           {/* ── Change history (admin) ── */}
           {isAdmin && log.length > 0 && (

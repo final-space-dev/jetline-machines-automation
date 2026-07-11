@@ -34,14 +34,12 @@ interface SummaryRow extends BaseRow {
   latest_balances: { black_impressions?: number; color_impressions?: number };
   age: string | null;
   condition_notes: string | null;
-  replace_flag: "YES" | "NO" | "MAYBE" | null;
   bms_installed_date: string | null;
 }
 
 interface StatusRow extends BaseRow {
   age: string | null;
   condition_notes: string | null;
-  replace_flag: "YES" | "NO" | "MAYBE" | null;
   reporting_enabled: boolean | null;
   bms_installed_date: string | null;
 }
@@ -241,7 +239,7 @@ function SummaryTab({ rows, filters, setFilters }: {
         <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
         <Button variant="outline" size="sm" onClick={() =>
           exportCsv("summary.csv",
-            ["Serial","Model","Store","Group","Type","Max Daily","Avg Daily","Active Days","Last Reading","B&W Reading","Colour Reading","Total Reading","BMS Install Date","BMS Age","Age","Condition","Replace"],
+            ["Serial","Model","Store","Group","Type","Max Daily","Avg Daily","Active Days","Last Reading","B&W Reading","Colour Reading","Total Reading","BMS Install Date","BMS Age","Age","Condition"],
             visible.map((r) => {
               const bw = r.latest_balances?.black_impressions ?? null;
               const col = r.latest_balances?.color_impressions ?? null;
@@ -250,7 +248,7 @@ function SummaryTab({ rows, filters, setFilters }: {
                 String(bw??""),String(col??""),
                 bw!=null||col!=null ? String((bw??0)+(col??0)) : "",
                 r.bms_installed_date??"",bmsAge(r.bms_installed_date),
-                r.age??"",r.condition_notes??"",r.replace_flag??""];
+                r.age??"",r.condition_notes??""];
             })
           )
         }>Export CSV</Button>
@@ -275,12 +273,11 @@ function SummaryTab({ rows, filters, setFilters }: {
               {th("bms_installed_date","BMS Age")}
               {th("age","Age")}
               {th("condition_notes","Condition")}
-              {th("replace_flag","Replace")}
             </TableRow>
           </TableHeader>
           <TableBody>
             {visible.length === 0 ? (
-              <TableRow><TableCell colSpan={17} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
+              <TableRow><TableCell colSpan={16} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
             ) : visible.map((r) => (
               <TableRow key={r.serial_number}>
                 <TableCell className="font-mono text-xs">{r.serial_number}</TableCell>
@@ -302,7 +299,6 @@ function SummaryTab({ rows, filters, setFilters }: {
                 <TableCell className="text-xs whitespace-nowrap">{bmsAge(r.bms_installed_date)}</TableCell>
                 <TableCell className="text-xs whitespace-nowrap">{r.age ?? "—"}</TableCell>
                 <TableCell className="text-xs max-w-[280px] truncate" title={r.condition_notes ?? ""}>{r.condition_notes ?? "—"}</TableCell>
-                <TableCell className="whitespace-nowrap"><ReplaceBadge flag={r.replace_flag} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -492,16 +488,6 @@ function MonthColumnsTab({ rows, months, filters, setFilters, exportName }: {
 
 // ── Status tab ────────────────────────────────────────────────────────────────
 
-function ReplaceBadge({ flag }: { flag: "YES" | "NO" | "MAYBE" | null }) {
-  if (!flag) return <span className="text-muted-foreground">—</span>;
-  const cls = flag === "YES"
-    ? "bg-red-100 text-red-700"
-    : flag === "MAYBE"
-    ? "bg-yellow-100 text-yellow-700"
-    : "bg-green-100 text-green-700";
-  return <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${cls}`}>{flag}</span>;
-}
-
 function StatusTab({ rows, filters, setFilters }: {
   rows: StatusRow[]; filters: Filters; setFilters: (f: Filters) => void;
 }) {
@@ -520,12 +506,12 @@ function StatusTab({ rows, filters, setFilters }: {
         <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
         <Button variant="outline" size="sm" onClick={() =>
           exportCsv("machine-status.csv",
-            ["Store","Model","Serial","Group","Type","BMS Install Date","BMS Age","Age","Condition","Replace"],
+            ["Store","Model","Serial","Group","Type","BMS Install Date","BMS Age","Age","Condition"],
             visible.map((r) => [
               r.store ?? "", r.model_name, r.serial_number,
               r.company_group ?? "", r.printer_type ?? "",
               r.bms_installed_date ?? "", bmsAge(r.bms_installed_date),
-              r.age ?? "", r.condition_notes ?? "", r.replace_flag ?? "",
+              r.age ?? "", r.condition_notes ?? "",
             ])
           )
         }>Export CSV</Button>
@@ -543,12 +529,11 @@ function StatusTab({ rows, filters, setFilters }: {
               {th("bms_installed_date","BMS Age")}
               {th("age","Age")}
               {th("condition_notes","Condition")}
-              {th("replace_flag","Replace")}
             </TableRow>
           </TableHeader>
           <TableBody>
             {visible.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
             ) : visible.map((r) => (
               <TableRow key={r.serial_number}>
                 <TableCell className="text-xs">{r.store ?? "—"}</TableCell>
@@ -560,13 +545,12 @@ function StatusTab({ rows, filters, setFilters }: {
                 <TableCell className="text-xs whitespace-nowrap">{bmsAge(r.bms_installed_date)}</TableCell>
                 <TableCell className="text-xs whitespace-nowrap">{r.age ?? "—"}</TableCell>
                 <TableCell className="text-xs max-w-[320px] truncate" title={r.condition_notes ?? ""}>{r.condition_notes ?? "—"}</TableCell>
-                <TableCell className="whitespace-nowrap"><ReplaceBadge flag={r.replace_flag} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-      <p className="text-xs text-muted-foreground">{visible.length} machines · {visible.filter(r => r.replace_flag === "YES").length} flagged for replacement</p>
+      <p className="text-xs text-muted-foreground">{visible.length} machines</p>
     </div>
   );
 }

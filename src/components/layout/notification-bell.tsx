@@ -53,6 +53,7 @@ function TypeIcon({ type }: { type: string }) {
     case "equipment_poor":
       return <AlertTriangle size={size} style={{ color: "var(--jl-red-500, #e6121f)" }} />;
     case "replace_flagged":
+    case "replacement_requested":
       return <Recycle size={size} style={{ color: "var(--jl-amber-500, #d97706)" }} />;
     default:
       return <Bell size={size} style={{ color: "var(--jl-ink-400, #94a3b8)" }} />;

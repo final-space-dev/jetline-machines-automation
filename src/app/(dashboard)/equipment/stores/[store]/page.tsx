@@ -28,7 +28,6 @@ interface Machine {
   printer_type: string | null;
   last_seen: string | null;
   condition_notes: string | null;
-  replace_flag: string | null;
   age: string | null;
   install_date: string | null;
   latest_balance: number | string | null;
@@ -671,22 +670,15 @@ export default function StoreDetailPage() {
                     <th>Install Date</th>
                     <th className="num">Balance</th>
                     <th>Last Seen</th>
-                    <th>Replace?</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
+                    <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
                   ) : machines.length === 0 ? (
-                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>No Xerox printers mapped to this store</td></tr>
+                    <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>No Xerox printers mapped to this store</td></tr>
                   ) : (
                     machines.map((m) => {
-                      const flag = m.replace_flag;
-                      const flagBadge =
-                        flag === "YES" ? "jl-badge--red"
-                        : flag === "MAYBE" ? "jl-badge--amber"
-                        : flag === "NO" ? "jl-badge--green"
-                        : "";
                       const balance = m.latest_balance != null ? Number(m.latest_balance) : null;
                       return (
                         <tr key={m.serial_number}
@@ -708,11 +700,6 @@ export default function StoreDetailPage() {
                           </td>
                           <td style={{ color: "var(--ink-500)" }}>
                             {m.last_seen ? new Date(m.last_seen).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" }) : "Never"}
-                          </td>
-                          <td>
-                            {flag
-                              ? <span className={`jl-badge ${flagBadge}`}>{flag}</span>
-                              : <span className="jl-muted">Not set</span>}
                           </td>
                         </tr>
                       );

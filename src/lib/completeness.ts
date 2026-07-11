@@ -11,7 +11,7 @@
  * `xerox.machine_feedback` (xeroxPool), joined to `xerox.printer_store_map` for
  * store scoping. Optional columns are probed via information_schema so a schema
  * that predates the newer columns (purchase_date, warranty_expiry, last_serviced,
- * next_service_due on items; condition_notes/age/replace_flag on machine_feedback)
+ * next_service_due on items; condition_notes/age on machine_feedback)
  * scores those points as 0 instead of throwing.
  */
 
@@ -59,7 +59,7 @@ const OPTIONAL_ITEM_COLUMNS = [
   "next_service_due",
 ] as const;
 
-const OPTIONAL_FEEDBACK_COLUMNS = ["condition_notes", "age", "replace_flag"] as const;
+const OPTIONAL_FEEDBACK_COLUMNS = ["condition_notes", "age"] as const;
 
 function filled(v: unknown): boolean {
   if (v === null || v === undefined) return false;
@@ -126,12 +126,11 @@ export function scoreItem(row: ItemRow, optionalCols: Set<string>): ItemBreakdow
   return { id: row.id, type: row.machine_type ?? "Unknown", score, missing };
 }
 
-/** Score a single printer's feedback completeness (condition + age + replace_flag). */
+/** Score a single printer's feedback completeness (condition + age). */
 export function scorePrinter(row: FeedbackRow, feedbackCols: Set<string>): PrinterBreakdown {
   const checks: Array<{ label: string; present: boolean }> = [
     { label: "condition", present: feedbackCols.has("condition_notes") && filled(row.condition_notes) },
     { label: "age", present: feedbackCols.has("age") && filled(row.age) },
-    { label: "replace_flag", present: feedbackCols.has("replace_flag") && filled(row.replace_flag) },
   ];
   const setCount = checks.filter((c) => c.present).length;
   const score = Math.round((setCount / checks.length) * 100);
@@ -186,7 +185,7 @@ export async function scoreStoreCompleteness(
       ? Math.round(itemBreakdown.reduce((s, i) => s + i.score, 0) / itemBreakdown.length)
       : 0;
 
-  // % of printers with condition + age + replace_flag all set (score === 100).
+  // % of printers with condition + age all set (score === 100).
   const printerScore =
     printerBreakdown.length > 0
       ? Math.round(

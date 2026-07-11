@@ -43,9 +43,15 @@ interface PrinterRow {
   serial: string;
   store: string | null;
   model: string | null;
-  replace_flag: string | null;
   contract_end: string | null;
   days_remaining: number | null;
+}
+
+interface ReplacementRequestRow {
+  entity_type: string;
+  entity_ref: string;
+  store: string | null;
+  item_label: string | null;
 }
 
 export async function GET() {
@@ -63,25 +69,19 @@ export async function GET() {
 
   return withClients([bmsPool, xeroxPool], async (bms, xerox) => {
     // Probe optional columns on both DBs.
-    const [hasReplaceFlag, hasNextService, hasUpdatedAt, hasContractEnd] = await Promise.all([
-      columnExists(bms, "equipment", "items", "replace_flag"),
+    const [hasNextService, hasUpdatedAt, hasContractEnd] = await Promise.all([
       columnExists(bms, "equipment", "items", "next_service_due"),
       columnExists(bms, "equipment", "items", "updated_at"),
       columnExists(xerox, "xerox", "machine_feedback", "contract_end"),
     ]);
 
     const updatedCol = hasUpdatedAt ? "updated_at::text" : "NULL::text";
-    // Cast to text: replace_flag is free-text ("yes"/"no") in the data model, but a
-    // freshly-provisioned DB may type it as BOOLEAN. ::text makes the JS-side
-    // .toLowerCase().includes("yes") safe regardless of the underlying column type.
-    const replaceExpr = hasReplaceFlag ? "replace_flag::text" : "NULL::text";
 
     // ── Equipment rows with computed bucket ──────────────────────────────────
     const equipItems = await bms.query<EquipRow>(`
       SELECT id, store, machine_type, make_model, condition,
              ${CONDITION_CASE} AS bucket,
-             ${updatedCol} AS updated_at,
-             ${replaceExpr} AS replace_flag
+             ${updatedCol} AS updated_at
       FROM equipment.items
     `);
 
@@ -111,12 +111,26 @@ export async function GET() {
         mf.serial_number AS serial,
         psm.store AS store,
         psm.model_name AS model,
-        mf.replace_flag::text AS replace_flag,
         ${contractSelect}
       FROM xerox.machine_feedback mf
       LEFT JOIN xerox.printer_store_map psm
         ON UPPER(TRIM(psm.serial_number)) = UPPER(TRIM(mf.serial_number))
     `);
+
+    // ── Open replacement requests (new replacement flow) ─────────────────────
+    // Sourced from equipment.replacement_requests, which supersedes the old
+    // replace_flag column. Wrapped so a missing table can't 500 the dashboard.
+    let replacementRequests: ReplacementRequestRow[] = [];
+    try {
+      const rr = await xerox.query<ReplacementRequestRow>(`
+        SELECT entity_type, entity_ref, store, item_label
+        FROM equipment.replacement_requests
+        WHERE status IN ('open','reviewing')
+      `);
+      replacementRequests = rr.rows;
+    } catch {
+      replacementRequests = [];
+    }
 
     // ── Assemble condition breakdown ─────────────────────────────────────────
     const conditionBreakdown = { good: 0, fair: 0, poor: 0, unknown: 0 };
@@ -138,35 +152,25 @@ export async function GET() {
         updated_at: r.updated_at,
       }));
 
-    // ── Attention: replace flagged (printers + equipment) ────────────────────
-    const replacePrinters = printers.rows
-      .filter((p) => (p.replace_flag ?? "").toLowerCase().includes("yes"))
-      .map((p) => ({
-        serial: p.serial,
-        store: p.store,
-        model: p.model,
-        replace_flag: p.replace_flag,
-        contract_end: p.contract_end,
-        days_remaining: p.days_remaining,
-      }));
-
-    const replaceEquipment = hasReplaceFlag
-      ? equipItems.rows
-          .filter((r) => ((r as EquipRow & { replace_flag?: string | null }).replace_flag ?? "").toLowerCase().includes("yes"))
-          .map((r) => ({
-            id: r.id,
-            store: r.store,
-            machine_type: r.machine_type,
-            make_model: r.make_model,
-            condition: r.condition,
-            updated_at: r.updated_at,
-          }))
-      : [];
-
-    const replaceFlagged = [
-      ...replacePrinters.map((p) => ({ kind: "printer" as const, ...p })),
-      ...replaceEquipment.map((e) => ({ kind: "equipment" as const, ...e })),
-    ];
+    // ── Attention: replace flagged (open replacement requests) ───────────────
+    // Sourced from equipment.replacement_requests (new flow) rather than the old
+    // replace_flag column. entity_type 'printer' → serial/store/model;
+    // anything else → equipment id/store/machine_type.
+    const replaceFlagged = replacementRequests.map((rr) =>
+      rr.entity_type === "printer"
+        ? {
+            kind: "printer" as const,
+            serial: rr.entity_ref,
+            store: rr.store,
+            model: rr.item_label,
+          }
+        : {
+            kind: "equipment" as const,
+            id: Number(rr.entity_ref),
+            store: rr.store,
+            machine_type: rr.item_label,
+          }
+    );
 
     // ── Attention: contracts expiring within 30 days ─────────────────────────
     const contractsExpiring = printers.rows
@@ -176,7 +180,6 @@ export async function GET() {
         serial: p.serial,
         store: p.store,
         model: p.model,
-        replace_flag: p.replace_flag,
         contract_end: p.contract_end,
         days_remaining: p.days_remaining,
       }));
@@ -219,15 +222,17 @@ export async function GET() {
       if (it.bucket === "good") s.good++;
       else if (it.bucket === "fair") s.fair++;
       else if (it.bucket === "poor") s.poor++;
-      const rf = (it as EquipRow & { replace_flag?: string | null }).replace_flag;
-      if ((rf ?? "").toLowerCase().includes("yes")) s.replace++;
       if (it.updated_at && (!s.lastActivity || it.updated_at > s.lastActivity)) s.lastActivity = it.updated_at;
     }
     for (const p of printers.rows) {
       if (!p.store) continue;
       const s = getStore(p.store);
       s.printers++;
-      if ((p.replace_flag ?? "").toLowerCase().includes("yes")) s.replace++;
+    }
+    // Replace count per store now comes from open replacement requests.
+    for (const rr of replacementRequests) {
+      if (!rr.store) continue;
+      getStore(rr.store).replace++;
     }
 
     const storeHealth = Array.from(storeMap.values())

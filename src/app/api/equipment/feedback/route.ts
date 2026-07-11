@@ -4,7 +4,7 @@ import { withClient, badRequest, serverError, ensureFeedbackColumns } from "@/li
 import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError, type SessionUser } from "@/lib/auth";
 
-const ALLOWED = ["condition_notes", "replace_flag", "age", "install_date", "contract_end", "technician_notes", "last_visit"];
+const ALLOWED = ["condition_notes", "age", "install_date", "contract_end", "technician_notes", "last_visit"];
 
 export async function PATCH(req: NextRequest) {
   let user: SessionUser;

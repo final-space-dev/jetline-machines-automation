@@ -64,8 +64,7 @@ type NotifType =
   | "service_due_soon"
   | "contract_expiring"
   | "contract_expired"
-  | "equipment_poor"
-  | "replace_flagged";
+  | "equipment_poor";
 
 interface Candidate {
   type: NotifType;
@@ -123,16 +122,12 @@ export async function POST(req: NextRequest) {
       contractExpiring: 0,
       contractExpired: 0,
       equipmentPoor: 0,
-      replaceFlagged: 0,
     };
 
     // ── Equipment items (bmsPool) ──────────────────────────────────────────────
     const hasItems = await tableExists(bms, "equipment", "items");
     if (hasItems) {
-      const [hasNextService, hasReplaceFlag] = await Promise.all([
-        columnExists(bms, "equipment", "items", "next_service_due"),
-        columnExists(bms, "equipment", "items", "replace_flag"),
-      ]);
+      const hasNextService = await columnExists(bms, "equipment", "items", "next_service_due");
 
       // Service overdue + due soon (<=14 days)
       if (hasNextService) {
@@ -196,39 +191,13 @@ export async function POST(req: NextRequest) {
           serial: null,
         });
       }
-
-      // Equipment flagged for replacement
-      if (hasReplaceFlag) {
-        const repl = await bms.query<{
-          id: number;
-          store: string | null;
-          make_model: string | null;
-          replace_flag: string | null;
-        }>(`
-          SELECT id, store, make_model, replace_flag
-          FROM equipment.items
-          WHERE replace_flag ILIKE '%yes%'
-        `);
-        for (const row of repl.rows) {
-          scanned.replaceFlagged++;
-          const label = row.make_model ?? "Equipment";
-          candidates.push({
-            type: "replace_flagged",
-            message: `Flagged for replacement: ${label}${row.store ? ` at ${row.store}` : ""}`,
-            store: row.store ?? null,
-            itemId: row.id,
-            serial: null,
-          });
-        }
-      }
     }
 
     // ── Printer feedback (xeroxPool) ───────────────────────────────────────────
     const hasFeedback = await tableExists(xerox, "xerox", "machine_feedback");
     if (hasFeedback) {
-      const [hasContractEnd, hasReplaceFlag, hasStoreMap] = await Promise.all([
+      const [hasContractEnd, hasStoreMap] = await Promise.all([
         columnExists(xerox, "xerox", "machine_feedback", "contract_end"),
-        columnExists(xerox, "xerox", "machine_feedback", "replace_flag"),
         tableExists(xerox, "xerox", "printer_store_map"),
       ]);
 
@@ -237,7 +206,6 @@ export async function POST(req: NextRequest) {
         ? `LEFT JOIN xerox.printer_store_map psm
              ON UPPER(TRIM(psm.serial_number)) = UPPER(TRIM(mf.serial_number))`
         : "";
-      const replaceSelect = hasReplaceFlag ? "mf.replace_flag AS replace_flag" : "NULL::text AS replace_flag";
 
       // Contract expiring (<=30d) + expired (<today)
       if (hasContractEnd) {
@@ -277,32 +245,6 @@ export async function POST(req: NextRequest) {
               serial: row.serial,
             });
           }
-        }
-      }
-
-      // Printer flagged for replacement
-      if (hasReplaceFlag) {
-        const repl = await xerox.query<{
-          serial: string;
-          store: string | null;
-          replace_flag: string | null;
-        }>(`
-          SELECT mf.serial_number AS serial,
-                 ${storeSelect},
-                 ${replaceSelect}
-          FROM xerox.machine_feedback mf
-          ${storeJoin}
-          WHERE mf.replace_flag ILIKE '%yes%'
-        `);
-        for (const row of repl.rows) {
-          scanned.replaceFlagged++;
-          candidates.push({
-            type: "replace_flagged",
-            message: `Printer flagged for replacement: ${row.serial}${row.store ? ` at ${row.store}` : ""}`,
-            store: row.store ?? null,
-            itemId: null,
-            serial: row.serial,
-          });
         }
       }
     }

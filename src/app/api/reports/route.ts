@@ -145,8 +145,7 @@ export async function GET(request: NextRequest) {
           ms.max_month,
           COALESCE(lb.balances, '{}'::json)        AS latest_balances,
         mf.age,
-        mf.condition_notes,
-        mf.replace_flag
+        mf.condition_notes
         FROM machines m
         LEFT JOIN daily_stats ds ON ds.printer_id = m.printer_id
         LEFT JOIN monthly_stats ms ON ms.printer_id = m.printer_id
@@ -298,7 +297,6 @@ export async function GET(request: NextRequest) {
           mf.serial_number,
           mf.age,
           mf.condition_notes,
-          mf.replace_flag,
           psm.company_group,
           psm.printer_type,
           psm.reporting_enabled

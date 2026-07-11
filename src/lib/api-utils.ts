@@ -101,6 +101,55 @@ export async function withClients<T>(
   }
 }
 
+// ── Store-feedback schema (comments + replacement requests) ───────────────────
+// Two shared tables serving BOTH entity types via a polymorphic key:
+//   entity_type: 'equipment' (ref = items.id) | 'printer' (ref = serial_number)
+// Comments are an immutable, attributed, timestamped log ("constant commentary").
+// Replacement requests replace the old replace_flag entirely — a store REQUESTS a
+// replacement with a motivation; admins triage via status. Idempotent self-heal.
+export async function ensureFeedbackTables(client: PoolClient): Promise<void> {
+  await client.query(`CREATE SCHEMA IF NOT EXISTS equipment`);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS equipment.machine_comments (
+      id          SERIAL PRIMARY KEY,
+      entity_type TEXT NOT NULL,
+      entity_ref  TEXT NOT NULL,
+      store       TEXT,
+      body        TEXT NOT NULL,
+      author_id   TEXT,
+      author_name TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS machine_comments_entity_idx
+      ON equipment.machine_comments (entity_type, entity_ref, created_at DESC)
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS equipment.replacement_requests (
+      id            SERIAL PRIMARY KEY,
+      entity_type   TEXT NOT NULL,
+      entity_ref    TEXT NOT NULL,
+      store         TEXT,
+      item_label    TEXT,
+      motivation    TEXT NOT NULL,
+      urgency       TEXT NOT NULL DEFAULT 'medium',
+      status        TEXT NOT NULL DEFAULT 'open',
+      requested_by_id   TEXT,
+      requested_by_name TEXT,
+      response_note TEXT,
+      responded_by  TEXT,
+      responded_at  TIMESTAMPTZ,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS replacement_requests_status_idx
+      ON equipment.replacement_requests (status, created_at DESC)
+  `);
+}
+
 // ── Schema self-heal ──────────────────────────────────────────────────────────
 // equipment.items is managed via raw SQL (not Prisma), and the Neon migration
 // copied only a partial column set — core columns (notes, condition, located_at,

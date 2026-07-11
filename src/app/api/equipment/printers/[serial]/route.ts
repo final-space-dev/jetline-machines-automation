@@ -6,13 +6,16 @@ import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError, getSessionUser, type SessionUser } from "@/lib/auth";
 
 const FEEDBACK_FIELDS = [
-  "condition", "condition_notes", "replace_flag", "age",
+  "condition", "condition_notes", "age",
   "install_date", "contract_end", "technician_notes", "last_visit",
   "supplier",
 ];
 
-// Subset a store_staff user may set (feedback edits only).
-const STAFF_FEEDBACK_FIELDS = new Set(["condition", "condition_notes", "replace_flag", "notes"]);
+// Store staff do NOT edit printer feedback fields directly — printers are a
+// managed asset. Staff interact with printers only via comments and replacement
+// requests (separate /api/feedback/* endpoints). So no printer feedback field is
+// staff-writable; this PATCH is effectively admin-only for the machine record.
+const STAFF_FEEDBACK_FIELDS = new Set<string>();
 
 function validSerial(sn: string): boolean {
   return sn.length >= 3 && sn.length <= 64 && /^[A-Z0-9\-_. ]+$/.test(sn);

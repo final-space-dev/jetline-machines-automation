@@ -5,7 +5,7 @@ import { xeroxPool } from "@/lib/xerox-pool";
 import { withClient, withClients, serverError, badRequest } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { getStoreGroup, STORE_GROUPS } from "@/lib/store-groups";
-import { requireUser, requireAdmin, AuthError, type SessionUser } from "@/lib/auth";
+import { requireUser, AuthError, type SessionUser } from "@/lib/auth";
 
 interface StoreRow {
   name: string;
@@ -135,7 +135,7 @@ export async function GET(
       xClient.query(
         `SELECT pd.serial_number, COALESCE(psm.model_name, pd.model) AS model_name,
                 psm.printer_type, pd.last_seen::text,
-                mf.condition_notes, mf.replace_flag, mf.age
+                mf.condition_notes, mf.age
          FROM xerox.printer_dimensions pd
          JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
          LEFT JOIN xerox.machine_feedback mf ON UPPER(TRIM(mf.serial_number)) = UPPER(TRIM(pd.serial_number))
@@ -164,8 +164,12 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ store: string }> }
 ) {
+  // Store contact details are editable by admins AND by staff on their OWN store
+  // (the store keeps its own contact info current). Only these contact fields are
+  // writable here — group/connection assignment lives in Config (admin-only).
+  let user: SessionUser;
   try {
-    await requireAdmin();
+    user = await requireUser();
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -173,6 +177,9 @@ export async function PATCH(
   const { store } = await params;
   const storeName = decodeURIComponent(store);
   if (!storeName.trim()) return badRequest("store is required");
+  if (user.role !== "admin" && storeName !== user.store) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const timer = routeTimer(`PATCH /api/stores/${storeName}`);
 
   const body = await req.json().catch(() => null);

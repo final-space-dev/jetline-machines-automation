@@ -42,7 +42,6 @@ interface PrinterAttention {
   serial: string;
   store: string | null;
   model: string | null;
-  replace_flag: string | null;
   contract_end: string | null;
   days_remaining: number | null;
 }
@@ -273,7 +272,7 @@ export default function FleetHealthPage() {
               },
             },
           ]
-        : [{ key: "replace_flag", label: "Replace", sortable: true, render: (r: PrinterAttention) => r.replace_flag ?? "" }]),
+        : []),
     ];
 
     return [

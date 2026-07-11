@@ -6,8 +6,9 @@ import { requireUser, requireAdmin, AuthError, type SessionUser } from "@/lib/au
 
 const ALLOWED_FIELDS = ["store", "machine_type", "make_model", "serial", "condition", "located_at", "status"];
 
-// Fields a store_staff user is permitted to patch on their own store's items.
-const STAFF_FIELDS = new Set(["condition", "notes", "replace_flag"]);
+// Store staff get full editing on their own store's equipment except `store`
+// (reassigning to another store is admin-only).
+const STAFF_FIELDS = new Set(ALLOWED_FIELDS.filter((f) => f !== "store"));
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user: SessionUser;

@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PrinterPageSkeleton } from "@/components/equipment/skeleton";
 import { EquipmentErrorBoundary } from "@/components/equipment/error-boundary";
 import { ModelSuggest } from "@/components/equipment/model-suggest";
+import { FeedbackPanel } from "@/components/equipment/feedback-panel";
 import { useHotkeys } from "@/lib/use-hotkey";
 import { addRecentItem } from "@/lib/recently-viewed";
 import { useRole } from "@/lib/use-role";
@@ -40,7 +41,6 @@ interface PrinterMapping {
 interface PrinterFeedback {
   condition: string | null;
   condition_notes: string | null;
-  replace_flag: string | null;
   age: string | null;
   install_date: string | null;
   contract_end: string | null;
@@ -73,13 +73,6 @@ const CONDITION_OPTIONS: { value: string; color: string }[] = [
   { value: "Good", color: "var(--green-500)" },
   { value: "Fair", color: "var(--amber-500)" },
   { value: "Poor", color: "var(--red-500)" },
-];
-
-// Replace recommendation - YES red / MAYBE amber / NO green.
-const REPLACE_OPTIONS: { value: string; color: string; badge: string }[] = [
-  { value: "YES", color: "var(--red-500)", badge: "jl-badge--red" },
-  { value: "MAYBE", color: "var(--amber-500)", badge: "jl-badge--amber" },
-  { value: "NO", color: "var(--green-500)", badge: "jl-badge--green" },
 ];
 
 function num(v: number | null | undefined): number {
@@ -148,7 +141,7 @@ export default function PrinterDetailPage() {
   const [dimensions, setDimensions] = useState<PrinterDimensions | null>(null);
   const [mapping, setMapping] = useState<PrinterMapping | null>(null);
   const [feedback, setFeedback] = useState<PrinterFeedback>({
-    condition: null, condition_notes: null, replace_flag: null, age: null,
+    condition: null, condition_notes: null, age: null,
     install_date: null, contract_end: null, technician_notes: null, last_visit: null,
     supplier: null,
   });
@@ -273,7 +266,6 @@ export default function PrinterDetailPage() {
 
   const storeName = mapping?.store ?? "";
   const modelName = mapping?.model_name ?? dimensions?.model ?? "Unknown Model";
-  const replaceOpt = REPLACE_OPTIONS.find((o) => o.value === feedback.replace_flag);
 
   return (
     <AppShell>
@@ -334,9 +326,6 @@ export default function PrinterDetailPage() {
                 {mapping?.printer_type && (
                   <span className="jl-badge">{mapping.printer_type}</span>
                 )}
-                {replaceOpt && (
-                  <span className={`jl-badge ${replaceOpt.badge}`}>Replace: {replaceOpt.value}</span>
-                )}
                 {feedback.condition && (() => {
                   const c = CONDITION_OPTIONS.find((o) => o.value === feedback.condition);
                   const dotClass = c?.value === "Good" ? "jl-dot--green" : c?.value === "Fair" ? "jl-dot--amber" : "jl-dot--red";
@@ -377,44 +366,23 @@ export default function PrinterDetailPage() {
             <section className="jl-card">
               <SectionHead icon={ClipboardCheck} title="Condition" />
               <div style={{ display: "grid", gap: "var(--s-5)" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-5)" }}>
-                  <div className="jl-field">
-                    <label>Condition</label>
-                    <div className="jl-segment">
-                      {CONDITION_OPTIONS.map((opt) => {
-                        const active = feedback.condition === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            aria-selected={active}
-                            onClick={() => setF("condition", active ? null : opt.value)}
-                            style={active ? { background: opt.color, color: "#fff", boxShadow: "var(--sh-sm)", flex: 1 } : { flex: 1 }}
-                          >
-                            {opt.value}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="jl-field">
-                    <label>Replace Recommendation</label>
-                    <div className="jl-segment">
-                      {REPLACE_OPTIONS.map((opt) => {
-                        const active = feedback.replace_flag === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            aria-selected={active}
-                            onClick={() => setF("replace_flag", active ? null : opt.value)}
-                            style={active ? { background: opt.color, color: "#fff", boxShadow: "var(--sh-sm)", flex: 1 } : { flex: 1 }}
-                          >
-                            {opt.value}
-                          </button>
-                        );
-                      })}
-                    </div>
+                <div className="jl-field">
+                  <label>Condition</label>
+                  <div className="jl-segment">
+                    {CONDITION_OPTIONS.map((opt) => {
+                      const active = feedback.condition === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          aria-selected={active}
+                          onClick={() => setF("condition", active ? null : opt.value)}
+                          style={active ? { background: opt.color, color: "#fff", boxShadow: "var(--sh-sm)", flex: 1 } : { flex: 1 }}
+                        >
+                          {opt.value}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="jl-field">
@@ -593,6 +561,9 @@ export default function PrinterDetailPage() {
                 </div>
               </section>
             )}
+
+            {/* Feedback & replacement requests (store + admin) */}
+            <FeedbackPanel type="printer" refId={serialStr} />
           </div>
         </div>
       </EquipmentErrorBoundary>

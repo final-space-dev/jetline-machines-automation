@@ -82,7 +82,7 @@ export async function GET() {
         `SELECT
            psm.store,
            COUNT(*)::bigint AS active,
-           COUNT(*) FILTER (WHERE mf.replace_flag ILIKE '%yes%')::bigint AS replace_flagged
+           0::bigint AS replace_flagged  -- TODO: derive from replacement_requests
          FROM xerox.printer_store_map psm
          JOIN xerox.printer_dimensions pd ON pd.serial_number = psm.serial_number
          LEFT JOIN xerox.machine_feedback mf
