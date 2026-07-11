@@ -1,27 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MessageSquare, Send, AlertOctagon, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { MessageSquare, Send, AlertOctagon, Clock, CheckCircle2, XCircle, MessageCircle, PencilLine } from "lucide-react";
 
 /**
  * Shared feedback surface for a single machine (equipment item or printer).
- * Renders two things, both driven by /api/feedback/*:
- *   1. A running, immutable, attributed comment feed ("constant commentary").
- *   2. Replacement requests — status + motivation. If none is open, a store can
- *      raise one (motivation + urgency); admins triage from the report.
+ * Renders:
+ *   1. Replacement-request state + a "Request replacement" action (motivation + urgency).
+ *   2. A comment input.
+ *   3. A UNIFIED activity timeline — comments, field changes, and request events
+ *      interleaved chronologically (one story per record, /api/feedback/timeline).
  *
- * Used on the equipment item page and the printer page. Xerox/BMS data stays
+ * Used on the equipment item + printer pages. This replaces the old separate
+ * comment-list + change-history table with a single feed. Xerox/BMS data stays
  * read-only elsewhere; this is where stores actually feed back.
  */
 
 type EntityType = "equipment" | "printer";
 
-interface Comment {
-  id: number;
-  body: string;
-  author_name: string | null;
-  store: string | null;
-  created_at: string;
+interface TimelineItem {
+  kind: "comment" | "change" | "request";
+  at: string;
+  actor: string | null;
+  text: string;
+  detail?: string | null;
+  meta?: { status?: string; response?: boolean };
 }
 
 interface ReplacementRequest {
@@ -52,7 +55,7 @@ function relDate(iso: string): string {
 }
 
 export function FeedbackPanel({ type, refId }: { type: EntityType; refId: string }) {
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [requests, setRequests] = useState<ReplacementRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
@@ -70,11 +73,11 @@ export function FeedbackPanel({ type, refId }: { type: EntityType; refId: string
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [cRes, rRes] = await Promise.all([
-        fetch(`/api/feedback/comments${qs}`),
+      const [tRes, rRes] = await Promise.all([
+        fetch(`/api/feedback/timeline${qs}`),
         fetch(`/api/feedback/replacement-requests${qs}`),
       ]);
-      if (cRes.ok) { const d = await cRes.json(); setComments(Array.isArray(d.comments) ? d.comments : []); }
+      if (tRes.ok) { const d = await tRes.json(); setTimeline(Array.isArray(d.timeline) ? d.timeline : []); }
       if (rRes.ok) { const d = await rRes.json(); setRequests(Array.isArray(d.requests) ? d.requests : []); }
     } catch {
       /* non-fatal */
@@ -98,7 +101,8 @@ export function FeedbackPanel({ type, refId }: { type: EntityType; refId: string
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Couldn't post comment"); return; }
-      setComments((prev) => [data.comment, ...prev]);
+      // Reflect the new comment in the unified timeline immediately.
+      setTimeline((prev) => [{ kind: "comment", at: data.comment.created_at, actor: data.comment.author_name, text: data.comment.body }, ...prev]);
       setDraft("");
     } catch {
       setError("Couldn't post comment");
@@ -121,6 +125,8 @@ export function FeedbackPanel({ type, refId }: { type: EntityType; refId: string
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Couldn't submit request"); return; }
       setRequests((prev) => [data.request, ...prev]);
+      // Show the request event in the timeline too.
+      setTimeline((prev) => [{ kind: "request", at: data.request.created_at, actor: data.request.requested_by_name, text: `Replacement requested (${data.request.urgency})`, detail: data.request.motivation, meta: { status: data.request.status } }, ...prev]);
       setShowReqForm(false);
       setMotivation("");
       setUrgency("medium");
@@ -205,23 +211,40 @@ export function FeedbackPanel({ type, refId }: { type: EntityType; refId: string
         </div>
 
         {loading ? (
-          <p className="jl-sm jl-muted">Loading feedback…</p>
-        ) : comments.length === 0 ? (
-          <p className="jl-sm jl-muted">No comments yet. Be the first to log what&apos;s happening.</p>
+          <p className="jl-sm jl-muted">Loading activity…</p>
+        ) : timeline.length === 0 ? (
+          <p className="jl-sm jl-muted">No activity yet. Add a comment to log what&apos;s happening.</p>
         ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-            {comments.map((c) => (
-              <li key={c.id} style={{ borderLeft: "2px solid var(--ink-100)", paddingLeft: 12 }}>
-                <div style={{ whiteSpace: "pre-wrap", fontSize: 13, color: "var(--ink-800)", lineHeight: 1.5 }}>{c.body}</div>
-                <div style={{ fontSize: 11, color: "var(--ink-400)", marginTop: 3 }}>
-                  {c.author_name ?? "user"} · {relDate(c.created_at)}
-                </div>
-              </li>
-            ))}
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+            {timeline.map((t, i) => <TimelineRow key={i} item={t} />)}
           </ul>
         )}
       </div>
     </section>
+  );
+}
+
+// One row in the unified activity timeline. A small icon distinguishes comment /
+// change / request without adding visual weight; the border-left keeps it a
+// single quiet stream.
+function TimelineRow({ item }: { item: TimelineItem }) {
+  const Icon = item.kind === "comment" ? MessageCircle : item.kind === "request" ? AlertOctagon : PencilLine;
+  const iconColor = item.kind === "request" ? "var(--red-500)" : item.kind === "change" ? "var(--ink-400)" : "var(--blue-500)";
+  return (
+    <li style={{ display: "flex", gap: 10 }}>
+      <div style={{ flexShrink: 0, marginTop: 1 }}><Icon size={15} style={{ color: iconColor }} /></div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+          {item.kind === "comment" ? item.text : <span style={{ fontWeight: 600 }}>{item.text}</span>}
+        </div>
+        {item.detail && (
+          <div style={{ fontSize: 12.5, color: "var(--ink-600)", whiteSpace: "pre-wrap", lineHeight: 1.45, marginTop: 1 }}>{item.detail}</div>
+        )}
+        <div style={{ fontSize: 11, color: "var(--ink-400)", marginTop: 2 }}>
+          {item.actor ?? "user"} · {relDate(item.at)}
+        </div>
+      </div>
+    </li>
   );
 }
 

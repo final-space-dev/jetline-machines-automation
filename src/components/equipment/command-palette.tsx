@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, Store, Package, Printer, Command, ArrowRight, Activity, Download, Plus, Settings } from "lucide-react";
 import { useHotkey } from "@/lib/use-hotkey";
 import { getRecentItems, type RecentItem } from "@/lib/recently-viewed";
+import { useRole } from "@/lib/use-role";
 
 // ── Result model ────────────────────────────────────────────────────────────
 type Kind = "recent" | "store" | "item" | "printer" | "command";
@@ -22,12 +23,22 @@ interface ItemHit { id: number; make_model: string | null; machine_type: string;
 interface PrinterHit { serial: string; model: string | null; store: string; }
 interface SearchResponse { stores: StoreHit[]; items: ItemHit[]; printers: PrinterHit[]; }
 
-const COMMANDS: Row[] = [
+// Quick commands are role-aware — no point offering a store user admin-only
+// destinations they'll just be bounced from.
+const ADMIN_COMMANDS: Row[] = [
   { kind: "command", primary: "Go to Fleet Health", href: "/equipment/fleet" },
+  { kind: "command", primary: "Replacement Requests", href: "/reports/replacements" },
   { kind: "command", primary: "Export All CSV", href: "/api/equipment/export", external: true },
-  { kind: "command", primary: "Add Equipment", href: "/equipment" },
-  { kind: "command", primary: "Open Setup", href: "/setup" },
+  { kind: "command", primary: "Open Config", href: "/setup" },
 ];
+function commandsForRole(role: string | null, store: string | null): Row[] {
+  if (role === "store_staff") {
+    return store
+      ? [{ kind: "command", primary: "My Store", href: `/equipment/stores/${encodeURIComponent(store)}` }]
+      : [];
+  }
+  return ADMIN_COMMANDS;
+}
 
 function sectionLabel(kind: Kind): string {
   switch (kind) {
@@ -62,6 +73,7 @@ function CommandGlyph({ primary }: { primary: string }) {
 
 export function CommandPalette() {
   const router = useRouter();
+  const { role, store } = useRole();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState<RecentItem[]>([]);
@@ -143,7 +155,7 @@ export function CommandPalette() {
         kind: "store",
         primary: s.name,
         secondary: `${s.mainGroup} / ${s.storeGroup}`,
-        href: `/stores/${encodeURIComponent(s.name)}`,
+        href: `/equipment/stores/${encodeURIComponent(s.name)}`,
       });
     }
 
@@ -168,12 +180,12 @@ export function CommandPalette() {
     }
 
     const needle = query.trim().toLowerCase();
-    for (const c of COMMANDS) {
+    for (const c of commandsForRole(role, store)) {
       if (!needle || c.primary.toLowerCase().includes(needle)) out.push(c);
     }
 
     return out;
-  }, [hasQuery, recent, data, query]);
+  }, [hasQuery, recent, data, query, role, store]);
 
   // Keep cursor in range as rows change
   useEffect(() => {

@@ -624,45 +624,8 @@ export default function EquipmentItemPage() {
             </Section>
           )}
 
-          {/* ── Feedback & replacement requests (store + admin) ── */}
+          {/* ── Activity: comments + field changes + requests, one timeline ── */}
           <FeedbackPanel type="equipment" refId={String(id)} />
-
-          {/* ── Change history (admin) ── */}
-          {isAdmin && log.length > 0 && (
-            <section style={{ display: "grid", gap: "var(--s-4)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--s-3)" }}>
-                <span className="jl-chip jl-chip--sm"><Clock /></span>
-                <h2 className="jl-h3">Change history</h2>
-              </div>
-              <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
-                <table className="jl-table">
-                  <thead>
-                    <tr>
-                      {["Field", "Previous value", "New value", "Changed by", "When"].map((h) => (
-                        <th key={h}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {log.map((entry, i) => (
-                      <tr key={i}>
-                        <td className="cell-strong">{entry.field.replace(/_/g, " ")}</td>
-                        <td className="jl-faint" style={{ fontStyle: "italic", maxWidth: 180 }}>{entry.old_value ?? ""}</td>
-                        <td style={{ maxWidth: 180, color: "var(--ink-900)" }}>{entry.new_value ?? ""}</td>
-                        <td className="jl-muted">{entry.changed_by}</td>
-                        <td className="jl-faint" style={{ whiteSpace: "nowrap" }}>
-                          {new Date(entry.changed_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}{" "}
-                          <span style={{ color: "var(--ink-300)" }}>
-                            {new Date(entry.changed_at).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
 
           <div style={{ height: "var(--s-8)" }} />
         </div>
