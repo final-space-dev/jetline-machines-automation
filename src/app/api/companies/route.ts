@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireUser, requireAdmin, AuthError } from "@/lib/auth";
 
 export async function GET() {
+  // Any signed-in user may read the connection list (Config dropdowns need it).
+  try {
+    await requireUser();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   try {
     const companies = await prisma.company.findMany({
       where: { isActive: true },
@@ -21,6 +29,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // Creating a BMS connection is an admin action.
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   try {
     const body = await request.json();
     const { name, bmsSchema, region, bmsHost, companyGroup } = body;

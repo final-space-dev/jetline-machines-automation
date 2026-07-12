@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { bmsPool } from "@/lib/bms-pool";
+import { requireAdmin, AuthError } from "@/lib/auth";
 
 // xerox.meter_readings_normalised: printer_id, report_date, meter_type, reading
 // Volume = sum of 4 sub-meters (NOT total_impressions which excludes A3)
@@ -40,6 +41,13 @@ async function getBmsInstallDates(): Promise<Map<string, string>> {
 }
 
 export async function GET(request: NextRequest) {
+  // Reports are fleet-wide, admin-only (store staff are scoped to their store).
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   const { searchParams } = request.nextUrl;
   const tab = searchParams.get("tab") ?? "summary";
   const client = await xeroxPool.connect();

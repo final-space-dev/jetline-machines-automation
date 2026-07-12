@@ -8,7 +8,13 @@ export default defineConfig({
     environment: "node",
     globals: true,
     setupFiles: ["./tests/setup.ts"],
-    include: ["tests/unit/**/*.test.ts", "tests/smoke/**/*.test.ts"],
+    // Integration (permission-matrix) tests need a live server + accounts, so they
+    // are opt-in via RUN_INTEGRATION=1 and never run in the default `npm test`.
+    include: [
+      "tests/unit/**/*.test.ts",
+      "tests/smoke/**/*.test.ts",
+      ...(process.env.RUN_INTEGRATION ? ["tests/integration/**/*.test.ts"] : []),
+    ],
     exclude: ["node_modules", ".next"],
     coverage: {
       provider: "v8",

@@ -10,6 +10,7 @@ import { StoresPanel } from "./stores/panel";
 import { UsersPanel } from "./users/panel";
 import { ImportPanel } from "./import/panel";
 import { SuppliersPanel } from "./suppliers/panel";
+import { RecentlyDeletedPanel } from "./recently-deleted/panel";
 import { MachineMappingPanel } from "../machine-mapping/panel";
 
 type TabKey =
@@ -20,7 +21,8 @@ type TabKey =
   | "suppliers"
   | "equipment-types"
   | "conditions"
-  | "users";
+  | "users"
+  | "recently-deleted";
 
 // Stores is first — a store is the cornerstone CRM entity. Machine Mapping is an
 // admin data-capture exercise that lives here (out of the main menu); its tab links
@@ -34,6 +36,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "equipment-types", label: "Equipment Types" },
   { key: "conditions", label: "Conditions" },
   { key: "users", label: "Users" },
+  { key: "recently-deleted", label: "Recently Deleted" },
 ];
 
 const DEFAULT_TAB: TabKey = "stores";
@@ -83,6 +86,7 @@ export function SetupShell({ active }: { active?: string }) {
         {tab === "equipment-types" && <EquipmentTypesPanel />}
         {tab === "conditions" && <ConditionsPanel />}
         {tab === "users" && <UsersPanel />}
+        {tab === "recently-deleted" && <RecentlyDeletedPanel />}
       </div>
     </AppShell>
   );

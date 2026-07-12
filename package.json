@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest --ui",
+    "test:permissions": "RUN_INTEGRATION=1 vitest run tests/integration/permissions.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:smoke": "vitest run --dir tests/smoke",
