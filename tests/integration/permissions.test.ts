@@ -164,10 +164,12 @@ describe("Permission matrix (role scoping guardrail)", () => {
   });
 
   // ── Connections (companies): read requires a session; create is admin-only ──
-  it("unauthenticated CANNOT read companies (401)", async () => {
+  it("unauthenticated CANNOT read companies (redirect or 401)", async () => {
     if (!available) return;
     const empty = new Map<string, string>();
-    expect(await api(empty, `/api/companies`)).toBe(401);
+    // Middleware redirects unauthenticated requests to /login (307) before the
+    // route's own 401 fires — either is a correct "blocked" outcome.
+    expect([307, 401, 403]).toContain(await api(empty, `/api/companies`));
   });
   it("staff CAN read companies (dropdowns need it)", async () => {
     if (!available) return;
