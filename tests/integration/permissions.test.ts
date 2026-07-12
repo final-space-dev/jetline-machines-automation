@@ -6,21 +6,25 @@ import { describe, it, expect, beforeAll } from "vitest";
  * and can't touch admin surfaces; admins can. A refactor that silently opens a
  * hole should fail HERE.
  *
- * Runs against BASE_URL (default the production URL — override for local/CI).
- * Requires two accounts to exist; if login fails or the server is down, the
- * suite SKIPS rather than fails, so it never flakes CI when creds aren't present.
- *
- * Env overrides:
- *   PERM_BASE_URL, PERM_ADMIN_EMAIL/PASSWORD, PERM_STAFF_EMAIL/PASSWORD/STORE
+ * ALL config comes from env — NO credentials or URLs are hardcoded (they'd end
+ * up in git history). Set these before running (see `npm run test:permissions`):
+ *   PERM_BASE_URL            e.g. http://localhost:3003 or your deploy URL
+ *   PERM_ADMIN_EMAIL / PERM_ADMIN_PASSWORD
+ *   PERM_STAFF_EMAIL / PERM_STAFF_PASSWORD / PERM_STAFF_STORE
+ * If any required var is missing the suite SKIPS (never fails CI, never leaks).
  */
 
-const BASE = process.env.PERM_BASE_URL || "https://jetline-machines.vercel.app";
-const ADMIN = { email: process.env.PERM_ADMIN_EMAIL || "tech@jetline.co.za", password: process.env.PERM_ADMIN_PASSWORD || "JetlineFleet2026!" };
+const BASE = process.env.PERM_BASE_URL || "http://localhost:3003";
+const ADMIN = { email: process.env.PERM_ADMIN_EMAIL ?? "", password: process.env.PERM_ADMIN_PASSWORD ?? "" };
 const STAFF = {
-  email: process.env.PERM_STAFF_EMAIL || "staff@alberton.test",
-  password: process.env.PERM_STAFF_PASSWORD || "AlbertonTest2026!",
-  store: process.env.PERM_STAFF_STORE || "Alberton",
+  email: process.env.PERM_STAFF_EMAIL ?? "",
+  password: process.env.PERM_STAFF_PASSWORD ?? "",
+  store: process.env.PERM_STAFF_STORE ?? "",
 };
+
+// If credentials aren't provided via env, skip the whole suite rather than run
+// with (or embed) real secrets.
+const HAS_CREDS = !!(ADMIN.email && ADMIN.password && STAFF.email && STAFF.password && STAFF.store);
 
 // ── Cookie-jar login against NextAuth Credentials (CSRF + callback) ───────────
 function parseSetCookies(res: Response): string[] {
@@ -78,7 +82,7 @@ async function api(jar: Map<string, string>, path: string, init?: RequestInit): 
   return res.status;
 }
 
-describe("Permission matrix (role scoping guardrail)", () => {
+describe.skipIf(!HAS_CREDS)("Permission matrix (role scoping guardrail)", () => {
   let adminJar: Map<string, string> | null = null;
   let staffJar: Map<string, string> | null = null;
   let available = false;
@@ -87,7 +91,7 @@ describe("Permission matrix (role scoping guardrail)", () => {
     adminJar = await login(ADMIN.email, ADMIN.password);
     staffJar = await login(STAFF.email, STAFF.password);
     available = !!adminJar && !!staffJar;
-    if (!available) console.log("[permissions] skipping — could not log in both accounts (server down or creds absent)");
+    if (!available) console.log("[permissions] skipping — could not log in both accounts (server down or wrong creds)");
   }, 60000);
 
   // ── Admin can reach admin-only data APIs ───────────────────────────────────
