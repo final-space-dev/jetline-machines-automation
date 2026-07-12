@@ -19,8 +19,10 @@ const PatchRequestSchema = z.object({
   id: z.number().int().positive(),
   status: z.enum(["open", "reviewing", "approved", "declined"]).optional(),
   response_note: z.string().trim().max(4000).optional(),
-}).refine((v) => v.status !== undefined || v.response_note !== undefined, {
-  message: "nothing to update (status or response_note)",
+  // "me" assigns the request to the acting admin; "" or null unassigns.
+  assign: z.union([z.literal("me"), z.literal(""), z.null()]).optional(),
+}).refine((v) => v.status !== undefined || v.response_note !== undefined || v.assign !== undefined, {
+  message: "nothing to update (status, response_note, or assign)",
 });
 
 /**
@@ -69,7 +71,7 @@ async function resolveStoreAndLabel(type: EntityType, ref: string): Promise<{ st
 }
 
 const SELECT_COLS = `id, entity_type, entity_ref, store, item_label, motivation, urgency, status,
-                     requested_by_name, response_note, responded_by,
+                     requested_by_name, assigned_to_name, response_note, responded_by,
                      responded_at::text AS responded_at, created_at::text AS created_at`;
 
 export async function GET(req: NextRequest) {
@@ -172,22 +174,37 @@ export async function PATCH(req: NextRequest) {
 
   const parsed = await validateBody(req, PatchRequestSchema);
   if (parsed.error) return parsed.error;
-  const { id, status, response_note } = parsed.data;
+  const { id, status, response_note, assign } = parsed.data;
 
+  const adminName = admin.name || admin.email || "admin";
   const sets: string[] = [];
   const params: unknown[] = [];
-  let statusChanged = false;
+  let responded = false;
   if (status !== undefined) {
     params.push(status); sets.push(`status = $${params.length}`);
-    statusChanged = true;
+    responded = true;
   }
   if (response_note !== undefined) {
     params.push(response_note || null); sets.push(`response_note = $${params.length}`);
+    responded = true;
+  }
+  // Ownership — "me" takes it, "" / null releases it.
+  if (assign !== undefined) {
+    if (assign === "me") {
+      params.push(String(admin.id)); sets.push(`assigned_to_id = $${params.length}`);
+      params.push(adminName); sets.push(`assigned_to_name = $${params.length}`);
+    } else {
+      sets.push(`assigned_to_id = NULL`);
+      sets.push(`assigned_to_name = NULL`);
+    }
   }
 
-  // Stamp responder when a status decision or note is recorded.
-  params.push(admin.name || admin.email || "admin"); sets.push(`responded_by = $${params.length}`);
-  if (statusChanged) sets.push(`responded_at = NOW()`);
+  // Only stamp responder/time when an actual response (status/note) is recorded —
+  // a pure assignment is not a response.
+  if (responded) {
+    params.push(adminName); sets.push(`responded_by = $${params.length}`);
+    sets.push(`responded_at = NOW()`);
+  }
   sets.push(`updated_at = NOW()`);
   params.push(id);
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { useRole } from "@/lib/use-role";
 import { useAdminGuard } from "@/lib/use-admin-guard";
+import { RequestsAttention } from "@/components/dashboard/requests-attention";
 import {
   RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock,
   Wifi, WifiOff,
@@ -260,6 +261,10 @@ export default function OperationsPage() {
 
         {/* Header */}
         <h1 className="jl-h1">Operations</h1>
+
+        {/* ── Needs your attention: the store feedback loop's response side.
+            Renders only when there are open requests, so it never adds noise. ── */}
+        <RequestsAttention />
 
         {/* ── Top KPI row ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "var(--s-4)" }}>

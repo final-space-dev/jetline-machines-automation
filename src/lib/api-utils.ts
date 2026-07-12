@@ -181,6 +181,12 @@ export async function ensureFeedbackTables(client: PoolClient): Promise<void> {
       updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // Ownership — an admin can take/assign a request so it's not an anonymous queue.
+  await client.query(`
+    ALTER TABLE equipment.replacement_requests
+      ADD COLUMN IF NOT EXISTS assigned_to_id   TEXT,
+      ADD COLUMN IF NOT EXISTS assigned_to_name TEXT
+  `);
   await client.query(`
     CREATE INDEX IF NOT EXISTS replacement_requests_status_idx
       ON equipment.replacement_requests (status, created_at DESC)

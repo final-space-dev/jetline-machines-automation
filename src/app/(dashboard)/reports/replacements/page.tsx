@@ -22,10 +22,22 @@ interface Req {
   urgency: "low" | "medium" | "high";
   status: "open" | "reviewing" | "approved" | "declined";
   requested_by_name: string | null;
+  assigned_to_name: string | null;
   response_note: string | null;
   responded_by: string | null;
   responded_at: string | null;
   created_at: string;
+}
+
+// SLA: an open/reviewing request older than this many days is overdue.
+const SLA_DAYS = 7;
+function ageDays(iso: string): number {
+  const d = new Date(iso).getTime();
+  if (Number.isNaN(d)) return 0;
+  return Math.floor((Date.now() - d) / 86_400_000);
+}
+function isOverdue(r: Req): boolean {
+  return (r.status === "open" || r.status === "reviewing") && ageDays(r.created_at) > SLA_DAYS;
 }
 
 const STATUS_META: Record<string, { label: string; badge: string; icon: typeof Clock }> = {
@@ -35,7 +47,7 @@ const STATUS_META: Record<string, { label: string; badge: string; icon: typeof C
   declined: { label: "Declined", badge: "", icon: XCircle },
 };
 const URGENCY_BADGE: Record<string, string> = { high: "jl-badge--red", medium: "jl-badge--amber", low: "jl-badge--green" };
-const FILTERS = ["all", "open", "reviewing", "approved", "declined"] as const;
+const FILTERS = ["all", "overdue", "open", "reviewing", "approved", "declined"] as const;
 type Filter = (typeof FILTERS)[number];
 
 function machineHref(r: Req): string {
@@ -86,10 +98,17 @@ export default function ReplacementRequestsPage() {
     }
   }, []);
 
-  const visible = useMemo(() => (filter === "all" ? rows : rows.filter((r) => r.status === filter)), [rows, filter]);
+  const visible = useMemo(() => {
+    if (filter === "all") return rows;
+    if (filter === "overdue") return rows.filter(isOverdue);
+    return rows.filter((r) => r.status === filter);
+  }, [rows, filter]);
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: rows.length, open: 0, reviewing: 0, approved: 0, declined: 0 };
-    for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
+    const c: Record<string, number> = { all: rows.length, overdue: 0, open: 0, reviewing: 0, approved: 0, declined: 0 };
+    for (const r of rows) {
+      c[r.status] = (c[r.status] ?? 0) + 1;
+      if (isOverdue(r)) c.overdue += 1;
+    }
     return c;
   }, [rows]);
 
@@ -134,10 +153,12 @@ export default function ReplacementRequestsPage() {
                     <span className={`jl-badge ${meta.badge}`}>{meta.label}</span>
                     <span className={`jl-badge ${URGENCY_BADGE[r.urgency] ?? ""}`} style={{ textTransform: "capitalize" }}>{r.urgency}</span>
                     <span className="jl-badge">{r.entity_type === "printer" ? "Printer" : "Equipment"}</span>
+                    {isOverdue(r) && <span className="jl-badge jl-badge--red">Overdue · {ageDays(r.created_at)}d</span>}
                     <Link href={machineHref(r)} className="cell-strong" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                       {r.item_label ?? r.entity_ref} <ExternalLink size={13} />
                     </Link>
                     <span style={{ fontSize: 12, color: "var(--ink-500)", marginLeft: "auto" }}>
+                      {r.assigned_to_name && <span style={{ color: "var(--ink-700)", fontWeight: 600 }}>{r.assigned_to_name} · </span>}
                       {r.store ?? "—"} · {r.requested_by_name ?? "user"} · {fmt(r.created_at)}
                     </span>
                   </div>
@@ -161,7 +182,18 @@ export default function ReplacementRequestsPage() {
                         onChange={(e) => setNoteDraft((d) => ({ ...d, [r.id]: e.target.value }))}
                         style={{ minHeight: 56 }}
                       />
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        {r.assigned_to_name ? (
+                          <button type="button" className="jl-btn jl-btn--ghost jl-btn--sm" disabled={busyId === r.id}
+                            onClick={() => patch(r.id, { assign: "" })} title="Release this request">
+                            Unassign
+                          </button>
+                        ) : (
+                          <button type="button" className="jl-btn jl-btn--soft jl-btn--sm" disabled={busyId === r.id}
+                            onClick={() => patch(r.id, { assign: "me" })}>
+                            Assign to me
+                          </button>
+                        )}
                         {r.status === "open" && (
                           <button type="button" className="jl-btn jl-btn--soft jl-btn--sm" disabled={busyId === r.id}
                             onClick={() => patch(r.id, { status: "reviewing", response_note: noteDraft[r.id] })}>
