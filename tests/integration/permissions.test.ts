@@ -188,7 +188,32 @@ describe.skipIf(!HAS_CREDS)("Permission matrix (role scoping guardrail)", () => 
     expect([401, 403]).toContain(status);
   });
 
-  // NOTE (known gap, not asserted): the legacy /api/machines and /api/sync routes
-  // (pre-CRM machine-tracker area) currently have no auth. Left untouched this
-  // sprint to avoid destabilising that area; tracked as a follow-up.
+  // ── Legacy machine-tracker routes are now gated too ────────────────────────
+  it("unauthenticated CANNOT read /api/machines (redirect/401)", async () => {
+    if (!available) return;
+    expect([307, 401, 403]).toContain(await api(new Map(), `/api/machines`));
+  });
+  it("staff CANNOT create a machine (401/403)", async () => {
+    if (!available) return;
+    const status = await api(staffJar!, `/api/machines`, {
+      method: "POST",
+      body: JSON.stringify({ serialNumber: "TEST" }),
+    });
+    expect([401, 403]).toContain(status);
+  });
+  it("staff CANNOT trigger a BMS sync (401/403)", async () => {
+    if (!available) return;
+    const status = await api(staffJar!, `/api/sync`, {
+      method: "POST",
+      body: JSON.stringify({ type: "full" }),
+    });
+    expect([401, 403]).toContain(status);
+  });
+  it("unauthenticated CANNOT trigger a BMS sync (redirect/401)", async () => {
+    if (!available) return;
+    expect([307, 401, 403]).toContain(await api(new Map(), `/api/sync`, {
+      method: "POST",
+      body: JSON.stringify({ type: "full" }),
+    }));
+  });
 });

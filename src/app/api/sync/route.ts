@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import prisma from "@/lib/prisma";
 import { runFullSync, syncCompanyById, testBMSConnection, createBMSConfig } from "@/lib/bms";
+import { requireUser, getSessionUser, AuthError } from "@/lib/auth";
+
+/** True if the request carries the correct x-cron-secret (for the hourly cron). */
+function hasValidCronSecret(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const provided = request.headers.get("x-cron-secret") ?? "";
+  const a = Buffer.from(provided);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /**
  * POST /api/sync
@@ -12,6 +24,15 @@ import { runFullSync, syncCompanyById, testBMSConnection, createBMSConfig } from
  * - { type: "test", bmsSchema: "...", bmsHost?: "..." } - Test BMS connection
  */
 export async function POST(request: NextRequest) {
+  // Triggering a BMS sync / connecting to arbitrary BMS hosts was previously wide
+  // open — the highest-risk endpoint here. Now requires EITHER an admin session
+  // (interactive use from the app) OR a valid x-cron-secret (the hourly cron).
+  if (!hasValidCronSecret(request)) {
+    const user = await getSessionUser().catch(() => null);
+    if (!user || user.role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
   try {
     const body = await request.json();
     const { type, companyId, bmsSchema, bmsHost } = body;
@@ -98,6 +119,12 @@ export async function POST(request: NextRequest) {
  * Get sync history and status
  */
 export async function GET(request: NextRequest) {
+  try {
+    await requireUser();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   try {
     const { searchParams } = new URL(request.url);
     const current = searchParams.get("current");

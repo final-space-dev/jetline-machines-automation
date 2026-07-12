@@ -41,8 +41,10 @@ ts() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 
 # ── 1. Full BMS/Xerox data sync ────────────────────────────────────────────────
 echo "[$(ts)] hourly-sync: POST ${SYNC_URL} (full)"
+# /api/sync now requires an admin session OR the x-cron-secret header (was open).
 curl -fsS -X POST "${SYNC_URL}" \
   -H "Content-Type: application/json" \
+  -H "x-cron-secret: ${SECRET}" \
   -d '{"type":"full"}'
 echo ""
 

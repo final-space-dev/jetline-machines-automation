@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { requireUser, requireAdmin, AuthError } from "@/lib/auth";
 
 /**
  * GET /api/machines
@@ -22,6 +23,13 @@ import { Prisma } from "@prisma/client";
  * - includeRates: Include current rate (latest rate by ratesFrom date)
  */
 export async function GET(request: NextRequest) {
+  // Legacy machine data — require a signed-in user (was previously open).
+  try {
+    await requireUser();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   try {
     const searchParams = request.nextUrl.searchParams;
 
@@ -142,6 +150,13 @@ export async function GET(request: NextRequest) {
  * Create a new machine (manual entry)
  */
 export async function POST(request: NextRequest) {
+  // Creating a machine record is an admin action (was previously open).
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   try {
     const body = await request.json();
     const {

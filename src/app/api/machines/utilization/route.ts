@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { calculateCostFromIncrementals } from "@/lib/cost";
+import { requireUser, AuthError } from "@/lib/auth";
 
 // Default duty cycles by category (monthly prints)
 const DUTY_CYCLES: Record<string, number> = {
@@ -65,6 +66,12 @@ interface MachineUtilization {
 }
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireUser();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   try {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId");
