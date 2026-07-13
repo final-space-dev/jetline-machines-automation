@@ -21,7 +21,9 @@ const EXT_BY_MIME: Record<string, string> = {
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB per file
 
 // POST — multipart form-data with one or more "files". Uploads to Vercel Blob
-// and appends the public Blob URLs to equipment.items.photos (TEXT[]).
+// with PRIVATE access (the store is private), storing each blob's URL in
+// equipment.items.photos (TEXT[]). Private blobs aren't publicly reachable — they
+// are served only to authenticated, own-store users via the proxy GET below.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!validId(id)) return notFound();
@@ -55,7 +57,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (file.size === 0 || file.size > MAX_BYTES) continue;
       const ext = EXT_BY_MIME[file.type] ?? ".bin";
       const key = `equipment/${id}/${randomUUID()}${ext}`;
-      const blob = await put(key, file, { access: "public", contentType: file.type });
+      // Private store — the URL is only usable with the store token, which the
+      // proxy route holds. It is never served directly to the browser.
+      const blob = await put(key, file, { access: "private", contentType: file.type });
       newUrls.push(blob.url);
     }
 
@@ -70,8 +74,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       [newUrls, id]
     );
 
+    // Return proxy view-URLs (by index), never the private blob URLs. The client
+    // renders <img src> from these; the proxy GET streams the private blob.
+    const stored: string[] = updated.rows[0].photos ?? [];
+    const viewUrls = stored.map((_, i) => `/api/equipment/items/${id}/photos/view?i=${i}`);
+
     timer.done({ id, added: newUrls.length });
-    return NextResponse.json({ photos: updated.rows[0].photos, added: newUrls });
+    return NextResponse.json({ photos: viewUrls, added: newUrls.length });
   }).catch((err) => { timer.error(err); return serverError(err, `POST /api/equipment/items/${id}/photos`); });
 }
 
@@ -91,32 +100,38 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const timer = routeTimer(`DELETE /api/equipment/items/${id}/photos`);
 
   const body = await req.json().catch(() => null);
-  const url = body && typeof body.url === "string" ? body.url : null;
-  if (!url) return badRequest("Missing url");
+  // Client holds only proxy view-URLs (by index), never the private blob URL, so
+  // deletion is by index into photos[].
+  const index = body && Number.isInteger(body.index) ? (body.index as number) : -1;
+  if (index < 0) return badRequest("Missing or invalid index");
 
   return withClient(bmsPool, async (client) => {
-    const owner = await client.query(`SELECT store FROM equipment.items WHERE id = $1`, [id]);
+    const owner = await client.query(`SELECT store, photos FROM equipment.items WHERE id = $1`, [id]);
     if (owner.rows.length === 0) return notFound();
     if (user.role !== "admin" && owner.rows[0].store !== user.store) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const photos: string[] = owner.rows[0].photos ?? [];
+    if (index >= photos.length) return badRequest("Index out of range");
+    const target = photos[index];
+    const remaining = photos.filter((_, i) => i !== index);
+
     const updated = await client.query(
-      `UPDATE equipment.items
-         SET photos = array_remove(COALESCE(photos, ARRAY[]::text[]), $1),
-             updated_at = NOW()
-       WHERE id = $2
-       RETURNING photos`,
-      [url, id]
+      `UPDATE equipment.items SET photos = $1::text[], updated_at = NOW()
+       WHERE id = $2 RETURNING photos`,
+      [remaining, id]
     );
     if (updated.rows.length === 0) return notFound();
 
     // Delete the underlying Blob (only our own Blob URLs; ignore legacy/local paths).
-    if (url.includes(".blob.vercel-storage.com/")) {
-      await del(url).catch(() => {});
+    if (typeof target === "string" && target.includes(".blob.vercel-storage.com/")) {
+      await del(target).catch(() => {});
     }
 
+    const stored: string[] = updated.rows[0].photos ?? [];
+    const viewUrls = stored.map((_, i) => `/api/equipment/items/${id}/photos/view?i=${i}`);
     timer.done({ id });
-    return NextResponse.json({ photos: updated.rows[0].photos });
+    return NextResponse.json({ photos: viewUrls });
   }).catch((err) => { timer.error(err); return serverError(err, `DELETE /api/equipment/items/${id}/photos`); });
 }

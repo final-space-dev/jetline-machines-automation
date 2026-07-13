@@ -6,8 +6,11 @@ import { Camera, Upload, X, Trash2 } from "lucide-react";
 /**
  * Compact per-row photo control for the store equipment table. Shows a camera
  * icon + photo count; clicking opens a small popover to view / add / remove
- * photos for that item without leaving the page. Uploads go to Vercel Blob via
- * POST /api/equipment/items/[id]/photos (multipart "files"); removal via DELETE.
+ * photos for that item without leaving the page. Photos live in a PRIVATE Vercel
+ * Blob store and are served only through the authenticated proxy
+ * (/api/equipment/items/[id]/photos/view?i=<index>) — the component works with
+ * those proxy view-URLs and never sees the private blob URL. Upload via POST,
+ * removal by index via DELETE.
  */
 export function PhotoButton({
   itemId,
@@ -18,7 +21,10 @@ export function PhotoButton({
   initialPhotos: string[] | null;
   canEdit: boolean;
 }) {
-  const [photos, setPhotos] = useState<string[]>(initialPhotos ?? []);
+  // The store list gives us the raw stored photos (private URLs we must not use
+  // directly) — we only need the COUNT to build proxy view-URLs by index.
+  const initialViewUrls = (initialPhotos ?? []).map((_, i) => `/api/equipment/items/${itemId}/photos/view?i=${i}`);
+  const [photos, setPhotos] = useState<string[]>(initialViewUrls);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,19 +62,18 @@ export function PhotoButton({
     }
   }, [itemId]);
 
-  const remove = useCallback(async (url: string) => {
+  const remove = useCallback(async (index: number) => {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(`/api/equipment/items/${itemId}/photos`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ index }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Remove failed"); return; }
       if (Array.isArray(data.photos)) setPhotos(data.photos);
-      else setPhotos((prev) => prev.filter((p) => p !== url));
     } catch {
       setError("Remove failed");
     } finally {
@@ -115,7 +120,7 @@ export function PhotoButton({
 
           {count > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 10 }}>
-              {photos.map((url) => (
+              {photos.map((url, i) => (
                 <div key={url} style={{ position: "relative", aspectRatio: "1", borderRadius: "var(--r-sm)", overflow: "hidden", background: "var(--ink-50)" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <a href={url} target="_blank" rel="noreferrer">
@@ -124,7 +129,7 @@ export function PhotoButton({
                   {canEdit && (
                     <button
                       type="button"
-                      onClick={() => remove(url)}
+                      onClick={() => remove(i)}
                       disabled={busy}
                       aria-label="Remove photo"
                       style={{

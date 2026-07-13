@@ -55,8 +55,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (user.role !== "admin" && item.rows[0].store !== user.store) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // Photos are in a private Blob store — expose proxy view-URLs (by index), not
+    // the private blob URLs. Consumers render <img src> and delete by index.
+    const row = item.rows[0] as Record<string, unknown> & { photos?: string[] | null };
+    const storedPhotos: string[] = Array.isArray(row.photos) ? row.photos : [];
+    row.photos = storedPhotos.map((_, i) => `/api/equipment/items/${id}/photos/view?i=${i}`);
     timer.done({ id });
-    return NextResponse.json({ item: item.rows[0], log: logRows.rows });
+    return NextResponse.json({ item: row, log: logRows.rows });
   }).catch((err) => { timer.error(err); return serverError(err, `GET /api/equipment/items/${id}`); });
 }
 

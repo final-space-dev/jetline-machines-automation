@@ -301,12 +301,12 @@ export default function EquipmentItemPage() {
     }
   };
 
-  const deletePhoto = async (url: string) => {
+  const deletePhoto = async (index: number) => {
     try {
       const res = await fetch(`/api/equipment/items/${id}/photos`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ index }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -595,7 +595,7 @@ export default function EquipmentItemPage() {
               </div>
               {photos.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "var(--s-3)" }}>
-                  {photos.map((url) => (
+                  {photos.map((url, i) => (
                     <div key={url} style={{
                       position: "relative", aspectRatio: "1 / 1",
                       borderRadius: "var(--r-md)", overflow: "hidden",
@@ -605,7 +605,7 @@ export default function EquipmentItemPage() {
                       <img src={url} alt="Equipment" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                       <button
                         type="button"
-                        onClick={() => deletePhoto(url)}
+                        onClick={() => deletePhoto(i)}
                         aria-label="Remove photo"
                         style={{
                           position: "absolute", top: 6, right: 6,
