@@ -386,9 +386,10 @@ export default function EquipmentItemPage() {
         {/* ── Content ── */}
         <div style={{ maxWidth: 980, margin: "0 auto", padding: "var(--s-7) var(--s-8)", display: "grid", gap: "var(--s-6)" }}>
 
-          {/* Record header */}
-          <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--s-4)" }}>
-            <div style={{ minWidth: 0 }}>
+          {/* Record header — identity on the left, a big hero photo on the right
+              so you instantly SEE which machine this is (product-page style). */}
+          <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--s-6)", flexWrap: "wrap" }}>
+            <div style={{ minWidth: 0, flex: "1 1 320px" }}>
               <h1 className="jl-display">
                 {item.machine_type}
                 {item.make_model && (
@@ -407,6 +408,30 @@ export default function EquipmentItemPage() {
                 )}
               </div>
             </div>
+
+            {/* Hero photo (first image). Clickable to open full size. */}
+            {photos.length > 0 && (
+              <a
+                href={photos[0]}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  flex: "0 0 auto", width: 220, height: 165, borderRadius: "var(--r-lg)",
+                  overflow: "hidden", background: "var(--surface-sunken)", boxShadow: "var(--sh-sm)",
+                  display: "block", position: "relative",
+                }}
+                title="View photo"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photos[0]} alt={itemLabel} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                {photos.length > 1 && (
+                  <span style={{
+                    position: "absolute", bottom: 6, right: 6, padding: "2px 8px", borderRadius: "var(--r-pill)",
+                    background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 11, fontWeight: 700,
+                  }}>+{photos.length - 1}</span>
+                )}
+              </a>
+            )}
           </header>
 
           {/* ── Identity ── */}

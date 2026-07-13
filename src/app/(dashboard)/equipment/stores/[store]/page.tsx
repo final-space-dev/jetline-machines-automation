@@ -597,7 +597,23 @@ export default function StoreDetailPage() {
                               />
                             </td>
                           )}
-                          <td className="cell-strong">{item.machine_type}</td>
+                          <td className="cell-strong">
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                              {item.photos && item.photos.length > 0 ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={`/api/equipment/items/${item.id}/photos/view?i=0`}
+                                  alt=""
+                                  style={{ width: 34, height: 34, objectFit: "cover", borderRadius: "var(--r-sm)", flexShrink: 0, background: "var(--ink-100)" }}
+                                />
+                              ) : (
+                                <span aria-hidden style={{ width: 34, height: 34, borderRadius: "var(--r-sm)", flexShrink: 0, background: "var(--ink-50)", display: "grid", placeItems: "center", color: "var(--ink-300)" }}>
+                                  <Package size={16} />
+                                </span>
+                              )}
+                              {item.machine_type}
+                            </span>
+                          </td>
                           <td>{item.make_model ?? <span className="jl-muted" style={{ fontStyle: "italic" }}>Not set</span>}</td>
                           <td><span className="jl-mono" style={{ color: "var(--ink-600)" }}>{item.serial ?? "Not set"}</span></td>
                           <td><span className={`jl-badge ${CONDITION_BADGE[bucket]}`}>{CONDITION_CONFIG[bucket].label}</span></td>
