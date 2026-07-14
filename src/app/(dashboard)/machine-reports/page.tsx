@@ -65,6 +65,19 @@ function fmt(n: number | null | undefined): string {
   return n.toLocaleString();
 }
 
+// Postgres bigint values arrive as STRINGS in JSON. Coerce to number so arithmetic
+// (totals via reduce) sums instead of string-concatenating. Returns 0 for
+// null/undefined/non-numeric.
+function num(v: unknown): number {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+// True when a daily/period value is genuinely present (a reading happened),
+// distinguishing "read, 0 volume" from "no reading" (undefined key).
+function present(v: unknown): boolean {
+  return v !== null && v !== undefined;
+}
+
 function fmtMonth(yyyymm: string): string {
   const [y, m] = yyyymm.split("-");
   return new Date(Number(y), Number(m) - 1, 1)
@@ -321,13 +334,14 @@ function MtdTab({ rows, dates, filters, setFilters }: {
   // Flatten date volumes onto row so useSorted can reach them via dot-notation key "d_2026-06-01"
   const augmented = useFiltered(rows, filters).map((r) => {
     const extra: Record<string, number> = {};
-    dates.forEach((d) => { extra[`d_${d}`] = r.daily_volumes[d] ?? 0; });
+    dates.forEach((d) => { extra[`d_${d}`] = num(r.daily_volumes[d]); });
     return { ...r, ...extra };
   });
   const visible = useSorted(augmented, sort);
 
-  const colTotals = dates.map((d) => visible.reduce((s, r) => s + (r.daily_volumes[d] ?? 0), 0));
-  const grandTotal = visible.reduce((s, r) => s + r.period_total, 0);
+  // num() coercion — daily_volumes/period_total are bigint strings from Postgres.
+  const colTotals = dates.map((d) => visible.reduce((s, r) => s + num(r.daily_volumes[d]), 0));
+  const grandTotal = visible.reduce((s, r) => s + num(r.period_total), 0);
 
   const th = (col: string, label: string, cls?: string) =>
     <Th col={col} sort={sort} onSort={toggle} className={cls}>{label}</Th>;
@@ -375,10 +389,10 @@ function MtdTab({ rows, dates, filters, setFilters }: {
                     <TableCell className="text-xs">{r.printer_type ?? "—"}</TableCell>
                     {dates.map((d) => (
                       <TableCell key={d} className="text-right font-mono text-xs">
-                        {r.daily_volumes[d] != null ? fmt(r.daily_volumes[d]) : "—"}
+                        {present(r.daily_volumes[d]) ? fmt(num(r.daily_volumes[d])) : "—"}
                       </TableCell>
                     ))}
-                    <TableCell className="text-right font-mono text-xs font-semibold">{fmt(r.period_total)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs font-semibold">{fmt(num(r.period_total))}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/40 font-semibold border-t-2">
@@ -411,13 +425,14 @@ function MonthColumnsTab({ rows, months, filters, setFilters, exportName }: {
   // Flatten month volumes onto row so useSorted can reach them via "m_2026-01"
   const augmented = useFiltered(rows, filters).map((r) => {
     const extra: Record<string, number> = {};
-    months.forEach((m) => { extra[`m_${m}`] = r.monthly_volumes[m] ?? 0; });
+    months.forEach((m) => { extra[`m_${m}`] = num(r.monthly_volumes[m]); });
     return { ...r, ...extra };
   });
   const visible = useSorted(augmented, sort);
 
-  const colTotals = months.map((m) => visible.reduce((s, r) => s + (r.monthly_volumes[m] ?? 0), 0));
-  const grandTotal = visible.reduce((s, r) => s + r.period_total, 0);
+  // num() coercion — bigint strings from Postgres would otherwise concatenate.
+  const colTotals = months.map((m) => visible.reduce((s, r) => s + num(r.monthly_volumes[m]), 0));
+  const grandTotal = visible.reduce((s, r) => s + num(r.period_total), 0);
 
   const th = (col: string, label: string, cls?: string) =>
     <Th col={col} sort={sort} onSort={toggle} className={cls}>{label}</Th>;
@@ -464,9 +479,9 @@ function MonthColumnsTab({ rows, months, filters, setFilters, exportName }: {
                     <TableCell className="text-xs">{r.company_group ?? "—"}</TableCell>
                     <TableCell className="text-xs">{r.printer_type ?? "—"}</TableCell>
                     {months.map((m) => (
-                      <TableCell key={m} className="text-right font-mono text-xs">{fmt(r.monthly_volumes[m]??0)}</TableCell>
+                      <TableCell key={m} className="text-right font-mono text-xs">{fmt(num(r.monthly_volumes[m]))}</TableCell>
                     ))}
-                    <TableCell className="text-right font-mono text-xs font-semibold">{fmt(r.period_total)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs font-semibold">{fmt(num(r.period_total))}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/40 font-semibold border-t-2">
