@@ -91,6 +91,21 @@ function statusBadge(s: EquipmentStatus): string {
   return "jl-badge";
 }
 
+/** Age in years+months from the install date, computed live. */
+function ageFromInstall(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const now = new Date();
+  let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  if (now.getDate() < d.getDate()) months -= 1;
+  if (months < 0) months = 0;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0) return `${m} month${m !== 1 ? "s" : ""}`;
+  return m > 0 ? `${y}y ${m}m` : `${y} year${y !== 1 ? "s" : ""}`;
+}
+
 // ─── Section card ─────────────────────────────────────────────────────────────
 
 function Section({ icon: Icon, title, children }: {
@@ -525,13 +540,22 @@ export default function EquipmentItemPage() {
             </div>
           </Section>
 
-          {/* ── Procurement (admin) ── */}
+          {/* ── Lifecycle (admin) — we track assets from when they go into
+                service, not when they were bought (that's depreciation, not us). ── */}
           {isAdmin && (
-            <Section icon={ShoppingCart} title="Procurement">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-5)" }}>
+            <Section icon={ShoppingCart} title="Lifecycle">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--s-5)" }}>
                 <div className="jl-field">
-                  <label>Purchase date</label>
-                  <JlDate value={form.purchase_date ?? null} onChange={(v) => set("purchase_date", v)} placeholder="Select date" />
+                  <label>Installed</label>
+                  <JlDate value={form.purchase_date ?? null} onChange={(v) => set("purchase_date", v)} placeholder="First install date" />
+                  <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>When it first entered service.</span>
+                </div>
+                <div className="jl-field">
+                  <label>Age</label>
+                  <div className="jl-input" style={{ display: "flex", alignItems: "center", background: "var(--surface-sunken)", color: "var(--ink-700)", fontWeight: 600 }}>
+                    {ageFromInstall(form.purchase_date)}
+                  </div>
+                  <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>Calculated from the install date.</span>
                 </div>
                 <div className="jl-field">
                   <label>Warranty expiry</label>
@@ -543,17 +567,7 @@ export default function EquipmentItemPage() {
                     source="suppliers"
                     value={form.supplier ?? ""}
                     onChange={(v) => set("supplier", v)}
-                    placeholder="Where it was bought"
-                  />
-                </div>
-                <div className="jl-field">
-                  <label>Purchase price (ZAR)</label>
-                  <input
-                    className="jl-input"
-                    type="number"
-                    value={form.purchase_price ?? ""}
-                    onChange={(e) => set("purchase_price", e.target.value || null)}
-                    placeholder="0.00"
+                    placeholder="Where it came from"
                   />
                 </div>
               </div>

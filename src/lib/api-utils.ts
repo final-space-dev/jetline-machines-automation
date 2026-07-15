@@ -245,7 +245,12 @@ export async function ensureFeedbackColumns(client: PoolClient): Promise<void> {
       ADD COLUMN IF NOT EXISTS condition        TEXT,
       ADD COLUMN IF NOT EXISTS condition_notes  TEXT,
       ADD COLUMN IF NOT EXISTS age              TEXT,
+      -- install_date = LATEST install (BMS): when last installed at the current
+      -- store; can be recent even for an old machine (moved between stores).
       ADD COLUMN IF NOT EXISTS install_date     DATE,
+      -- original_install_date = when the machine FIRST entered service, ever
+      -- (from JETLINE_AGED). Fixed; drives Age (computed dynamically from it).
+      ADD COLUMN IF NOT EXISTS original_install_date DATE,
       ADD COLUMN IF NOT EXISTS contract_end     DATE,
       ADD COLUMN IF NOT EXISTS technician_notes TEXT,
       ADD COLUMN IF NOT EXISTS last_visit       DATE,

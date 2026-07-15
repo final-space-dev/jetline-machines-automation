@@ -6,8 +6,10 @@ import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError, getSessionUser, type SessionUser } from "@/lib/auth";
 
 const FEEDBACK_FIELDS = [
-  "condition", "condition_notes", "age",
-  "install_date", "contract_end", "technician_notes", "last_visit",
+  "condition", "condition_notes",
+  // install_date = Latest install (BMS, current store); original_install_date =
+  // first-ever install (drives Age, computed dynamically — age is NOT stored).
+  "install_date", "original_install_date", "contract_end", "technician_notes", "last_visit",
   "supplier",
 ];
 

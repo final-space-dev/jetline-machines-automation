@@ -34,8 +34,9 @@ export async function GET(
       xClient.query(
         `SELECT pd.serial_number, COALESCE(psm.model_name, pd.model) AS model_name,
                 psm.printer_type, pd.last_seen::text,
-                mf.condition_notes, mf.age,
+                mf.condition_notes,
                 mf.install_date::text AS install_date,
+                mf.original_install_date::text AS original_install_date,
                 bal.latest_balance,
                 bal.latest_balance_date::text AS latest_balance_date
          FROM xerox.printer_dimensions pd

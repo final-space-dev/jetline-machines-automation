@@ -41,12 +41,27 @@ interface PrinterMapping {
 interface PrinterFeedback {
   condition: string | null;
   condition_notes: string | null;
-  age: string | null;
-  install_date: string | null;
+  install_date: string | null;            // Latest install (BMS, current store)
+  original_install_date: string | null;   // First-ever install → drives Age
   contract_end: string | null;
   technician_notes: string | null;
   last_visit: string | null;
   supplier: string | null;
+}
+
+/** Age in years+months from the original install date, computed live. */
+function ageFromDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const now = new Date();
+  let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  if (now.getDate() < d.getDate()) months -= 1;
+  if (months < 0) months = 0;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0) return `${m} month${m !== 1 ? "s" : ""}`;
+  return m > 0 ? `${y}y ${m}m` : `${y} year${y !== 1 ? "s" : ""}`;
 }
 
 interface MeterReading {
@@ -141,9 +156,9 @@ export default function PrinterDetailPage() {
   const [dimensions, setDimensions] = useState<PrinterDimensions | null>(null);
   const [mapping, setMapping] = useState<PrinterMapping | null>(null);
   const [feedback, setFeedback] = useState<PrinterFeedback>({
-    condition: null, condition_notes: null, age: null,
-    install_date: null, contract_end: null, technician_notes: null, last_visit: null,
-    supplier: null,
+    condition: null, condition_notes: null,
+    install_date: null, original_install_date: null, contract_end: null,
+    technician_notes: null, last_visit: null, supplier: null,
   });
   const [history, setHistory] = useState<MeterReading[]>([]);
   const [loading, setLoading] = useState(true);
@@ -405,9 +420,24 @@ export default function PrinterDetailPage() {
                 <div style={{ display: "grid", gap: "var(--s-5)" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--s-5)" }}>
                     <div className="jl-field">
-                      <label>Install Date</label>
-                      <JlDate value={feedback.install_date ?? null} onChange={(v) => setF("install_date", v)} placeholder="Select date" />
+                      <label>Original Install Date</label>
+                      <JlDate value={feedback.original_install_date ?? null} onChange={(v) => setF("original_install_date", v)} placeholder="First ever install" />
+                      <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>When the machine first entered service.</span>
                     </div>
+                    <div className="jl-field">
+                      <label>Latest Install Date</label>
+                      <JlDate value={feedback.install_date ?? null} onChange={(v) => setF("install_date", v)} placeholder="Install at current store" />
+                      <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>Install at its current store (may be recent).</span>
+                    </div>
+                    <div className="jl-field">
+                      <label>Age</label>
+                      <div className="jl-input" style={{ display: "flex", alignItems: "center", background: "var(--surface-sunken)", color: "var(--ink-700)", fontWeight: 600 }}>
+                        {ageFromDate(feedback.original_install_date)}
+                      </div>
+                      <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>Calculated from the original install date.</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--s-5)" }}>
                     <div className="jl-field">
                       <label>Contract End</label>
                       <JlDate value={feedback.contract_end ?? null} onChange={(v) => setF("contract_end", v)} placeholder="Select date" />
@@ -416,15 +446,9 @@ export default function PrinterDetailPage() {
                       <label>Last Visit</label>
                       <JlDate value={feedback.last_visit ?? null} onChange={(v) => setF("last_visit", v)} placeholder="Select date" />
                     </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "var(--s-5)" }}>
                     <div className="jl-field">
                       <label>Supplier</label>
                       <ModelSuggest source="suppliers" value={feedback.supplier ?? ""} onChange={(v) => setF("supplier", v || null)} placeholder="Where it was bought" />
-                    </div>
-                    <div className="jl-field">
-                      <label>Age</label>
-                      <input className="jl-input" value={feedback.age ?? ""} onChange={(e) => setF("age", e.target.value || null)} placeholder="e.g. 3 years" />
                     </div>
                   </div>
                   {contractExpired && (

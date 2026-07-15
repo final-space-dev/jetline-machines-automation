@@ -28,10 +28,25 @@ interface Machine {
   printer_type: string | null;
   last_seen: string | null;
   condition_notes: string | null;
-  age: string | null;
-  install_date: string | null;
+  install_date: string | null;            // Latest install (BMS, current store)
+  original_install_date: string | null;   // First-ever install → drives Age
   latest_balance: number | string | null;
   latest_balance_date: string | null;
+}
+
+/** Age in years from an original install date, computed live. */
+function ageYears(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const now = new Date();
+  let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  if (now.getDate() < d.getDate()) months -= 1;
+  if (months < 0) months = 0;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0) return `${m}m`;
+  return m > 0 ? `${y}y ${m}m` : `${y}y`;
 }
 
 interface EquipmentItem {
@@ -683,16 +698,17 @@ export default function StoreDetailPage() {
                     <th>Serial</th>
                     <th>Model</th>
                     <th>Type</th>
-                    <th>Install Date</th>
+                    <th>Age</th>
+                    <th>Installed</th>
                     <th className="num">Balance</th>
                     <th>Last Seen</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
+                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
                   ) : machines.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>No Xerox printers mapped to this store</td></tr>
+                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>No Xerox printers mapped to this store</td></tr>
                   ) : (
                     machines.map((m) => {
                       const balance = m.latest_balance != null ? Number(m.latest_balance) : null;
@@ -704,7 +720,14 @@ export default function StoreDetailPage() {
                           <td><span className="jl-mono" style={{ color: "var(--ink-600)" }}>{m.serial_number}</span></td>
                           <td className="cell-strong">{m.model_name ?? <span className="jl-muted" style={{ fontStyle: "italic", fontWeight: 400 }}>Not set</span>}</td>
                           <td style={{ color: "var(--ink-500)" }}>{m.printer_type ?? "Not set"}</td>
-                          <td style={{ color: "var(--ink-500)" }}>
+                          <td style={{ color: "var(--ink-700)", fontWeight: 600 }}
+                            title={m.original_install_date ? `Original install ${new Date(m.original_install_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}` : "No original install date"}
+                          >
+                            {ageYears(m.original_install_date)}
+                          </td>
+                          <td style={{ color: "var(--ink-500)" }}
+                            title="Latest install (current store)"
+                          >
                             {m.install_date
                               ? new Date(m.install_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" })
                               : <span className="jl-muted">Not set</span>}
