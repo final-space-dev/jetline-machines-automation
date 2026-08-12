@@ -54,7 +54,7 @@ interface MonthlyRow extends BaseRow {
   period_total: number;
 }
 
-type TabType = "summary" | "mtd" | "monthly" | "ytd" | "status";
+type TabType = "summary" | "mtd" | "weekly" | "monthly" | "ytd" | "status";
 
 interface SortState { col: string; dir: "asc" | "desc" }
 
@@ -87,6 +87,26 @@ function fmtMonth(yyyymm: string): string {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-ZA", { day: "2-digit", month: "short" });
+}
+
+// ISO-8601 week number (weeks Mon–Sun; week 1 contains the year's first Thursday).
+function isoWeekNum(d: Date): number {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;          // Mon=0 … Sun=6
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);     // Thursday of this week
+  const firstThu = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const firstDayNum = (firstThu.getUTCDay() + 6) % 7;
+  firstThu.setUTCDate(firstThu.getUTCDate() - firstDayNum + 3);
+  return 1 + Math.round((date.getTime() - firstThu.getTime()) / (7 * 86400000));
+}
+
+// Weekly column header: the key is the week's Sunday end-date (YYYY-MM-DD).
+// Rendered as "Wk 32 · 9 Aug 26".
+function fmtWeek(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  const end = d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" });
+  return `Wk ${isoWeekNum(d)} · ${end}`;
 }
 
 function fmtInstallDate(iso: string | null): string {
@@ -414,9 +434,11 @@ function MtdTab({ rows, dates, filters, setFilters }: {
 
 // ── Monthly / YTD shared tab ──────────────────────────────────────────────────
 
-function MonthColumnsTab({ rows, months, filters, setFilters, exportName }: {
+function MonthColumnsTab({ rows, months, filters, setFilters, exportName, formatHeader = fmtMonth }: {
   rows: MonthlyRow[]; months: string[]; filters: Filters;
   setFilters: (f: Filters) => void; exportName: string;
+  // How to label each period column. Monthly/YTD use fmtMonth; Weekly passes fmtWeek.
+  formatHeader?: (key: string) => string;
 }) {
   const [sort, setSort] = useState<SortState>({ col: "store", dir: "asc" });
   const toggle = (col: string) =>
@@ -443,7 +465,7 @@ function MonthColumnsTab({ rows, months, filters, setFilters, exportName }: {
         <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
         <Button variant="outline" size="sm" onClick={() =>
           exportCsv(`${exportName}.csv`,
-            ["Serial","Model","Store","Group","Type",...months.map(fmtMonth),"Total"],
+            ["Serial","Model","Store","Group","Type",...months.map(formatHeader),"Total"],
             visible.map((r) => [r.serial_number,r.model_name,r.store??"",r.company_group??"",r.printer_type??"",
               ...months.map((m) => String(r.monthly_volumes[m]??0)),String(r.period_total)])
           )
@@ -459,8 +481,8 @@ function MonthColumnsTab({ rows, months, filters, setFilters, exportName }: {
               {th("company_group","Group")}
               {th("printer_type","Type")}
               {months.map((m) => (
-                <Th key={m} col={`m_${m}`} sort={sort} onSort={toggle} className="text-right text-xs">
-                  {fmtMonth(m)}
+                <Th key={m} col={`m_${m}`} sort={sort} onSort={toggle} className="text-right text-xs whitespace-nowrap">
+                  {formatHeader(m)}
                 </Th>
               ))}
               {th("period_total","Total","text-right")}
@@ -575,6 +597,7 @@ function StatusTab({ rows, filters, setFilters }: {
 const TABS: { key: TabType; label: string }[] = [
   { key: "summary",  label: "Summary" },
   { key: "mtd",     label: "Month to Date" },
+  { key: "weekly",  label: "Weekly" },
   { key: "monthly", label: "Monthly (6m)" },
   { key: "ytd",     label: "Year to Date" },
   { key: "status",  label: "Machine Status" },
@@ -650,6 +673,7 @@ export default function MachineReportsPage() {
           <>
             {activeTab === "summary" && <SummaryTab rows={current.rows as SummaryRow[]} filters={filters} setFilters={setFilters} />}
             {activeTab === "mtd" && <MtdTab rows={current.rows as MtdRow[]} dates={current.dates??[]} filters={filters} setFilters={setFilters} />}
+            {activeTab === "weekly" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="weekly" formatHeader={fmtWeek} />}
             {activeTab === "monthly" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="monthly" />}
             {activeTab === "ytd" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="ytd" />}
             {activeTab === "status" && <StatusTab rows={current.rows as StatusRow[]} filters={filters} setFilters={setFilters} />}

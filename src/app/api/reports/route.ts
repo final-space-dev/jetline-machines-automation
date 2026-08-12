@@ -296,6 +296,50 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ tab, rows: result.rows, months });
     }
 
+    // ── WEEKLY: total per ISO week (Mon–Sun), year-to-date ─────────────────────
+    // Each week is keyed by its SUNDAY end-date (YYYY-MM-DD). Postgres weeks start
+    // Monday, so date_trunc('week', date) is the Monday and +6 days is the Sunday.
+    if (tab === "weekly") {
+      const weeksResult = await client.query<{ week: string }>(
+        `SELECT DISTINCT (DATE_TRUNC('week', date) + INTERVAL '6 days')::date::text AS week
+         FROM xerox.meter_volumes
+         WHERE date >= DATE_TRUNC('year', CURRENT_DATE)
+           AND date <= CURRENT_DATE
+         ORDER BY week`
+      );
+      const months = weeksResult.rows.map((r) => r.week);
+
+      const result = await client.query(`
+        WITH ${MACHINE_CTE},
+        weekly AS (
+          SELECT
+            printer_id,
+            (DATE_TRUNC('week', date) + INTERVAL '6 days')::date::text AS week,
+            SUM(volume)::bigint AS volume
+          FROM xerox.meter_volumes
+          WHERE date >= DATE_TRUNC('year', CURRENT_DATE) AND date <= CURRENT_DATE
+          GROUP BY printer_id, (DATE_TRUNC('week', date) + INTERVAL '6 days')::date::text
+        )
+        SELECT
+          m.serial_number,
+          m.model_name,
+          m.store,
+          m.company_group,
+          m.printer_type,
+          COALESCE(
+            json_object_agg(wk.week, COALESCE(wv.volume, 0) ORDER BY wk.week)
+            FILTER (WHERE wk.week IS NOT NULL), '{}'::json
+          ) AS monthly_volumes,
+          COALESCE(SUM(wv.volume), 0)::bigint AS period_total
+        FROM machines m
+        CROSS JOIN (SELECT DISTINCT week FROM weekly) wk
+        LEFT JOIN weekly wv ON wv.printer_id = m.printer_id AND wv.week = wk.week
+        GROUP BY m.serial_number, m.model_name, m.store, m.company_group, m.printer_type
+        ORDER BY m.store NULLS LAST, m.serial_number
+      `);
+      return NextResponse.json({ tab, rows: result.rows, months });
+    }
+
     // ── STATUS: machine feedback list (all machines with feedback data) ────────
     if (tab === "status") {
       const result = await client.query(`
