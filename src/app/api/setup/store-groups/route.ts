@@ -4,7 +4,7 @@ import { bmsPool } from "@/lib/bms-pool";
 import { withClient, badRequest, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { STORE_GROUPS } from "@/lib/store-groups";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 
 /**
  * Store group hierarchy — THREE-LEVEL model with per-store active toggle.
@@ -23,7 +23,7 @@ import { requireAdmin, AuthError } from "@/lib/auth";
 /** Admin gate: returns a 401/403 response if not an admin, else null. */
 async function adminGate(): Promise<NextResponse | null> {
   try {
-    await requireAdmin();
+    await requireCapability("config:stores");
     return null;
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });

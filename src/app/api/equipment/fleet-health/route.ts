@@ -4,7 +4,7 @@ import { xeroxPool } from "@/lib/xerox-pool";
 import { withClients, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { getStoreGroup } from "@/lib/store-groups";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 import type { PoolClient } from "pg";
 
 // ── Condition classification (mirrors api/equipment/all-stores) ────────────────
@@ -59,7 +59,7 @@ export async function GET() {
   // redirected away from /equipment/fleet by middleware). Gate the data to
   // authenticated admins so it can't be read unauthenticated or cross-store.
   try {
-    await requireAdmin();
+    await requireCapability("nav:fleet");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

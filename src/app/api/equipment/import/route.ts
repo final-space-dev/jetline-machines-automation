@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { bmsPool } from "@/lib/bms-pool";
 import { withClient, badRequest, serverError, ensureItemColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 
 /**
  * Equipment mass-import (ADMIN ONLY) — the CRM bulk-load tool under Config.
@@ -66,7 +66,7 @@ function normPrice(v: unknown): number | null {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireCapability("config:import");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

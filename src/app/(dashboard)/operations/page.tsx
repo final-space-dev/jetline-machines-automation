@@ -153,7 +153,7 @@ function SyncRow({ sync }: { sync: OpsData["sync"]["recentSyncs"][0] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OperationsPage() {
-  const { allowed, loading: guardLoading } = useAdminGuard(); // admin-only
+  const { allowed, loading: guardLoading } = useAdminGuard("nav:operations");
   const { isAdmin } = useRole();
   const [data, setData] = useState<OpsData | null>(null);
   const [loading, setLoading] = useState(true);

@@ -21,14 +21,18 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.role = user.role;
         token.store = user.store;
+        token.permissions = user.permissions;
       }
       return token;
     },
     async session({ session, token }) {
+      // Edge/middleware only — pure token passthrough, no DB. The Node config in
+      // src/lib/auth.ts does the authoritative DB refresh.
       if (session.user) {
         if (token.sub) session.user.id = token.sub;
         session.user.role = token.role;
-        session.user.store = token.store;
+        session.user.store = token.store ?? null;
+        session.user.permissions = token.permissions ?? { nav: [], config: [] };
       }
       return session;
     },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { bmsPool } from "@/lib/bms-pool";
 import { withClient, badRequest, notFound, serverError, ensureItemColumns } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 
 /**
  * Recently-deleted equipment recovery (admin-only). Soft-deleted items keep a
@@ -15,7 +15,7 @@ import { requireAdmin, AuthError } from "@/lib/auth";
  */
 
 export async function GET() {
-  try { await requireAdmin(); }
+  try { await requireCapability("config:recently-deleted"); }
   catch (e) { if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status }); throw e; }
 
   const timer = routeTimer("GET /api/equipment/deleted");
@@ -36,7 +36,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  try { await requireAdmin(); }
+  try { await requireCapability("config:recently-deleted"); }
   catch (e) { if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status }); throw e; }
 
   const body = await req.json().catch(() => null);

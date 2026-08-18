@@ -4,9 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { JlSelect } from "@/components/ui/jl-select";
 import { useRole } from "@/lib/use-role";
 import { STORE_GROUPS } from "@/lib/store-groups";
-import { Eye, EyeOff, Pencil, Trash2, Plus, X } from "lucide-react";
+import {
+  NAV_CAPS,
+  CONFIG_CAPS,
+  type Permissions,
+  EMPTY_PERMISSIONS,
+  normalisePermissions,
+} from "@/lib/permissions";
+import { Eye, EyeOff, Pencil, Trash2, Plus, X, Check } from "lucide-react";
 
-type Role = "admin" | "store_staff";
+type Role = "admin" | "store_staff" | "custom";
 
 // Public user shape returned by /api/setup/users — never carries a password.
 interface UserRow {
@@ -15,11 +22,13 @@ interface UserRow {
   name: string;
   role: Role;
   store: string | null;
+  permissions: Permissions | null;
 }
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
   { value: "store_staff", label: "Store staff" },
+  { value: "custom", label: "Custom access" },
 ];
 
 // Distinct, sorted store list drawn from the fleet's store hierarchy.
@@ -34,16 +43,37 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// Human-readable summary of a custom user's grant for the table (e.g.
+// "Machine Reports · Machine Mapping"). Falls back to "No access" when empty.
+function grantSummary(permissions: Permissions | null): string {
+  const p = normalisePermissions(permissions);
+  const labels = [
+    ...NAV_CAPS.filter((c) => p.nav.includes(c.key)).map((c) => c.label),
+    ...CONFIG_CAPS.filter((c) => p.config.includes(c.key)).map((c) => c.label),
+  ];
+  if (labels.length === 0) return "No access";
+  if (labels.length <= 3) return labels.join(" · ");
+  return `${labels.slice(0, 2).join(" · ")} +${labels.length - 2} more`;
+}
+
 // ── Add / Edit form state ─────────────────────────────────────────────────
 interface FormState {
   email: string;
   name: string;
   role: Role;
   store: string;
+  permissions: Permissions;
   password: string;
 }
 
-const EMPTY_FORM: FormState = { email: "", name: "", role: "store_staff", store: "", password: "" };
+const EMPTY_FORM: FormState = {
+  email: "",
+  name: "",
+  role: "store_staff",
+  store: "",
+  permissions: EMPTY_PERMISSIONS,
+  password: "",
+};
 
 export function UsersPanel() {
   const { isAdmin, loading: roleLoading } = useRole();
@@ -82,6 +112,7 @@ export function UsersPanel() {
 
   const admins = useMemo(() => rows.filter((r) => r.role === "admin").length, [rows]);
   const staff = useMemo(() => rows.filter((r) => r.role === "store_staff").length, [rows]);
+  const custom = useMemo(() => rows.filter((r) => r.role === "custom").length, [rows]);
 
   if (roleLoading || loading) {
     return (
@@ -99,6 +130,7 @@ export function UsersPanel() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className="jl-badge jl-badge--red">{admins} admin</span>
           <span className="jl-badge jl-badge--blue">{staff} store staff</span>
+          {custom > 0 && <span className="jl-badge">{custom} custom</span>}
           {isAdmin && (
             <button className="jl-btn jl-btn--primary jl-btn--sm" onClick={() => setEditing("new")}>
               <Plus size={16} /> Add User
@@ -158,11 +190,19 @@ export function UsersPanel() {
                     <td>
                       {u.role === "admin" ? (
                         <span className="jl-badge jl-badge--red">Admin</span>
+                      ) : u.role === "custom" ? (
+                        <span className="jl-badge">Custom</span>
                       ) : (
                         <span className="jl-badge jl-badge--blue">Store staff</span>
                       )}
                     </td>
-                    <td>{u.store ?? <span className="jl-muted">Global</span>}</td>
+                    <td>
+                      {u.role === "custom" ? (
+                        <span className="jl-sm jl-muted">{grantSummary(u.permissions)}</span>
+                      ) : (
+                        u.store ?? <span className="jl-muted">Global</span>
+                      )}
+                    </td>
                     <td>
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                         <button
@@ -232,7 +272,14 @@ function UserModal({
 
   const [form, setForm] = useState<FormState>(
     user
-      ? { email: user.email, name: user.name, role: user.role, store: user.store ?? "", password: "" }
+      ? {
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          store: user.store ?? "",
+          permissions: normalisePermissions(user.permissions),
+          password: "",
+        }
       : EMPTY_FORM,
   );
   const [showPassword, setShowPassword] = useState(false);
@@ -241,6 +288,14 @@ function UserModal({
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  function toggleCap(kind: "nav" | "config", key: string) {
+    setForm((prev) => {
+      const list = prev.permissions[kind];
+      const next = list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+      return { ...prev, permissions: { ...prev.permissions, [kind]: next } };
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -251,6 +306,13 @@ function UserModal({
     if (!form.name.trim()) return setError("Name is required");
     if (!isEdit && !form.password) return setError("Password is required");
     if (form.role === "store_staff" && !form.store) return setError("Store is required for store staff");
+    if (
+      form.role === "custom" &&
+      form.permissions.nav.length === 0 &&
+      form.permissions.config.length === 0
+    ) {
+      return setError("Select at least one menu item or config section");
+    }
 
     setSaving(true);
     try {
@@ -261,6 +323,7 @@ function UserModal({
           name: form.name.trim(),
           role: form.role,
           store: form.role === "store_staff" ? form.store : "",
+          permissions: form.role === "custom" ? form.permissions : undefined,
         };
         if (form.password) body.password = form.password;
         res = await fetch(`/api/setup/users/${user!.id}`, {
@@ -277,6 +340,7 @@ function UserModal({
             name: form.name.trim(),
             role: form.role,
             store: form.role === "store_staff" ? form.store : "",
+            permissions: form.role === "custom" ? form.permissions : undefined,
             password: form.password,
           }),
         });
@@ -364,6 +428,51 @@ function UserModal({
                 placeholder="Select store"
               />
             </div>
+          )}
+
+          {form.role === "custom" && (
+            <>
+              <div className="jl-field">
+                <label>Menu items</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {NAV_CAPS.map((c) => (
+                    <label key={c.key} className="jl-check">
+                      <input
+                        type="checkbox"
+                        checked={form.permissions.nav.includes(c.key)}
+                        onChange={() => toggleCap("nav", c.key)}
+                      />
+                      <span className="box">
+                        <Check />
+                      </span>
+                      <span>{c.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="jl-field">
+                <label>Config sections</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {CONFIG_CAPS.map((c) => (
+                    <label key={c.key} className="jl-check">
+                      <input
+                        type="checkbox"
+                        checked={form.permissions.config.includes(c.key)}
+                        onChange={() => toggleCap("config", c.key)}
+                      />
+                      <span className="box">
+                        <Check />
+                      </span>
+                      <span>{c.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <span className="hint">
+                  The Config menu appears when at least one section is selected.
+                </span>
+              </div>
+            </>
           )}
 
           <div className="jl-field">

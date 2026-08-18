@@ -1,8 +1,15 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { prisma, ensureUserPermissionsColumn } from "@/lib/prisma";
 import { isLoginLocked, recordLoginFailure, clearLoginFailures } from "@/lib/rate-limit";
+import {
+  type Permissions,
+  EMPTY_PERMISSIONS,
+  normalisePermissions,
+  canNav,
+  canConfig,
+} from "@/lib/permissions";
 
 /**
  * Phase 09 — Authentication & Roles (NextAuth v5 / Auth.js).
@@ -19,7 +26,7 @@ import { isLoginLocked, recordLoginFailure, clearLoginFailures } from "@/lib/rat
  * lazily, so a missing secret will not crash at import time.
  */
 
-export type Role = "admin" | "store_staff";
+export type Role = "admin" | "store_staff" | "custom";
 
 export type SessionUser = {
   id: number;
@@ -27,10 +34,13 @@ export type SessionUser = {
   name: string;
   role: Role;
   store: string | null;
+  permissions: Permissions;
 };
 
 function normaliseRole(role: string): Role {
-  return role === "admin" ? "admin" : "store_staff";
+  if (role === "admin") return "admin";
+  if (role === "custom") return "custom";
+  return "store_staff";
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -61,6 +71,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // check the password until the window passes (brute-force protection).
         if (await isLoginLocked(email)) return null;
 
+        // Guarantee the additive `permissions` column exists before selecting it.
+        await ensureUserPermissionsColumn();
+
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
           await recordLoginFailure(email);
@@ -84,25 +97,56 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: normaliseRole(user.role),
           store: user.store ?? null,
+          permissions: normalisePermissions(user.permissions),
         };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // `user` is only present on initial sign-in.
+      // `user` is only present on initial sign-in — seed the claims then.
       if (user) {
         token.role = user.role;
         token.store = user.store;
+        token.permissions = user.permissions;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        // token.sub holds the user id string; expose it as user.id.
-        if (token.sub) session.user.id = token.sub;
-        session.user.role = token.role;
-        session.user.store = token.store;
+      if (!session.user) return session;
+
+      // token.sub holds the user id string; expose it as user.id.
+      if (token.sub) session.user.id = token.sub;
+      // Fast path / fallback: claims carried on the token from sign-in.
+      session.user.role = token.role;
+      session.user.store = token.store ?? null;
+      session.user.permissions = token.permissions ?? EMPTY_PERMISSIONS;
+      session.user.disabled = false;
+
+      // Authoritative refresh: re-read role/store/permissions from the DB on
+      // every session read so permission changes AND revocations (delete) take
+      // effect on the user's next request — important for external users.
+      // Best-effort: on any DB error we keep the token-derived claims above so a
+      // transient blip never wrongly logs anyone out.
+      const id = Number(token.sub);
+      if (Number.isInteger(id) && id > 0) {
+        try {
+          await ensureUserPermissionsColumn();
+          const fresh = await prisma.user.findUnique({
+            where: { id },
+            select: { role: true, store: true, permissions: true },
+          });
+          if (!fresh) {
+            // Account was deleted — mark the session disabled so guards deny it.
+            session.user.disabled = true;
+          } else {
+            session.user.role = normaliseRole(fresh.role);
+            session.user.store = fresh.store ?? null;
+            session.user.permissions = normalisePermissions(fresh.permissions);
+          }
+        } catch {
+          /* keep token-derived claims (fallback) */
+        }
       }
       return session;
     },
@@ -118,6 +162,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await auth();
   const u = session?.user;
   if (!u?.email) return null;
+  // Account deleted since the token was issued (see session callback refresh).
+  if (u.disabled) return null;
 
   return {
     id: Number(u.id),
@@ -125,6 +171,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     name: u.name ?? "",
     role: u.role,
     store: u.store ?? null,
+    permissions: u.permissions ?? EMPTY_PERMISSIONS,
   };
 }
 
@@ -167,4 +214,49 @@ export async function requireAdmin(): Promise<SessionUser> {
   if (!user) throw new AuthError(401, "Unauthorized");
   if (user.role !== "admin") throw new AuthError(403, "Forbidden");
   return user;
+}
+
+/**
+ * Require a specific capability. Admins always pass (capabilities are ignored
+ * for them), so swapping `requireAdmin()` → `requireCapability(...)` on a route
+ * NEVER changes admin behaviour and still denies store_staff — it only lets a
+ * "custom" user through when they hold the grant.
+ *
+ * `cap` is "nav:<key>" or "config:<key>" (keys from src/lib/permissions.ts).
+ */
+export async function requireCapability(
+  cap: `nav:${string}` | `config:${string}`,
+): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new AuthError(401, "Unauthorized");
+  if (user.role === "admin") return user;
+
+  if (!hasCapability(user, cap)) throw new AuthError(403, "Forbidden");
+  return user;
+}
+
+/**
+ * Like requireCapability but passes if the user holds ANY of the given
+ * capabilities. Used where one route backs more than one section (e.g. the
+ * Models panel also reads Equipment Types). Admins always pass.
+ */
+export async function requireAnyCapability(
+  caps: (`nav:${string}` | `config:${string}`)[],
+): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new AuthError(401, "Unauthorized");
+  if (user.role === "admin") return user;
+  if (!caps.some((c) => hasCapability(user, c))) throw new AuthError(403, "Forbidden");
+  return user;
+}
+
+/** Pure check (no throw): does this user hold the capability? Admin ⇒ always. */
+function hasCapability(user: SessionUser, cap: `nav:${string}` | `config:${string}`): boolean {
+  if (user.role === "admin") return true;
+  const sep = cap.indexOf(":");
+  const kind = cap.slice(0, sep);
+  const key = cap.slice(sep + 1);
+  return kind === "nav"
+    ? canNav(user.role, user.permissions, key)
+    : canConfig(user.role, user.permissions, key);
 }

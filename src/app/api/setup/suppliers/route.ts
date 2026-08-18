@@ -3,7 +3,7 @@ import type { PoolClient } from "pg";
 import { bmsPool } from "@/lib/bms-pool";
 import { withClient, badRequest, notFound, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireAdmin, requireUser, AuthError } from "@/lib/auth";
+import { requireCapability, requireUser, AuthError } from "@/lib/auth";
 
 /**
  * Suppliers — a shared CRM picklist used by BOTH equipment and printers to record
@@ -17,7 +17,7 @@ import { requireAdmin, requireUser, AuthError } from "@/lib/auth";
 
 async function adminGate(): Promise<NextResponse | null> {
   try {
-    await requireAdmin();
+    await requireCapability("config:suppliers");
     return null;
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });

@@ -3,12 +3,12 @@ import type { PoolClient } from "pg";
 import { bmsPool } from "@/lib/bms-pool";
 import { withClient, badRequest, notFound, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 
 /** Admin gate: returns a 401/403 response if not an admin, else null. */
 async function adminGate(): Promise<NextResponse | null> {
   try {
-    await requireAdmin();
+    await requireCapability("config:conditions");
     return null;
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });

@@ -613,7 +613,7 @@ interface ApiPayload {
 const DEFAULT_FILTERS: Filters = { search: "", store: "all", group: "all", type: "all", model: "all" };
 
 export default function MachineReportsPage() {
-  const { allowed, loading: guardLoading } = useAdminGuard(); // admin-only
+  const { allowed, loading: guardLoading } = useAdminGuard("nav:machine-reports");
   const [activeTab, setActiveTab] = useState<TabType>("summary");
   const [cache, setCache] = useState<Partial<Record<TabType, ApiPayload>>>({});
   const [loading, setLoading] = useState(false);

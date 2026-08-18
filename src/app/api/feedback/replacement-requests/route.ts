@@ -4,7 +4,7 @@ import { bmsPool } from "@/lib/bms-pool";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { withClient, badRequest, notFound, serverError, ensureFeedbackTables, validateBody } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireUser, requireAdmin, AuthError, type SessionUser } from "@/lib/auth";
+import { requireUser, requireCapability, AuthError, type SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   // Only admins triage requests.
   let admin: SessionUser;
-  try { admin = await requireAdmin(); }
+  try { admin = await requireCapability("nav:replacements"); }
   catch (e) { if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status }); throw e; }
 
   const parsed = await validateBody(req, PatchRequestSchema);

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma, ensureUserPermissionsColumn } from "@/lib/prisma";
 import { badRequest, notFound, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireAdmin, AuthError, type Role } from "@/lib/auth";
+import { normalisePermissions } from "@/lib/permissions";
 
 /** Admin gate: returns a 401/403 response if not an admin, else null. */
 async function adminGate(): Promise<NextResponse | null> {
@@ -30,7 +31,14 @@ function validId(raw: string): number | null {
 }
 
 /** Public shape — NEVER includes the password hash. */
-const publicSelect = { id: true, email: true, name: true, role: true, store: true } as const;
+const publicSelect = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  store: true,
+  permissions: true,
+} as const;
 
 // Update a user. Body: { name?, role?, store?, password? }.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -46,6 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!body || typeof body !== "object") return badRequest("invalid body");
 
   try {
+    await ensureUserPermissionsColumn();
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) return notFound("User not found");
 
@@ -63,7 +72,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       body.role !== undefined ? (body.role as Role) : (existing.role as Role);
 
     if (body.role !== undefined) {
-      if (!isValidRole(body.role)) return badRequest("role must be 'admin' or 'store_staff'");
+      if (!isValidRole(body.role)) {
+        return badRequest("role must be 'admin', 'store_staff' or 'custom'");
+      }
       data.role = body.role;
     }
 
@@ -72,8 +83,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ? (typeof body.store === "string" && body.store.trim() ? body.store.trim() : null)
         : existing.store;
 
-    if (effectiveRole === "admin") {
-      // Admins are global — never carry a store.
+    if (effectiveRole === "admin" || effectiveRole === "custom") {
+      // Admins and custom users are global — never carry a store.
       effectiveStore = null;
     } else if (!effectiveStore) {
       return badRequest("store is required for store_staff");
@@ -82,6 +93,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Only write store when role or store was part of the request.
     if (body.role !== undefined || body.store !== undefined) {
       data.store = effectiveStore;
+    }
+
+    // Permissions: only custom users carry a grant. Update it when the caller
+    // sends `permissions` or when the role changes, so switching away from
+    // custom clears the grant (SQL NULL) and switching to custom seeds it.
+    if (body.permissions !== undefined || body.role !== undefined) {
+      data.permissions =
+        effectiveRole === "custom"
+          ? (normalisePermissions(
+              body.permissions !== undefined ? body.permissions : existing.permissions,
+            ) as unknown as Prisma.InputJsonValue)
+          : Prisma.DbNull;
     }
 
     if (typeof body.password === "string" && body.password) {

@@ -3,12 +3,15 @@ import type { PoolClient } from "pg";
 import { bmsPool } from "@/lib/bms-pool";
 import { withClient, badRequest, notFound, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireAnyCapability, AuthError } from "@/lib/auth";
 
-/** Admin gate: returns a 401/403 response if not an admin, else null. */
+/**
+ * Capability gate: admins + custom users holding Equipment Types OR Models (the
+ * Models panel reads equipment types). Returns a 401/403 response, else null.
+ */
 async function adminGate(): Promise<NextResponse | null> {
   try {
-    await requireAdmin();
+    await requireAnyCapability(["config:equipment-types", "config:models"]);
     return null;
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });

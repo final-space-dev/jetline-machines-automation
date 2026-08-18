@@ -62,7 +62,7 @@ function fmt(iso: string): string {
 }
 
 export default function ReplacementRequestsPage() {
-  const { allowed, loading: guardLoading } = useAdminGuard();
+  const { allowed, loading: guardLoading } = useAdminGuard("nav:replacements");
   const [rows, setRows] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("open");

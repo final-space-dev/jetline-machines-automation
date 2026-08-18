@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { bmsPool } from "@/lib/bms-pool";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 
 export async function GET() {
   // Machine mapping is an admin data-capture exercise — not for store staff.
   try {
-    await requireAdmin();
+    await requireCapability("config:machine-mapping");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -98,7 +98,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin();
+    await requireCapability("config:machine-mapping");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requireAdmin();
+    await requireCapability("config:machine-mapping");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

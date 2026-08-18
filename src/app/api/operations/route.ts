@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { bmsPool } from "@/lib/bms-pool";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 
 export async function GET() {
   // Fleet-wide operations data is admin-only (store staff are scoped to their store).
   try {
-    await requireAdmin();
+    await requireCapability("nav:operations");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

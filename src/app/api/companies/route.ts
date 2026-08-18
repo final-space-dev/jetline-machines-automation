@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireUser, requireAdmin, AuthError } from "@/lib/auth";
+import { requireUser, requireCapability, AuthError } from "@/lib/auth";
 
 export async function GET() {
   // Any signed-in user may read the connection list (Config dropdowns need it).
@@ -31,7 +31,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   // Creating a BMS connection is an admin action.
   try {
-    await requireAdmin();
+    await requireCapability("config:stores");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

@@ -188,7 +188,7 @@ function CompletenessLeaderboard({ rows }: { rows: DataQualityRow[] }) {
 export default function FleetHealthPage() {
   // admin-only; store staff are redirected to their store. Gate rendering on it
   // so staff never hit the fleet render path (the API 403s them).
-  const { allowed, loading: guardLoading } = useAdminGuard();
+  const { allowed, loading: guardLoading } = useAdminGuard("nav:fleet");
   const [data, setData] = useState<FleetHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("poorCondition");

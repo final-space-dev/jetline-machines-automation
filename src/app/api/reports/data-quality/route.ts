@@ -4,7 +4,7 @@ import { bmsPool } from "@/lib/bms-pool";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { withClients, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireAdmin, AuthError } from "@/lib/auth";
+import { requireCapability, AuthError } from "@/lib/auth";
 import { getStoreGroup } from "@/lib/store-groups";
 import { scoreItem, scorePrinter } from "@/lib/completeness";
 
@@ -82,7 +82,7 @@ function escapeCell(v: unknown): string {
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireCapability("nav:fleet");
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

@@ -59,16 +59,20 @@ model PrinterModel {
 // USERS & AUTH (Phase 09 — NextAuth v5 credentials provider)
 // =============================================================================
 
-// User - Application login accounts. Roles: "admin" | "store_staff".
+// User - Application login accounts. Roles: "admin" | "store_staff" | "custom".
 // store is only set for store_staff (scopes them to a single store).
+// permissions is only used for "custom" users: { nav: string[], config: string[] }.
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String   // bcrypt hash
-  name      String
-  role      String   // "admin" | "store_staff"
-  store     String?  // only set for store_staff
-  createdAt DateTime @default(now()) @map("created_at")
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  password    String   // bcrypt hash
+  name        String
+  role        String   // "admin" | "store_staff" | "custom"
+  store       String?  // only set for store_staff
+  // Capability grant for role="custom" (JSONB). Nullable + additive: existing
+  // rows are untouched. See src/lib/permissions.ts for the shape.
+  permissions Json?
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("users")
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getBrand, splitBrandName } from "@/lib/brand";
 import { useRole } from "@/lib/use-role";
+import { type Permissions, canNav, canSeeConfig } from "@/lib/permissions";
 import {
   ChevronLeft,
   Menu,
@@ -24,7 +25,17 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-type NavItem = { name: string; href: string; icon: typeof Store; badge?: boolean };
+// `cap` = the nav capability key that grants a custom user this item.
+// `config: true` marks the Config item (shown when a custom user holds ANY
+// config section). Items without either are admin-only structural entries.
+type NavItem = {
+  name: string;
+  href: string;
+  icon: typeof Store;
+  badge?: boolean;
+  cap?: string;
+  config?: boolean;
+};
 type Section = {
   key: string;
   title: string;
@@ -36,15 +47,15 @@ const SECTIONS: Section[] = [
     key: "stores",
     title: "Stores",
     items: [
-      { name: "All Stores", href: "/stores", icon: Store },
-      { name: "Fleet Health", href: "/equipment/fleet", icon: HeartPulse },
+      { name: "All Stores", href: "/stores", icon: Store, cap: "all-stores" },
+      { name: "Fleet Health", href: "/equipment/fleet", icon: HeartPulse, cap: "fleet" },
     ],
   },
   {
     key: "operations",
     title: "Operations",
     items: [
-      { name: "Dashboard", href: "/operations", icon: LayoutDashboard },
+      { name: "Dashboard", href: "/operations", icon: LayoutDashboard, cap: "operations" },
     ],
   },
   {
@@ -53,17 +64,17 @@ const SECTIONS: Section[] = [
     items: [
       // Machine Reports is the first report; this section is the home for all
       // future reporting (recon, volume, billing, …).
-      { name: "Machine Reports", href: "/machine-reports", icon: BarChart3 },
-      { name: "Replacement Requests", href: "/reports/replacements", icon: AlertOctagon },
+      { name: "Machine Reports", href: "/machine-reports", icon: BarChart3, cap: "machine-reports" },
+      { name: "Replacement Requests", href: "/reports/replacements", icon: AlertOctagon, cap: "replacements" },
     ],
   },
   {
     key: "config",
     title: "Config",
     items: [
-      { name: "Config", href: "/setup", icon: Settings },
+      { name: "Config", href: "/setup", icon: Settings, config: true },
       // Activity sits below Config per the menu ordering. It keeps the today-count badge.
-      { name: "Activity", href: "/activity", icon: Activity, badge: true },
+      { name: "Activity", href: "/activity", icon: Activity, badge: true, cap: "activity" },
     ],
   },
 ];
@@ -74,7 +85,12 @@ const SECTIONS: Section[] = [
  * (and, while the session is still resolving, everyone) see the full menu so it
  * never flashes an incomplete menu for the common admin case.
  */
-function sectionsForRole(role: string | null, store: string | null, resolved: boolean): Section[] {
+function sectionsForRole(
+  role: string | null,
+  store: string | null,
+  permissions: Permissions,
+  resolved: boolean,
+): Section[] {
   if (resolved && role === "store_staff") {
     return [
       {
@@ -87,6 +103,17 @@ function sectionsForRole(role: string | null, store: string | null, resolved: bo
       },
     ];
   }
+
+  // Custom users see only the items their grant allows. Drop empty sections.
+  if (resolved && role === "custom") {
+    return SECTIONS.map((section) => ({
+      ...section,
+      items: section.items.filter((item) =>
+        item.config ? canSeeConfig(role, permissions) : !!item.cap && canNav(role, permissions, item.cap),
+      ),
+    })).filter((section) => section.items.length > 0);
+  }
+
   return SECTIONS;
 }
 
@@ -223,8 +250,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   // Menu by role. While the session resolves we show the full menu (so the admin
   // case never flashes an incomplete menu); once resolved, store staff get their
   // restricted single-store menu. Server-side guards still enforce access.
-  const { role, store, loading } = useRole();
-  const visibleSections = sectionsForRole(role, store, !loading);
+  const { role, store, permissions, loading } = useRole();
+  const visibleSections = sectionsForRole(role, store, permissions, !loading);
 
   function NavRow({ item }: { item: NavItem }) {
     const active = isItemActive(pathname, item.href);
@@ -355,7 +382,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 export function MobileNavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const todayCount = useTodayCount();
-  const { role, store, loading } = useRole();
+  const { role, store, permissions, loading } = useRole();
 
   // Close automatically whenever the route changes.
   useEffect(() => {
@@ -365,7 +392,7 @@ export function MobileNavDrawer({ open, onClose }: { open: boolean; onClose: () 
 
   if (!open) return null;
 
-  const visibleSections = sectionsForRole(role, store, !loading);
+  const visibleSections = sectionsForRole(role, store, permissions, !loading);
 
   return (
     <div className="jl-mobile-overlay" onClick={onClose} role="dialog" aria-label="Navigation menu">

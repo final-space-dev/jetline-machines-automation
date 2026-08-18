@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import type { Role } from "@/lib/auth";
+import { type Permissions, EMPTY_PERMISSIONS } from "@/lib/permissions";
 
 /**
  * Client-side role hook. Reads the NextAuth session (requires a
@@ -15,6 +16,7 @@ import type { Role } from "@/lib/auth";
 export type UseRole = {
   role: Role | null;
   store: string | null;
+  permissions: Permissions;
   isAdmin: boolean;
   loading: boolean;
 };
@@ -30,10 +32,13 @@ export function useRole(): UseRole {
   const loading = status === "loading";
   const role = (data?.user?.role as Role | undefined) ?? null;
   const store = (data?.user?.store as string | null | undefined) ?? null;
+  const permissions =
+    (data?.user?.permissions as Permissions | undefined) ?? EMPTY_PERMISSIONS;
 
   return {
     role,
     store,
+    permissions,
     // Only admin once the session is resolved AND the role is explicitly admin.
     isAdmin: status === "authenticated" && role === "admin",
     loading,

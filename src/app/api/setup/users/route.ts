@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma, ensureUserPermissionsColumn } from "@/lib/prisma";
 import { badRequest, serverError, validateBody } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireAdmin, AuthError, type Role } from "@/lib/auth";
+import { normalisePermissions } from "@/lib/permissions";
 import { z } from "zod";
+
+const PermissionsSchema = z
+  .object({
+    nav: z.array(z.string()).optional().default([]),
+    config: z.array(z.string()).optional().default([]),
+  })
+  .optional();
 
 // Minimum password policy for new accounts: 8+ chars with at least one letter and
 // one number. Keeps it usable for shop-floor staff without being a nuisance.
 const CreateUserSchema = z.object({
   email: z.string().trim().toLowerCase().email("a valid email is required"),
   name: z.string().trim().min(1, "name is required").max(120),
-  role: z.enum(["admin", "store_staff"]),
+  role: z.enum(["admin", "store_staff", "custom"]),
   store: z.string().trim().optional().default(""),
+  permissions: PermissionsSchema,
   password: z.string()
     .min(8, "password must be at least 8 characters")
     .max(200)
@@ -36,21 +45,29 @@ async function adminGate(): Promise<NextResponse | null> {
 }
 
 const BCRYPT_ROUNDS = 10;
-const VALID_ROLES: Role[] = ["admin", "store_staff"];
+const VALID_ROLES: Role[] = ["admin", "store_staff", "custom"];
 
 function isValidRole(role: unknown): role is Role {
   return typeof role === "string" && (VALID_ROLES as string[]).includes(role);
 }
 
 /** Public shape — NEVER includes the password hash. */
-const publicSelect = { id: true, email: true, name: true, role: true, store: true } as const;
+const publicSelect = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  store: true,
+  permissions: true,
+} as const;
 
-// List all users (id, email, name, role, store). Password is never returned.
+// List all users (id, email, name, role, store, permissions). Password never returned.
 export async function GET() {
   const gate = await adminGate();
   if (gate) return gate;
   const timer = routeTimer("GET /api/setup/users");
   try {
+    await ensureUserPermissionsColumn();
     const rows = await prisma.user.findMany({
       select: publicSelect,
       orderBy: [{ role: "asc" }, { name: "asc" }],
@@ -71,17 +88,23 @@ export async function POST(req: NextRequest) {
 
   const parsed = await validateBody(req, CreateUserSchema);
   if (parsed.error) return parsed.error;
-  const { email, name, role, store, password } = parsed.data;
+  const { email, name, role, store, permissions, password } = parsed.data;
 
   try {
+    await ensureUserPermissionsColumn();
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await prisma.user.create({
       data: {
         email,
         name,
         role,
-        // Only store_staff carry a store; admins are global.
+        // Only store_staff carry a store; admins/custom are global.
         store: role === "store_staff" ? store : null,
+        // Only custom users carry a permission grant; others store SQL NULL.
+        permissions:
+          role === "custom"
+            ? (normalisePermissions(permissions) as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
         password: hash,
       },
       select: publicSelect,
