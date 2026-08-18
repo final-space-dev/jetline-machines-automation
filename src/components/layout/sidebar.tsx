@@ -91,7 +91,13 @@ function sectionsForRole(
   permissions: Permissions,
   resolved: boolean,
 ): Section[] {
-  if (resolved && role === "store_staff") {
+  // Until the session resolves we don't know the role, so show NOTHING rather
+  // than the full menu — otherwise a restricted (store_staff / custom) user sees
+  // the full admin menu flash before their real menu loads. With the single
+  // persistent SessionProvider this only happens on the first hard page load.
+  if (!resolved) return [];
+
+  if (role === "store_staff") {
     return [
       {
         key: "store",
@@ -105,7 +111,7 @@ function sectionsForRole(
   }
 
   // Custom users see only the items their grant allows. Drop empty sections.
-  if (resolved && role === "custom") {
+  if (role === "custom") {
     return SECTIONS.map((section) => ({
       ...section,
       items: section.items.filter((item) =>
@@ -114,7 +120,9 @@ function sectionsForRole(
     })).filter((section) => section.items.length > 0);
   }
 
-  return SECTIONS;
+  // Admins get the full menu. Any other/unknown role gets nothing (never leak the
+  // full menu to an unrecognised role).
+  return role === "admin" ? SECTIONS : [];
 }
 
 /* Brand block — rounded red-gradient mark + two-tone wordmark, matching the

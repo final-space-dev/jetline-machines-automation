@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRole } from "@/lib/use-role";
+import { canConfig } from "@/lib/permissions";
 import {
   ArrowUpDown,
   ArrowUp,
@@ -198,12 +199,15 @@ function SortHeader({
 // wraps this in <AppShell> via the default export below.
 export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
-  // Machine mapping is an admin-only data-capture tool (it's under Config, not in
-  // the main menu). Non-admins are redirected home; the data API also 403s them.
-  const { isAdmin, loading: roleLoading } = useRole();
+  // Machine mapping lives under Config. Admins can use it, and so can a custom
+  // user granted the "machine-mapping" config section (e.g. a Xerox partner).
+  // Anyone else is redirected home; the data API also enforces this server-side.
+  const { role, permissions, loading: roleLoading } = useRole();
+  const allowed =
+    role === "admin" || (role === "custom" && canConfig(role, permissions, "machine-mapping"));
   useEffect(() => {
-    if (!roleLoading && !isAdmin) router.replace("/");
-  }, [roleLoading, isAdmin, router]);
+    if (!roleLoading && !allowed) router.replace("/");
+  }, [roleLoading, allowed, router]);
 
   const [machines, setMachines] = useState<XeroxMachine[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
