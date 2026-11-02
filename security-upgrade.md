@@ -67,13 +67,13 @@ This repo is on branch `flatten-to-root` and also has a box deploy.sh; productio
 
 ## Result
 
-- status: <!-- done | blocked | awaiting-network -->
-- next: <!-- the version installed -->
-- react: <!-- the version installed -->
-- commit: <!-- the upgrade commit's short sha and branch -->
-- pushed: <!-- yes / no -->
-- deployed: <!-- where and how, the deployment URL or the deploy script's last line; or "not deployed" and why -->
-- verified: <!-- the evidence, one line -->
-- audit: <!-- other critical/high findings, or none -->
-- notes: <!-- anything Archon should know -->
-- at: <!-- ISO time -->
+- status: done
+- next: 16.4.3
+- react: 19.2.9 (react-dom 19.2.9; eslint-config-next 16.4.3)
+- commit: 1a53f3f on flatten-to-root (started from 294c64d, same branch)
+- pushed: yes — origin/flatten-to-root
+- deployed: Vercel production via `vercel deploy --prod` from a clean worktree of 1a53f3f: https://jetline-machines-91b37f8cm-finalspace-alwyns-projects.vercel.app (dpl_5DXNSqbu3zU6tnWFAQWZCZEgRwcr), aliased to https://fleet.jetline.co.za
+- verified: `vercel ls jetline-machines --prod` shows 91b37f8cm newest and Ready; https://fleet.jetline.co.za answers 307 to /login, /login answers 200; the deployment's package.json (read via the deployments files API) declares next 16.4.3, react 19.2.9
+- audit: `npm audit --omit=dev` names neither next nor react. Critical: @auth/core <=0.41.2 (GHSA-7rqj-j65f-68wh, GHSA-xmf8-cvqr-rfgj, GHSA-x445-f3h2-j279). High: mysql2 <=3.23.0 (GHSA-3f6p-5ww8-9rcr, GHSA-rgwj-5xj2-c3m3); source-map-js 1.0.0–1.2.1 (GHSA-68fv-2mgg-jv7q); undici <=6.29.0 (11 advisories); xlsx (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9, no fix available); zod <4.6.6 (GHSA-mrhx-c7xc-m3w5, fix needs @vercel/blob 2.4.0 breaking change). Not fixed here.
+- notes: Branch check: production (rg4wx7864, 2026-08-18) was built by CLI from flatten-to-root commit 294c64d, confirmed via the deployment's githubCommitRef/Sha meta, so no branch switch was needed. The Vercel project's Git integration has productionBranch=main, so the push did not trigger a build; deployed with the CLI as instructed. npm ls: next 16.4.3 everywhere; react 19.2.9 is flagged "invalid" only because @imc-trading/react-pivottable (wants 18.2.0) and react-day-picker 8 (wants <=18) are pre-existing React-19 peer mismatches already covered by .npmrc legacy-peer-deps=true (react was 19.2.1 before). `npm run test`: 47/47 pass. `npm run build`: passes. `npm run lint` FAILS both before and after the upgrade: a clean worktree of 294c64d lints with 6 errors/30 warnings; after the upgrade 32 errors/30 warnings. The 26 new errors are new rules in eslint-config-next 16.4.3 (react-hooks/set-state-in-effect, "Cannot call impure function during render", "Cannot access variable before it is declared", @typescript-eslint/no-require-imports), i.e. stricter linting, not changed runtime behaviour. No code was changed: lint was already red before this upgrade, is not part of the Next 16 build, and did not gate the previous production deploy. The build rewrote next-env.d.ts; I restored it with git checkout so only the three permitted files changed. The deployment meta has no git sha because the worktree was a detached HEAD; the deployed package.json was checked directly instead. Uncommitted files not mine (JETLINE_AGED.xlsx, _analyze.cjs, docs/) were left untouched. Vercel CLI 59.11.2 was used.
+- at: 2026-11-02T12:24:05Z
