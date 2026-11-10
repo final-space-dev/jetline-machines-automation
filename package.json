@@ -8,6 +8,8 @@
     "start": "next start -p 3003",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
+    "ui:audit": "bash scripts/ui-audit.sh",
+    "gate": "npm run ui:audit && npm run type-check && npm run test:unit && npm run build",
     "test": "vitest",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest --ui",
