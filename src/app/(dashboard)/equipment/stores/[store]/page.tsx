@@ -401,6 +401,7 @@ export default function StoreDetailPage() {
     {
       key: "model",
       label: "Make / model",
+      hideBelow: "sm",
       sortValue: (item) => item.make_model ?? "",
       cell: (item) => item.make_model ?? <Muted>Not set</Muted>,
     },

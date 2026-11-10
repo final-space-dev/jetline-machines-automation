@@ -167,7 +167,7 @@ const CONTRACT_COLUMNS: Column<PrinterAttention>[] = [
 const STORE_COLUMNS: Column<StoreHealthRow>[] = [
   { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/equipment/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
   { key: "group", label: "Group", hideBelow: "md", sortValue: (r) => r.group ?? "", cell: (r) => <Muted>{r.group ?? ""}</Muted> },
-  { key: "equipment", label: "Equipment", align: "right", sortValue: (r) => r.equipment, cell: (r) => <span className={cn(GRID.num, "font-medium")}>{r.equipment}</span> },
+  { key: "equipment", label: "Equipment", align: "right", hideBelow: "sm", sortValue: (r) => r.equipment, cell: (r) => <span className={cn(GRID.num, "font-medium")}>{r.equipment}</span> },
   { key: "poor", label: "Poor", align: "right", sortValue: (r) => r.poor, cell: (r) => <span className={cn(GRID.num, r.poor > 0 ? "font-semibold text-deficit" : "text-faint")}>{r.poor}</span> },
   { key: "printers", label: "Printers", align: "right", hideBelow: "sm", sortValue: (r) => r.printers, cell: (r) => <span className={GRID.num}>{r.printers}</span> },
   { key: "replace", label: "Replace", align: "right", hideBelow: "sm", sortValue: (r) => r.replace, cell: (r) => <span className={cn(GRID.num, r.replace > 0 ? "font-semibold" : "text-faint")}>{r.replace}</span> },

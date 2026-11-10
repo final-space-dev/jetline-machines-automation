@@ -166,9 +166,9 @@ export default function ActivityPage() {
       title="Activity"
       toolbar={
         <>
-          <Pick aria-label="Store" className="w-48" value={store || ALL} onChange={(v) => setStore(v === ALL ? "" : v)} options={STORE_OPTIONS} />
-          <DayField value={from} onChange={setFrom} placeholder="From date" className="flex w-52 items-center gap-1.5" />
-          <DayField value={to} onChange={setTo} placeholder="To date" className="flex w-52 items-center gap-1.5" />
+          <Pick aria-label="Store" className="w-full sm:w-48" value={store || ALL} onChange={(v) => setStore(v === ALL ? "" : v)} options={STORE_OPTIONS} />
+          <DayField value={from} onChange={setFrom} placeholder="From date" className="flex w-full items-center gap-1.5 sm:w-52" />
+          <DayField value={to} onChange={setTo} placeholder="To date" className="flex w-full items-center gap-1.5 sm:w-52" />
           <Segmented value={type} onValueChange={(v) => setType(v as TypeFilter)} options={TYPE_BUTTONS} />
         </>
       }

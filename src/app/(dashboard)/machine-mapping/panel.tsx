@@ -315,6 +315,8 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
   const body = (
     <>
       {/* Embedded under Config the heading and the tab already name this, so the bar carries only the counts and actions. */}
+      {/* On its own page the counts sit beside the title, except on a phone, where they come first here. */}
+      {!embedded && <div className="flex items-center gap-2 sm:hidden">{summary}</div>}
       {embedded && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">{summary}</div>
@@ -446,7 +448,7 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
 
   if (embedded) return <div className="flex w-full min-w-0 flex-col gap-4">{body}</div>;
   return (
-    <Page title="Machine mapping" titleExtra={summary} actions={actions}>
+    <Page title="Machine mapping" titleExtra={<span className="contents max-sm:hidden">{summary}</span>} actions={actions}>
       {body}
     </Page>
   );

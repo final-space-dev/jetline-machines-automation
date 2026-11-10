@@ -190,13 +190,14 @@ function FilterBar({ allRows, filters, setFilters, onExport }: {
   const set = (key: keyof Filters) => (val: string) => setFilters({ ...filters, [key]: val });
   const options = (all: string, values: string[]) => [{ value: "all", label: all }, ...values.map((v) => ({ value: v, label: v }))];
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input placeholder="Search serial, model, store, group" aria-label="Search" value={filters.search} onChange={(e) => set("search")(e.target.value)} className="w-full sm:w-60" />
-      <Pick aria-label="Store" className="w-36" value={filters.store} onChange={set("store")} options={options("All stores", uniq("store"))} />
-      <Pick aria-label="Group" className="w-36" value={filters.group} onChange={set("group")} options={options("All groups", uniq("company_group"))} />
-      <Pick aria-label="Type" className="w-36" value={filters.type} onChange={set("type")} options={options("All types", uniq("printer_type"))} />
-      <Pick aria-label="Model" className="w-40" value={filters.model} onChange={set("model")} options={options("All models", uniq("model_name"))} />
-      <Button variant="outline" size="sm" className="sm:ml-auto" onClick={onExport}>
+    // A phone gets a tidy two-column grid; wider screens one wrapping row.
+    <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap">
+      <Input placeholder="Search serial, model, store, group" aria-label="Search" value={filters.search} onChange={(e) => set("search")(e.target.value)} className="col-span-2 w-full sm:w-60" />
+      <Pick aria-label="Store" className="w-full sm:w-36" value={filters.store} onChange={set("store")} options={options("All stores", uniq("store"))} />
+      <Pick aria-label="Group" className="w-full sm:w-36" value={filters.group} onChange={set("group")} options={options("All groups", uniq("company_group"))} />
+      <Pick aria-label="Type" className="w-full sm:w-36" value={filters.type} onChange={set("type")} options={options("All types", uniq("printer_type"))} />
+      <Pick aria-label="Model" className="w-full sm:w-40" value={filters.model} onChange={set("model")} options={options("All models", uniq("model_name"))} />
+      <Button variant="outline" size="sm" className="col-span-2 sm:ml-auto" onClick={onExport}>
         <Download /> Export CSV
       </Button>
     </div>
