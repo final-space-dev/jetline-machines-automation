@@ -5,7 +5,8 @@ import { Download } from "lucide-react";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsTrigger } from "@/components/ui/tabs";
+import { TabStrip } from "@/components/machines/tab-strip";
 import { DataTable, type Column } from "@/components/machines/data-table";
 import { Loading } from "@/components/machines/loading";
 import { Page } from "@/components/machines/page";
@@ -458,11 +459,11 @@ export default function MachineReportsPage() {
   return (
     <Page title="Machine Reports">
       <Tabs value={activeTab} onValueChange={switchTab}>
-        <TabsList>
+        <TabStrip>
           {TABS.map((t) => (
             <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
           ))}
-        </TabsList>
+        </TabStrip>
       </Tabs>
       {loading && <Loading />}
       {error && (

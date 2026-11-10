@@ -5,7 +5,8 @@ import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsTrigger } from "@/components/ui/tabs";
+import { TabStrip } from "@/components/machines/tab-strip";
 import { Textarea } from "@/components/ui/textarea";
 import { REQUEST_STATUS, URGENCY_STATUS } from "@/components/equipment/feedback-panel";
 import { Empty } from "@/components/machines/empty";
@@ -125,13 +126,13 @@ export default function ReplacementRequestsPage() {
   return (
     <Page title="Replacement Requests">
       <Tabs value={filter} onValueChange={setFilter}>
-        <TabsList>
+        <TabStrip>
           {FILTERS.map((f) => (
             <TabsTrigger key={f} value={f} className="capitalize">
               {f}{counts[f] ? ` (${counts[f]})` : ""}
             </TabsTrigger>
           ))}
-        </TabsList>
+        </TabStrip>
       </Tabs>
 
       {loading ? (

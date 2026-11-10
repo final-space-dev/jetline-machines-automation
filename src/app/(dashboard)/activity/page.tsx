@@ -155,7 +155,7 @@ export default function ActivityPage() {
           <Pick aria-label="Store" className="w-48" value={store || ALL} onChange={(v) => setStore(v === ALL ? "" : v)} options={STORE_OPTIONS} />
           <DayField value={from} onChange={setFrom} placeholder="From date" className="flex w-52 items-center gap-1.5" />
           <DayField value={to} onChange={setTo} placeholder="To date" className="flex w-52 items-center gap-1.5" />
-          <Segmented label="Filter by type" value={type} onValueChange={(v) => setType(v as TypeFilter)} options={TYPE_BUTTONS} />
+          <Segmented value={type} onValueChange={(v) => setType(v as TypeFilter)} options={TYPE_BUTTONS} />
         </>
       }
     >

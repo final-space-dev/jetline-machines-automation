@@ -20,14 +20,14 @@ export function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn(SURFACE.card, "flex min-h-0 min-w-0 flex-col px-4 pt-3 pb-4", className)}>
+    <section className={cn(SURFACE.card, "flex min-w-0 shrink-0 flex-col px-4 pt-3 pb-4", className)}>
       {(caption || right) && (
         <div className="mb-3 flex flex-none flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
           {caption ? <h2 className={TYPE.microLabel}>{caption}</h2> : <span />}
           {right && <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">{right}</div>}
         </div>
       )}
-      <div className={cn("min-h-0 min-w-0 flex-1", bodyClassName)}>{children}</div>
+      <div className={cn("min-w-0", bodyClassName)}>{children}</div>
     </section>
   );
 }

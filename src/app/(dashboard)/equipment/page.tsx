@@ -150,7 +150,6 @@ function AddEquipmentDialog({
           </Field>
           <Field label="Status">
             <Segmented
-              label="Status"
               value={form.status}
               onValueChange={(v) => set("status", v)}
               options={EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))}
@@ -393,7 +392,7 @@ export default function EquipmentCRMPage() {
       </TileRow>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Segmented label="Group stores" value={view} onValueChange={changeView} options={VIEW_OPTIONS} />
+        <Segmented value={view} onValueChange={changeView} options={VIEW_OPTIONS} />
         <div className="relative w-full sm:w-80">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
           <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search stores" aria-label="Search stores" className="pl-9" />

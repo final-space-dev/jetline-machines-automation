@@ -372,7 +372,6 @@ export default function EquipmentItemPage() {
             </div>
             <Field label="Status">
               <Segmented
-                label="Status"
                 value={form.status ?? ""}
                 onValueChange={(s) => set("status", s)}
                 options={EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))}
@@ -384,10 +383,10 @@ export default function EquipmentItemPage() {
           {/* Condition: every user. */}
           <Panel caption="Condition" bodyClassName="flex flex-col gap-4">
             <Field label="Condition" hint={legacyCondition ? `Legacy notes: ${legacyCondition}` : undefined}>
-              <Segmented label="Condition" value={conditionValue ?? ""} onValueChange={(c) => selectCondition(c as ConditionBucket)} options={CONDITION_BUCKETS.map((c) => ({ value: c, label: c }))} />
+              <Segmented value={conditionValue ?? ""} onValueChange={(c) => selectCondition(c as ConditionBucket)} options={CONDITION_BUCKETS.map((c) => ({ value: c, label: c }))} />
             </Field>
             <Field label="Replace">
-              <Segmented label="Replace" value={currentReplace ?? ""} onValueChange={(r) => selectReplace(r as ReplaceValue)} options={REPLACE_OPTIONS.map((r) => ({ value: r, label: r }))} />
+              <Segmented value={currentReplace ?? ""} onValueChange={(r) => selectReplace(r as ReplaceValue)} options={REPLACE_OPTIONS.map((r) => ({ value: r, label: r }))} />
             </Field>
             <Field label="Notes" htmlFor="item-notes">
               <Textarea id="item-notes" value={notesBody} onChange={(e) => setNotesBody(e.target.value)} placeholder="Comments, faults observed, operator instructions, repair details" rows={4} />
@@ -401,8 +400,8 @@ export default function EquipmentItemPage() {
                 <Field label="Installed" htmlFor="item-installed" hint="When it first entered service.">
                   <DayField id="item-installed" value={form.purchase_date ?? null} onChange={(v) => set("purchase_date", v)} placeholder="First install date" />
                 </Field>
-                <Field label="Age" htmlFor="item-age" hint="Calculated from the install date.">
-                  <Input id="item-age" value={ageFromInstall(form.purchase_date)} readOnly disabled />
+                <Field label="Age" hint="Calculated from the install date.">
+                  <p className="py-1.5 font-medium">{ageFromInstall(form.purchase_date)}</p>
                 </Field>
                 <Field label="Warranty expiry" htmlFor="item-warranty">
                   <DayField id="item-warranty" value={form.warranty_expiry ?? null} onChange={(v) => set("warranty_expiry", v)} placeholder="Select date" />

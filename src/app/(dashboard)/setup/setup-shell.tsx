@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsTrigger } from "@/components/ui/tabs";
+import { TabStrip } from "@/components/machines/tab-strip";
 import { Page } from "@/components/machines/page";
 import { useRole } from "@/lib/use-role";
 import { canConfig } from "@/lib/permissions";
@@ -85,11 +86,11 @@ export function SetupShell({ active }: { active?: string }) {
   return (
     <Page title="Config">
       <Tabs value={activeTab} onValueChange={switchTab}>
-        <TabsList>
+        <TabStrip>
           {visibleTabs.map((t) => (
             <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
           ))}
-        </TabsList>
+        </TabStrip>
       </Tabs>
 
       {activeTab === "stores" && <StoresPanel />}

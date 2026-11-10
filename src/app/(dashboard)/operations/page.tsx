@@ -214,7 +214,7 @@ export default function OperationsPage() {
         <Tile label="Not in BMS" value={crossRef.notInBms} />
       </TileRow>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <Panel caption="Xerox data pipeline" right={<Badge status={pipelineOk ? "success" : "danger"}>{pipelineOk ? "Live" : "Stale"}</Badge>}>
           <KeyValueList
             items={[

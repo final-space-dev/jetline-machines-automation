@@ -10,7 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { TabStrip } from "@/components/machines/tab-strip";
 import { BulkActionBar } from "@/components/equipment/bulk-action-bar";
 import { PhotoButton } from "@/components/equipment/photo-button";
 import { PrintSection } from "@/components/equipment/print-section";
@@ -477,7 +478,7 @@ export default function StoreDetailPage() {
       title={storeName}
       titleExtra={
         completeness && (
-          <Link href={`/stores/${encodeURIComponent(storeName)}/completeness`} title="View data completeness breakdown">
+          <Link href={`/stores/${encodeURIComponent(storeName)}/completeness`} prefetch={false} title="View data completeness breakdown">
             <CompletenessBadge score={completeness.overallScore} />
           </Link>
         )
@@ -522,11 +523,11 @@ export default function StoreDetailPage() {
       </TileRow>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabStrip>
           <TabsTrigger value="equipment">Equipment{items.length > 0 ? ` (${items.length})` : ""}</TabsTrigger>
           <TabsTrigger value="printers">Printers{machines.length > 0 ? ` (${machines.length})` : ""}</TabsTrigger>
           <TabsTrigger value="performance">Printer Performance</TabsTrigger>
-        </TabsList>
+        </TabStrip>
 
         <TabsContent value="equipment" className="flex flex-col gap-3 pt-4">
           <div className="flex flex-wrap items-center gap-2.5">
@@ -542,7 +543,6 @@ export default function StoreDetailPage() {
               options={[{ value: ALL, label: "All Types" }, ...types.map((t) => ({ value: t, label: t }))]}
             />
             <Segmented
-              label="Filter by status"
               value={filterStatus || ALL}
               onValueChange={(v) => setFilterStatus(v === ALL ? "" : v)}
               options={[{ value: ALL, label: "All" }, ...EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))]}

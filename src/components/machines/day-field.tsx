@@ -37,7 +37,7 @@ export function DayField({
   return (
     <div className={className ?? "flex items-center gap-1.5"}>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger render={<Button id={id} variant="outline" disabled={disabled} className="flex-1 justify-start" />}>
+        <PopoverTrigger render={<Button id={id} variant="outline" disabled={disabled} className="h-8 flex-1 justify-start px-2.5 font-normal" />}>
           <CalendarDays />
           {selected ? show(selected) : placeholder}
         </PopoverTrigger>

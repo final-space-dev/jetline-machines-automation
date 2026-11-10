@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { TabStrip } from "@/components/machines/tab-strip";
 import { DataTable, type Column } from "@/components/machines/data-table";
 import { Empty } from "@/components/machines/empty";
 import { Loading } from "@/components/machines/loading";
@@ -181,6 +182,7 @@ function LeaderRow({ rank, row }: { rank: number; row: DataQualityRow }) {
   return (
     <Link
       href={`/stores/${encodeURIComponent(row.store)}/completeness`}
+      prefetch={false}
       className="flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none hover:bg-muted focus-visible:bg-muted"
     >
       <span className={cn(TYPE.micro, "w-4 shrink-0 text-right font-semibold text-muted-foreground tabular-nums")}>{rank}</span>
@@ -295,12 +297,12 @@ export default function FleetHealthPage() {
 
       <Panel caption="Needs attention">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
+          <TabStrip>
             <TabsTrigger value="poorCondition">Poor Condition <Badge variant="secondary">{ai.poorCondition.length}</Badge></TabsTrigger>
             <TabsTrigger value="serviceOverdue">Service Overdue <Badge variant="secondary">{ai.serviceOverdue.length}</Badge></TabsTrigger>
             <TabsTrigger value="replaceFlagged">Replace Flagged <Badge variant="secondary">{ai.replaceFlagged.length}</Badge></TabsTrigger>
             <TabsTrigger value="contractsExpiring">Contracts Expiring <Badge variant="secondary">{ai.contractsExpiring.length}</Badge></TabsTrigger>
-          </TabsList>
+          </TabStrip>
           <TabsContent value="poorCondition" className="pt-3">
             <DataTable columns={POOR_COLUMNS} rows={ai.poorCondition} rowKey={(r) => `eq-${r.id}`} empty={NOTHING} pageSize={25} card={false} />
           </TabsContent>

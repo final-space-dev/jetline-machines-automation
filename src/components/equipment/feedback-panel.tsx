@@ -183,7 +183,7 @@ export function FeedbackPanel({ type, refId }: { type: EntityType; refId: string
             </Field>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <Field label="Urgency">
-                <Segmented label="Urgency" value={urgency} onValueChange={(v) => setUrgency(v as "low" | "medium" | "high")} options={URGENCIES} />
+                <Segmented value={urgency} onValueChange={(v) => setUrgency(v as "low" | "medium" | "high")} options={URGENCIES} />
               </Field>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => { setShowReqForm(false); setError(null); }} disabled={submittingReq}>Cancel</Button>

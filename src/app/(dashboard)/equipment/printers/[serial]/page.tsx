@@ -298,7 +298,7 @@ export default function PrinterDetailPage() {
           <Panel caption="Condition" bodyClassName="flex flex-col gap-4">
             <Field label="Condition">
               <div className="flex flex-wrap items-center gap-2">
-                <Segmented label="Condition" value={feedback.condition ?? ""} onValueChange={(v) => setF("condition", v)} options={CONDITION_OPTIONS} />
+                <Segmented value={feedback.condition ?? ""} onValueChange={(v) => setF("condition", v)} options={CONDITION_OPTIONS} />
                 {feedback.condition && (
                   <Button variant="ghost" size="sm" onClick={() => setF("condition", null)}>
                     <X /> Clear
@@ -327,8 +327,8 @@ export default function PrinterDetailPage() {
                 <Field label="Latest Install Date" htmlFor="printer-install" hint="Install at its current store (may be recent).">
                   <DayField id="printer-install" value={feedback.install_date ?? null} onChange={(v) => setF("install_date", v)} placeholder="Install at current store" />
                 </Field>
-                <Field label="Age" htmlFor="printer-age" hint="Calculated from the original install date.">
-                  <Input id="printer-age" value={ageFromDate(feedback.original_install_date)} readOnly disabled />
+                <Field label="Age" hint="Calculated from the original install date.">
+                  <p className="py-1.5 font-medium">{ageFromDate(feedback.original_install_date)}</p>
                 </Field>
                 <Field label="Contract End" htmlFor="printer-contract">
                   <DayField id="printer-contract" value={feedback.contract_end ?? null} onChange={(v) => setF("contract_end", v)} placeholder="Select date" />
@@ -361,7 +361,7 @@ export default function PrinterDetailPage() {
           {history.length > 1 && (
             <Panel
               caption="Volume history"
-              right={<Segmented label="Counter" value={counter} onValueChange={(v) => setCounter(v as CounterKey)} options={COUNTER_TYPES.map((ct) => ({ value: ct.key, label: ct.label }))} />}
+              right={<Segmented value={counter} onValueChange={(v) => setCounter(v as CounterKey)} options={COUNTER_TYPES.map((ct) => ({ value: ct.key, label: ct.label }))} />}
               bodyClassName="flex flex-col gap-4"
             >
               <Bars

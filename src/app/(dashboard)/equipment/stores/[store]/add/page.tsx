@@ -84,7 +84,7 @@ export default function AddEquipmentPage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Status" className="sm:col-span-2">
-              <Segmented label="Status" value={status} onValueChange={(v) => setStatus(v as EquipmentStatus)} options={EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))} />
+              <Segmented value={status} onValueChange={(v) => setStatus(v as EquipmentStatus)} options={EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))} />
             </Field>
             <Field label="Condition" htmlFor="eq-condition">
               <Pick id="eq-condition" value={condition} onChange={setCondition} options={CONDITION_OPTIONS} />
