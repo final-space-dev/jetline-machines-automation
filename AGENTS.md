@@ -7,11 +7,15 @@ requests. Next.js on Vercel, Postgres on Neon, Prisma, next-auth.
 ## The three laws
 
 1. **Work on the `dev` branch only.** Production is deployed by hand, by
-   Alwyn's say-so, from the branch production runs. An agent never deploys to
-   Vercel Production (`vercel --prod`, `vercel promote`, `vercel rollback`),
-   never changes a Production variable, domain or project setting, and never
-   points anything it runs at the production database. Dev has its own
-   database and its own address: `docs/DEV-ENVIRONMENT.md`.
+   Alwyn's say-so, from the branch production runs. An agent never runs a
+   Vercel deploy command by hand (`vercel deploy`, `vercel --prod`,
+   `vercel promote`, `vercel rollback`): from this checkout they act on
+   production's project. The only deploy an agent runs is
+   `scripts/deploy-dev.sh`, which can reach the dev project and nothing else.
+   An agent never changes a variable, domain or setting of the Vercel project
+   `jetline-machines`, and never points anything it runs at the production
+   database. Dev has its own Vercel project, database and address:
+   `docs/DEV-ENVIRONMENT.md`.
 2. **The kit is never edited.** The interface is built from the Jetline kit
    pulled from Archon into `src/components/ui/`, `src/lib/ui/` and
    `src/app/jetline-theme.css`. Those are not changed here. What the kit lacks

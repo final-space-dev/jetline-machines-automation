@@ -9,74 +9,91 @@ is not touched by anything on this page.
 | | Production | Dev |
 |---|---|---|
 | Address | https://fleet.jetline.co.za | https://jetline-machines-dev.vercel.app |
-| Vercel environment | Production | Preview |
-| Git branch | `flatten-to-root` (deployed by hand with the CLI) | `dev` |
+| Vercel project | `jetline-machines` | `jetline-machines-dev` (a separate project) |
+| Git branch | `flatten-to-root` (deployed by hand with the CLI) | `dev` (deployed by `scripts/deploy-dev.sh`) |
 | Database | Neon project `jetline-machines-database`, branch `main` | The same Neon project, branch `dev` |
 | Mark on screen | none | **DEV** beside the name in the menu, on the phone bar and on the sign-in page |
 
-The Vercel project is `jetline-machines` in the FinalSpace team. The Neon
-project is in the FinalSpace Neon organisation, region eu-central-1.
+Both Vercel projects are in the FinalSpace team. The Neon project is in the
+FinalSpace Neon organisation, region eu-central-1.
+
+### Why dev is its own Vercel project
+
+The plan was a Preview deployment of `dev` inside `jetline-machines`. That
+cannot work today: every new Preview deployment of `jetline-machines` stops
+before the build with "Resource provisioning timed out". The step that hangs
+is the Neon integration connected to that project, which is asked to prepare
+a database for each preview and never answers (five attempts on 10 November
+2026, from git pushes and from the CLI; the last preview that worked was on
+2 November). So the dev copy is a separate project with no integrations:
+nothing in it can touch production, and nothing in production's project can
+break it.
 
 ## Opening it
 
-The dev address sits behind Vercel's deployment protection: Vercel asks you
-to sign in to Vercel before it shows the page. On the iPad, sign in to Vercel
-once in Safari and the address opens from then on. Anything that probes it
-without signing in (Archon's check, `curl`) gets `401`; that answer means the
+The dev address is behind Vercel's deployment protection, set to cover every
+address of the dev project: Vercel asks you to sign in to Vercel before it
+shows the page. On the iPad, sign in to Vercel once in Safari and the address
+opens from then on. Anything that asks without signing in (Archon's check,
+`curl`) is redirected to Vercel's sign-in (`302`); that answer means the
 deployment is up and protected, not that it is down.
 
-Sign in to Machines itself with a dev account. The dev database is a copy of
-production's, so production's staff accounts exist there with the passwords
+Then sign in to Machines itself with a dev account. The dev database is a
+copy of production's, so production's accounts exist there with the passwords
 they had when the copy was taken. Two accounts exist only on dev:
 `dev-admin@jetline.local` (admin) and `dev-store@jetline.local` (store staff,
-Alberton). Their password is not written down anywhere in git; reset it with
-`scripts/seed-users.ts` against the dev database when needed (see below).
+Alberton). Their password is not written down anywhere in git; make the
+accounts again with a new one when needed (see "A local copy on the dev
+database").
 
 ## Deploying dev
-
-Dev is deployed with the CLI, from a checkout of `dev`:
 
 ```
 git checkout dev && git pull
 scripts/deploy-dev.sh
 ```
 
-The script refuses to run on any other branch or with uncommitted changes,
-makes a **Preview** deployment (`vercel deploy --target=preview`, never
-`--prod`), and points `jetline-machines-dev.vercel.app` at it. A push to
-`dev` does not deploy by itself: this project's deployments are made by the
-CLI.
+The script refuses to run on any other branch or with uncommitted changes. It
+names the dev project by id, checks that the id still belongs to a project
+called `jetline-machines-dev`, makes a **Preview** deployment of it and points
+`jetline-machines-dev.vercel.app` at that deployment. It contains no
+production deploy flag.
+
+A push to `dev` deploys nothing. `vercel.json` switches off git deployments
+for `dev` and `ui/archon-kit`, because a push would otherwise start a preview
+in production's project that fails at the Neon step.
+
+Run by hand from this checkout, `vercel` acts on the project the checkout is
+linked to, which is production's. Do not run `vercel deploy`, `vercel --prod`,
+`vercel promote` or `vercel rollback` by hand here. The script is the only
+deploy an agent runs.
 
 ## Variables
 
-Dev's variables are Vercel **Preview** variables scoped to the git branch
-`dev`. Names only; values are never written here or anywhere in git.
+Dev's variables live on the project `jetline-machines-dev`. Names only; values
+are never written here or anywhere in git.
 
-| Name | Scope | What it is |
-|---|---|---|
-| `DATABASE_URL` | Preview, branch `dev` | The pooled address of the Neon branch `dev` |
-| `AUTH_SECRET` | Preview, branch `dev` | next-auth's signing secret, dev's own (a production session is not valid on dev) |
-| `CRON_SECRET` | Preview, branch `dev` | Dev's own |
+| Name | What it is |
+|---|---|
+| `DATABASE_URL` | The pooled address of the Neon branch `dev` |
+| `AUTH_SECRET` | next-auth's signing secret, dev's own (a production session is not valid on dev) |
+| `CRON_SECRET` | Dev's own |
+| `JL_ENVIRONMENT` | `dev`. Turns on the DEV mark and makes photos read-only (`src/lib/environment.ts`) |
 
-Production's `DATABASE_URL` is a Production-only variable, so a Preview
-deployment of any other branch has no database address at all and fails
-rather than reaching production data.
+Each is set for the dev project's Preview environment, which is what the
+script deploys, and for its Production environment in case Vercel ever treats
+a deployment of the dev project as its production one (it did so for the very
+first deployment of the new project).
 
-To add or change one (the value is typed at the prompt or piped in, never put
-on the command line):
+To change one, name the project explicitly so the command cannot land on
+production's project (the value is typed at the prompt, never put on the
+command line):
 
 ```
-vercel env add NAME preview dev --sensitive
+VERCEL_ORG_ID=team_rdzvPFmt6vykW9Fg69BxJNi0 VERCEL_PROJECT_ID=prj_v9CCDtNAkX7ACQegeOpg3DuOurxk vercel env add NAME preview --sensitive
 ```
 
-Never `vercel env add … production`, never `vercel env rm` on anything that
-includes Production.
-
-Variables that came with the Neon and Blob integrations (`POSTGRES_*`,
-`PG*`, `DATABASE_URL_UNPOOLED`, `BLOB_STORE_ID` and others) are set for
-Preview and Production together and point at production. The code reads none
-of the database ones (it reads only `DATABASE_URL`). The photo store is the
-exception: see "What dev may not do".
+Never add, change or remove a variable on `jetline-machines`.
 
 ## The dev database
 
@@ -110,8 +127,9 @@ Check before starting that `DATABASE_URL` in `.env.local` is the dev branch
 (its host begins `ep-bold-sun`), not production. Stop the server when done;
 this laptop is short of memory.
 
-To make or reset the dev-only admin (the script creates the account, or
-leaves an existing one's password alone):
+To make the dev-only admin (the script creates the account; it does not
+change the password of one that exists, so remove the account in Config →
+Users first if it is there):
 
 ```
 SEED_ADMIN_EMAIL=dev-admin@jetline.local SEED_ADMIN_NAME="Dev Admin" SEED_ADMIN_PASSWORD='<a new password>' npx tsx scripts/seed-users.ts
@@ -119,11 +137,12 @@ SEED_ADMIN_EMAIL=dev-admin@jetline.local SEED_ADMIN_NAME="Dev Admin" SEED_ADMIN_
 
 ## What dev may not do
 
-- **Photos are read-only on dev.** Dev reaches the same private photo store
-  as production, and its database copy holds the same photo addresses. The
-  upload and delete routes refuse on any Vercel deployment that is not
-  Production (`src/app/api/equipment/items/[id]/photos/route.ts`), so a click
-  on dev cannot remove a photo production shows. Photos still display.
+- **Photos are read-only on dev, and do not display.** The dev database copy
+  holds the addresses of production's photos. The upload and delete routes
+  refuse on the dev copy and on any preview
+  (`src/app/api/equipment/items/[id]/photos/route.ts`), so a click on dev can
+  never remove a photo production shows. The dev project is not connected to
+  the photo store at all, so photos show as broken images there.
 - **BMS sync does nothing on dev.** The BMS databases are on the stores'
   private network, which Vercel cannot reach. The sync button fails; that is
   expected.
@@ -133,20 +152,38 @@ SEED_ADMIN_EMAIL=dev-admin@jetline.local SEED_ADMIN_NAME="Dev Admin" SEED_ADMIN_
 
 Production is Alwyn's call, each time:
 
-1. The change is on `dev`, `npm run gate` passes, and it has been looked at on
-   the dev address.
+1. The change is on `dev`, `npm run gate` passes, it is deployed with
+   `scripts/deploy-dev.sh` and it has been looked at on the dev address.
 2. Alwyn says to release.
 3. `dev` is merged into the branch production is deployed from
    (`flatten-to-root`) and that branch is deployed to Production by hand.
 
-An agent does steps 1 only.
+An agent does step 1 only.
 
 ## Known gaps (10 November 2026)
 
-- Vercel's own "production branch" setting for this project is `main`, which
+- **Previews of `jetline-machines` are broken** ("Resource provisioning timed
+  out" at the Neon integration step, see above). It is not known whether a
+  production deployment of `jetline-machines` runs the same step. If the next
+  production deploy hangs the same way, the fix is in the Neon integration's
+  connection to the project (Vercel dashboard, Storage), not in the code.
+  Production itself keeps running on its last deployment either way.
+- **Leftovers in `jetline-machines` from the first attempt**: three Preview
+  variables scoped to the branch `dev` (`DATABASE_URL`, `AUTH_SECRET`,
+  `CRON_SECRET`; they point at the dev database and nothing uses them) and
+  five failed preview deployments of 10 November. They can be removed in the
+  dashboard; an agent leaves production's project alone.
+- **Leftovers in `jetline-machines-dev`**: its very first deployment was made
+  its Production deployment by Vercel and was built before the variables
+  existed, so it does not work. It sits at
+  `jetline-machines-dev-finalspace-alwyns-projects.vercel.app`; the dev
+  address does not point at it. A deployment-protection bypass token exists on
+  the dev project (the CLI made it when `vercel curl` was used to test the
+  sign-in). Both can be removed in the dashboard.
+- Vercel's "production branch" setting for `jetline-machines` is `main`, which
   is far behind what production actually runs (`flatten-to-root`, deployed by
-  the CLI). A push to `main` could deploy old code to production if the git
-  integration is ever switched on. Decide which branch is production and make
+  the CLI), and git deployments are switched on. A push to `main` would try to
+  deploy old code to production. Decide which branch is production and make
   the setting agree.
 - `src/lib/bms/connection.ts` has a default database user and password
   written in the code. They should come from variables only.
@@ -157,3 +194,6 @@ An agent does steps 1 only.
 - The completeness badge on a store and the rows of the completeness
   leaderboard link to `/stores/<store>/completeness`, a page that does not
   exist. It did not exist before the UI work either.
+- The store analysis page (`/stores/[id]`) gets a 500 from
+  `/api/machines/utilization` on the dev database and shows the store without
+  utilisation figures. Not caused by the UI work.
