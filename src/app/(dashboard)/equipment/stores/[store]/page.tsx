@@ -3,22 +3,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AppShell } from "@/components/layout/app-shell";
-import { toast } from "sonner";
-import {
-  Package, Printer, Plus, Search, Save, ChevronRight, Check,
-} from "lucide-react";
-import {
-  EQUIPMENT_STATUSES, STATUS_CONFIG, classifyCondition,
-  CONDITION_CONFIG, type EquipmentStatus, type ConditionBucket,
-} from "@/lib/equipment-utils";
-import { JlSelect } from "@/components/ui/jl-select";
-import { getStoreGroup, STORE_GROUPS } from "@/lib/store-groups";
-import { useRole } from "@/lib/use-role";
+import { Package, Plus, Save, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BulkActionBar } from "@/components/equipment/bulk-action-bar";
-import { PrintSection } from "@/components/equipment/print-section";
-import { CompletenessBadge, completenessColors } from "@/components/equipment/completeness-badge";
 import { PhotoButton } from "@/components/equipment/photo-button";
+import { PrintSection } from "@/components/equipment/print-section";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Field } from "@/components/machines/field";
+import { LinkButton } from "@/components/machines/link-button";
+import { Loading } from "@/components/machines/loading";
+import { ConditionBar } from "@/components/machines/mix-bar";
+import { Page } from "@/components/machines/page";
+import { Muted, Panel } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
+import { CompletenessBadge, ConditionBadge, EQUIPMENT_STATUS_LABEL, EquipmentStatusBadge } from "@/components/machines/status-badge";
+import { Tile, TileRow } from "@/components/machines/tile";
+import { EQUIPMENT_STATUSES, classifyCondition, type ConditionBucket, type EquipmentStatus } from "@/lib/equipment-utils";
+import { getStoreGroup, STORE_GROUPS } from "@/lib/store-groups";
+import { toast } from "@/lib/toast";
+import { GRID } from "@/lib/ui/ui-tokens";
+import { useRole } from "@/lib/use-role";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,74 +99,12 @@ interface Completeness {
   printerBreakdown: { serial: string; score: number; missing: string[] }[];
 }
 
-// Condition → jl-badge modifier.
-const CONDITION_BADGE: Record<ConditionBucket, string> = {
-  good: "jl-badge--green",
-  fair: "jl-badge--amber",
-  poor: "jl-badge--red",
-  unknown: "",
-};
-
-// Status → jl-badge modifier.
-const STATUS_BADGE: Record<EquipmentStatus, string> = {
-  active: "jl-badge--green",
-  inactive: "",
-  disposed: "jl-badge--red",
-  transferred: "jl-badge--blue",
-};
-
 // All store names (from the group hierarchy) for the bulk reassign dropdown.
 const ALL_STORE_NAMES = [...STORE_GROUPS.map((e) => e.store)].sort();
 
-// ─── Kit checkbox ──────────────────────────────────────────────────────────────
+const ALL = "__all__";
 
-function JlCheck({
-  checked, indeterminate, onChange, label,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <label className="jl-check" onClick={(e) => e.stopPropagation()}>
-      <input
-        type="checkbox"
-        aria-label={label}
-        checked={checked}
-        ref={(el) => { if (el) el.indeterminate = !!indeterminate && !checked; }}
-        onChange={onChange}
-        onClick={(e) => e.stopPropagation()}
-      />
-      <span className="box">
-        <Check />
-      </span>
-    </label>
-  );
-}
-
-// ─── Health bar ────────────────────────────────────────────────────────────────
-
-function HealthBar({ items }: { items: EquipmentItem[] }) {
-  const counts: Record<ConditionBucket, number> = { good: 0, fair: 0, poor: 0, unknown: 0 };
-  for (const it of items) counts[classifyCondition(it.condition)]++;
-  const total = items.length || 1;
-  const segs: { bucket: ConditionBucket; color: string }[] = [
-    { bucket: "good", color: "var(--green-500)" },
-    { bucket: "fair", color: "var(--amber-500)" },
-    { bucket: "poor", color: "var(--red-500)" },
-    { bucket: "unknown", color: "var(--ink-200)" },
-  ];
-  return (
-    <div className="jl-health-bar" style={{ display: "flex", height: 8, borderRadius: "var(--r-pill)", overflow: "hidden", width: 160, background: "var(--ink-100)" }}>
-      {segs.map((s) =>
-        counts[s.bucket] > 0 ? (
-          <div key={s.bucket} title={`${CONDITION_CONFIG[s.bucket].label}: ${counts[s.bucket]}`} style={{ width: `${(counts[s.bucket] / total) * 100}%`, background: s.color }} />
-        ) : null
-      )}
-    </div>
-  );
-}
+const day = (iso: string, year: "numeric" | "2-digit" = "2-digit") => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year });
 
 // ─── Relative time ──────────────────────────────────────────────────────────────
 
@@ -203,8 +151,8 @@ export default function StoreDetailPage() {
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
-  // Store page tabs — keeps the page calm: one thing at a time.
-  const [tab, setTab] = useState<"equipment" | "printers" | "performance">("equipment");
+  // Store page tabs: one thing at a time keeps the page calm.
+  const [tab, setTab] = useState("equipment");
 
   // Multi-select (admin only). Tracked by item id so selection survives filter changes.
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -398,161 +346,213 @@ export default function StoreDetailPage() {
     ? [identity.storeGroup, identity.mainGroup, identity.holdingGroup].filter(Boolean)
     : [];
 
-  // Base 6 columns + optional leading checkbox column for admins.
-  const EQ_COLS = isAdmin ? 7 : 6;
+  const conditionCounts = useMemo(() => {
+    const counts: Record<ConditionBucket, number> = { good: 0, fair: 0, poor: 0, unknown: 0 };
+    for (const it of items) counts[classifyCondition(it.condition)]++;
+    return counts;
+  }, [items]);
+
+  // ─── Columns ───────────────────────────────────────────────────────────────
+
+  const equipmentColumns: Column<EquipmentItem>[] = [
+    ...(isAdmin
+      ? [{
+          key: "select",
+          width: "w-11",
+          label: (
+            <Checkbox
+              aria-label="Select all visible equipment"
+              checked={allVisibleSelected}
+              indeterminate={someVisibleSelected && !allVisibleSelected}
+              onCheckedChange={toggleAllVisible}
+            />
+          ),
+          cell: (item: EquipmentItem) => (
+            // The row opens the item: ticking it must not.
+            <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+              <Checkbox aria-label={`Select ${item.machine_type}`} checked={selected.has(item.id)} onCheckedChange={() => toggleOne(item.id)} />
+            </span>
+          ),
+        } satisfies Column<EquipmentItem>]
+      : []),
+    {
+      key: "type",
+      label: "Type",
+      sortValue: (item) => item.machine_type,
+      cell: (item) => (
+        <span className="inline-flex items-center gap-2.5 font-medium">
+          {item.photos && item.photos.length > 0 ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`/api/equipment/items/${item.id}/photos/view?i=0`} alt="" className="size-8 shrink-0 rounded-lg bg-muted object-cover" />
+          ) : (
+            <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-faint">
+              <Package className="size-4" />
+            </span>
+          )}
+          {item.machine_type}
+        </span>
+      ),
+    },
+    {
+      key: "model",
+      label: "Make / Model",
+      sortValue: (item) => item.make_model ?? "",
+      cell: (item) => item.make_model ?? <Muted>Not set</Muted>,
+    },
+    {
+      key: "serial",
+      label: "Serial",
+      hideBelow: "md",
+      sortValue: (item) => item.serial ?? "",
+      cell: (item) => (item.serial ? <span className="tabular-nums">{item.serial}</span> : <Muted>Not set</Muted>),
+    },
+    {
+      key: "condition",
+      label: "Condition",
+      hideBelow: "sm",
+      sortValue: (item) => classifyCondition(item.condition),
+      cell: (item) => <ConditionBadge condition={item.condition} />,
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortValue: (item) => item.status ?? "active",
+      cell: (item) => <EquipmentStatusBadge status={item.status} />,
+    },
+    {
+      key: "photos",
+      label: "Photos",
+      hideBelow: "md",
+      cell: (item) => <PhotoButton itemId={item.id} initialPhotos={item.photos} canEdit={isAdmin} />,
+    },
+  ];
+
+  const printerColumns: Column<Machine>[] = [
+    { key: "serial", label: "Serial", sortValue: (m) => m.serial_number, cell: (m) => <span className="tabular-nums">{m.serial_number}</span> },
+    { key: "model", label: "Model", sortValue: (m) => m.model_name ?? "", cell: (m) => (m.model_name ? <span className="font-medium">{m.model_name}</span> : <Muted>Not set</Muted>) },
+    { key: "type", label: "Type", hideBelow: "md", sortValue: (m) => m.printer_type ?? "", cell: (m) => m.printer_type ?? <Muted>Not set</Muted> },
+    {
+      key: "age",
+      label: "Age",
+      sortValue: (m) => (m.original_install_date ? -new Date(m.original_install_date).getTime() : 0),
+      cell: (m) => (
+        <span className="font-medium" title={m.original_install_date ? `Original install ${day(m.original_install_date, "numeric")}` : "No original install date"}>
+          {ageYears(m.original_install_date)}
+        </span>
+      ),
+    },
+    {
+      key: "installed",
+      label: "Installed",
+      hideBelow: "lg",
+      sortValue: (m) => (m.install_date ? new Date(m.install_date).getTime() : 0),
+      cell: (m) => <span title="Latest install (current store)">{m.install_date ? day(m.install_date) : <Muted>Not set</Muted>}</span>,
+    },
+    {
+      key: "balance",
+      label: "Balance",
+      align: "right",
+      hideBelow: "sm",
+      sortValue: (m) => (m.latest_balance != null ? Number(m.latest_balance) : -1),
+      cell: (m) => {
+        const balance = m.latest_balance != null ? Number(m.latest_balance) : null;
+        return (
+          <span className={GRID.num} title={m.latest_balance_date ? `as at ${day(m.latest_balance_date, "numeric")}` : undefined}>
+            {balance != null ? balance.toLocaleString("en-ZA") : <Muted>—</Muted>}
+          </span>
+        );
+      },
+    },
+    {
+      key: "seen",
+      label: "Last Seen",
+      hideBelow: "md",
+      sortValue: (m) => (m.last_seen ? new Date(m.last_seen).getTime() : 0),
+      cell: (m) => (m.last_seen ? day(m.last_seen) : "Never"),
+    },
+  ];
 
   return (
-    <AppShell>
-      {/* Sticky top bar */}
-      <div
-        className="jl-page-pad"
-        style={{
-          position: "sticky", top: 0, zIndex: 30,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          // height matches the top header (64px) so the two bars read as one band.
-          gap: 12, height: 64, padding: "0 40px", background: "var(--surface)", boxShadow: "var(--sh-sm)",
-        }}
-      >
-        <nav className="jl-breadcrumb">
-          <Link href="/equipment">Stores</Link>
-          <span className="sep">/</span>
-          <span className="current">{storeName}</span>
-        </nav>
-        {dirty && (
-          <button
-            onClick={saveIdentity}
-            disabled={saving}
-            className="jl-btn jl-btn--primary jl-btn--sm jl-touch-btn"
-            data-loading={saving ? "" : undefined}
-          >
-            <Save /> Save
-          </button>
+    <Page
+      title={storeName}
+      titleExtra={
+        completeness && (
+          <Link href={`/stores/${encodeURIComponent(storeName)}/completeness`} title="View data completeness breakdown">
+            <CompletenessBadge score={completeness.overallScore} />
+          </Link>
+        )
+      }
+      crumbs={isAdmin ? [{ label: "Stores", href: "/equipment" }, { label: storeName }] : undefined}
+      actions={
+        dirty && (
+          <Button onClick={saveIdentity} disabled={saving}>
+            {saving ? <Spinner /> : <Save />} Save
+          </Button>
+        )
+      }
+    >
+      <Panel caption="Store details" right={groupChips.map((g) => <Badge key={g} variant="secondary">{g}</Badge>)}>
+        {identity && (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Field label="Address" htmlFor="store-address">
+              <Input id="store-address" value={identity.address} onChange={(e) => setField("address", e.target.value)} placeholder="Store address" />
+            </Field>
+            <Field label="Phone" htmlFor="store-phone">
+              <Input id="store-phone" value={identity.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="Contact number" />
+            </Field>
+            <Field label="Manager Name" htmlFor="store-manager">
+              <Input id="store-manager" value={identity.managerName} onChange={(e) => setField("managerName", e.target.value)} placeholder="Manager" />
+            </Field>
+            <Field label="Manager Email" htmlFor="store-email">
+              <Input id="store-email" type="email" value={identity.managerEmail} onChange={(e) => setField("managerEmail", e.target.value)} placeholder="name@jetline.co.za" />
+            </Field>
+          </div>
         )}
-      </div>
+      </Panel>
 
-      <div className="jl-page-pad" style={{ padding: "28px 40px 60px" }}>
-        {/* Identity card */}
-        <div className="jl-card" style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <h1 className="jl-h1">{storeName}</h1>
-            {completeness && (
-              <Link href={`/stores/${encodeURIComponent(storeName)}/completeness`} title="View data completeness breakdown">
-                <CompletenessBadge score={completeness.overallScore} size="md" />
-              </Link>
-            )}
-          </div>
-          {groupChips.length > 0 && (
-            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {groupChips.map((g) => (
-                <span key={g} className="jl-badge">{g}</span>
-              ))}
-            </div>
-          )}
+      <TileRow>
+        <Tile label="Equipment" value={items.length} />
+        <Tile label="Active Printers" value={activePrinters} />
+        <Tile
+          label="Condition"
+          value={items.length > 0 ? `${conditionCounts.good} good` : "—"}
+          prior={items.length > 0 ? <ConditionBar {...conditionCounts} className="mt-1" /> : undefined}
+        />
+        <Tile label="Last Updated" value={relTime(lastUpdated)} />
+      </TileRow>
 
-          {identity && (
-            <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-              <div className="jl-field">
-                <label>Address</label>
-                <input className="jl-input" value={identity.address} onChange={(e) => setField("address", e.target.value)} placeholder="Store address…" />
-              </div>
-              <div className="jl-field">
-                <label>Phone</label>
-                <input className="jl-input" value={identity.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="Contact number…" />
-              </div>
-              <div className="jl-field">
-                <label>Manager Name</label>
-                <input className="jl-input" value={identity.managerName} onChange={(e) => setField("managerName", e.target.value)} placeholder="Manager…" />
-              </div>
-              <div className="jl-field">
-                <label>Manager Email</label>
-                <input className="jl-input" type="email" value={identity.managerEmail} onChange={(e) => setField("managerEmail", e.target.value)} placeholder="name@jetline.co.za" />
-              </div>
-            </div>
-          )}
-        </div>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="equipment">Equipment{items.length > 0 ? ` (${items.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="printers">Printers{machines.length > 0 ? ` (${machines.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="performance">Printer Performance</TabsTrigger>
+        </TabsList>
 
-        {/* Summary KPI strip */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
-          <div className="jl-kpi">
-            <div className="jl-kpi__top">
-              <span className="jl-kpi__label">Equipment</span>
-              <span className="jl-chip jl-chip--sm jl-chip--neutral"><Package /></span>
+        <TabsContent value="equipment" className="flex flex-col gap-3 pt-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
+              <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search equipment" aria-label="Search equipment" className="pl-9" />
             </div>
-            <div className="jl-kpi__value">{items.length}</div>
-          </div>
-          <div className="jl-kpi">
-            <div className="jl-kpi__top">
-              <span className="jl-kpi__label">Active Printers</span>
-              <span className="jl-chip jl-chip--sm jl-chip--neutral"><Printer /></span>
-            </div>
-            <div className="jl-kpi__value">{activePrinters}</div>
-          </div>
-          <div className="jl-kpi">
-            <div className="jl-kpi__top">
-              <span className="jl-kpi__label">Condition</span>
-            </div>
-            <HealthBar items={items} />
-          </div>
-          <div className="jl-kpi">
-            <div className="jl-kpi__top">
-              <span className="jl-kpi__label">Last Updated</span>
-            </div>
-            <div className="jl-kpi__value" style={{ fontSize: 20 }}>{relTime(lastUpdated)}</div>
-          </div>
-        </div>
-
-        {/* Tabs — Equipment · Printers · Printer Performance. One at a time keeps
-            the page uncluttered. */}
-        <div className="jl-tabs" role="tablist" style={{ marginBottom: 20 }}>
-          <button type="button" role="tab" aria-selected={tab === "equipment"} onClick={() => setTab("equipment")}>
-            Equipment{items.length > 0 ? ` (${items.length})` : ""}
-          </button>
-          <button type="button" role="tab" aria-selected={tab === "printers"} onClick={() => setTab("printers")}>
-            Printers{machines.length > 0 ? ` (${machines.length})` : ""}
-          </button>
-          <button type="button" role="tab" aria-selected={tab === "performance"} onClick={() => setTab("performance")}>
-            Printer Performance
-          </button>
-        </div>
-
-        {/* Equipment tab */}
-        {tab === "equipment" && (
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-            <div className="jl-search" style={{ flex: "1 1 180px", maxWidth: 260 }}>
-              <Search />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search equipment…" />
-            </div>
-            <JlSelect
-              value={filterType}
-              onChange={setFilterType}
-              placeholder="All Types"
-              style={{ width: 170 }}
-              options={[{ value: "", label: "All Types" }, ...types.map((t) => ({ value: t, label: t }))]}
+            <Pick
+              aria-label="Filter by type"
+              className="w-44"
+              value={filterType || ALL}
+              onChange={(v) => setFilterType(v === ALL ? "" : v)}
+              options={[{ value: ALL, label: "All Types" }, ...types.map((t) => ({ value: t, label: t }))]}
             />
-            <div className="jl-segment" role="tablist" aria-label="Filter by status">
-              <button type="button" role="tab" aria-selected={filterStatus === ""} onClick={() => setFilterStatus("")} className="jl-touch-toggle">
-                All
-              </button>
-              {EQUIPMENT_STATUSES.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  role="tab"
-                  aria-selected={filterStatus === s}
-                  onClick={() => setFilterStatus(filterStatus === s ? "" : s)}
-                  className="jl-touch-toggle"
-                >
-                  {STATUS_CONFIG[s].label}
-                </button>
-              ))}
-            </div>
-            <Link href={addHref} className="jl-btn jl-btn--primary jl-touch-btn" style={{ marginLeft: "auto" }}>
+            <Segmented
+              label="Filter by status"
+              value={filterStatus || ALL}
+              onValueChange={(v) => setFilterStatus(v === ALL ? "" : v)}
+              options={[{ value: ALL, label: "All" }, ...EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))]}
+            />
+            <LinkButton href={addHref} className="sm:ml-auto">
               <Plus /> Add Equipment
-            </Link>
+            </LinkButton>
           </div>
 
-          {/* Bulk action bar — admins only, when at least one item is selected */}
+          {/* Bulk actions: admins only, while at least one item is selected. */}
           {isAdmin && selectedIds.length > 0 && (
             <BulkActionBar
               selectedIds={selectedIds}
@@ -562,204 +562,39 @@ export default function StoreDetailPage() {
             />
           )}
 
-          <div className="jl-table-wrap">
-            {/* Desktop: table. Mobile: card stack (below). */}
-            <div className="jl-table-desktop" style={{ overflowX: "auto" }}>
-              <table className="jl-table">
-                <thead>
-                  <tr>
-                    {isAdmin && (
-                      <th style={{ width: 44 }}>
-                        <JlCheck
-                          checked={allVisibleSelected}
-                          indeterminate={someVisibleSelected}
-                          onChange={toggleAllVisible}
-                          label="Select all visible equipment"
-                        />
-                      </th>
-                    )}
-                    <th>Type</th>
-                    <th>Make / Model</th>
-                    <th>Serial</th>
-                    <th>Condition</th>
-                    <th>Status</th>
-                    <th style={{ width: 64, textAlign: "center" }}>Photos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={EQ_COLS} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
-                  ) : filtered.length === 0 ? (
-                    <tr><td colSpan={EQ_COLS} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>
-                      {items.length === 0 ? "No equipment recorded yet" : "No results match your filters"}
-                    </td></tr>
-                  ) : (
-                    filtered.map((item) => {
-                      const bucket = classifyCondition(item.condition);
-                      const status = item.status ?? "active";
-                      const isSelected = selected.has(item.id);
-                      return (
-                        <tr key={item.id}
-                          onClick={() => router.push(`/equipment/items/${item.id}`)}
-                          style={{ cursor: "pointer", background: isSelected ? "var(--red-tint)" : undefined }}
-                        >
-                          {isAdmin && (
-                            <td style={{ width: 44 }} onClick={(e) => { e.stopPropagation(); toggleOne(item.id); }}>
-                              <JlCheck
-                                checked={isSelected}
-                                onChange={() => toggleOne(item.id)}
-                                label={`Select ${item.machine_type}`}
-                              />
-                            </td>
-                          )}
-                          <td className="cell-strong">
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                              {item.photos && item.photos.length > 0 ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={`/api/equipment/items/${item.id}/photos/view?i=0`}
-                                  alt=""
-                                  style={{ width: 34, height: 34, objectFit: "cover", borderRadius: "var(--r-sm)", flexShrink: 0, background: "var(--ink-100)" }}
-                                />
-                              ) : (
-                                <span aria-hidden style={{ width: 34, height: 34, borderRadius: "var(--r-sm)", flexShrink: 0, background: "var(--ink-50)", display: "grid", placeItems: "center", color: "var(--ink-300)" }}>
-                                  <Package size={16} />
-                                </span>
-                              )}
-                              {item.machine_type}
-                            </span>
-                          </td>
-                          <td>{item.make_model ?? <span className="jl-muted" style={{ fontStyle: "italic" }}>Not set</span>}</td>
-                          <td><span className="jl-mono" style={{ color: "var(--ink-600)" }}>{item.serial ?? "Not set"}</span></td>
-                          <td><span className={`jl-badge ${CONDITION_BADGE[bucket]}`}>{CONDITION_CONFIG[bucket].label}</span></td>
-                          <td><span className={`jl-badge ${STATUS_BADGE[status]}`}>{STATUS_CONFIG[status].label}</span></td>
-                          <td style={{ textAlign: "center" }}>
-                            <PhotoButton itemId={item.id} initialPhotos={item.photos} canEdit={isAdmin} />
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+          {loading ? (
+            <Loading />
+          ) : (
+            <DataTable
+              columns={equipmentColumns}
+              rows={filtered}
+              rowKey={(item) => item.id}
+              onRowClick={(item) => router.push(`/equipment/items/${item.id}`)}
+              rowClassName={(item) => (selected.has(item.id) ? "bg-accent" : undefined)}
+              empty={items.length === 0 ? "No equipment recorded yet" : "No results match your filters"}
+            />
+          )}
+        </TabsContent>
 
-            {/* Mobile: tappable card stack (no column headers). */}
-            <div className="jl-cards-mobile" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-              {loading ? (
-                <div style={{ padding: 32, textAlign: "center", color: "var(--ink-400)" }}>Loading…</div>
-              ) : filtered.length === 0 ? (
-                <div style={{ padding: 32, textAlign: "center", color: "var(--ink-400)" }}>
-                  {items.length === 0 ? "No equipment recorded yet" : "No results match your filters"}
-                </div>
-              ) : (
-                filtered.map((item) => {
-                  const bucket = classifyCondition(item.condition);
-                  const status = item.status ?? "active";
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => router.push(`/equipment/items/${item.id}`)}
-                      className="jl-card jl-card--pad-sm jl-card--interactive"
-                      style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", minHeight: 44 }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p className="jl-h3">{item.machine_type}</p>
-                        <p className="jl-sm" style={{ color: item.make_model ? "var(--ink-600)" : "var(--ink-400)", fontStyle: item.make_model ? "normal" : "italic", marginTop: 2 }}>
-                          {item.make_model ?? "No model set"}
-                        </p>
-                        {item.serial && (
-                          <p className="jl-xs jl-mono" style={{ color: "var(--ink-500)", marginTop: 2 }}>{item.serial}</p>
-                        )}
-                        <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                          <span className={`jl-badge ${CONDITION_BADGE[bucket]}`}>{CONDITION_CONFIG[bucket].label}</span>
-                          <span className={`jl-badge ${STATUS_BADGE[status]}`}>{STATUS_CONFIG[status].label}</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={18} style={{ color: "var(--ink-300)", flexShrink: 0 }} />
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-        )}
+        <TabsContent value="printers" className="pt-4">
+          {loading ? (
+            <Loading />
+          ) : (
+            <DataTable
+              columns={printerColumns}
+              rows={machines}
+              rowKey={(m) => m.serial_number}
+              onRowClick={(m) => router.push(`/equipment/printers/${encodeURIComponent(m.serial_number)}`)}
+              empty="No Xerox printers mapped to this store"
+            />
+          )}
+        </TabsContent>
 
-        {/* Printers tab */}
-        {tab === "printers" && (
-        <div>
-          <div className="jl-table-wrap">
-            <div style={{ overflowX: "auto" }}>
-              <table className="jl-table">
-                <thead>
-                  <tr>
-                    <th>Serial</th>
-                    <th>Model</th>
-                    <th>Type</th>
-                    <th>Age</th>
-                    <th>Installed</th>
-                    <th className="num">Balance</th>
-                    <th>Last Seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>Loading…</td></tr>
-                  ) : machines.length === 0 ? (
-                    <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "var(--ink-400)" }}>No Xerox printers mapped to this store</td></tr>
-                  ) : (
-                    machines.map((m) => {
-                      const balance = m.latest_balance != null ? Number(m.latest_balance) : null;
-                      return (
-                        <tr key={m.serial_number}
-                          onClick={() => router.push(`/equipment/printers/${encodeURIComponent(m.serial_number)}`)}
-                          style={{ cursor: "pointer" }}
-                        >
-                          <td><span className="jl-mono" style={{ color: "var(--ink-600)" }}>{m.serial_number}</span></td>
-                          <td className="cell-strong">{m.model_name ?? <span className="jl-muted" style={{ fontStyle: "italic", fontWeight: 400 }}>Not set</span>}</td>
-                          <td style={{ color: "var(--ink-500)" }}>{m.printer_type ?? "Not set"}</td>
-                          <td style={{ color: "var(--ink-700)", fontWeight: 600 }}
-                            title={m.original_install_date ? `Original install ${new Date(m.original_install_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}` : "No original install date"}
-                          >
-                            {ageYears(m.original_install_date)}
-                          </td>
-                          <td style={{ color: "var(--ink-500)" }}
-                            title="Latest install (current store)"
-                          >
-                            {m.install_date
-                              ? new Date(m.install_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" })
-                              : <span className="jl-muted">Not set</span>}
-                          </td>
-                          <td className="num" style={{ color: "var(--ink-700)", fontVariantNumeric: "tabular-nums" }}
-                            title={m.latest_balance_date ? `as at ${new Date(m.latest_balance_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}` : undefined}
-                          >
-                            {balance != null ? balance.toLocaleString("en-ZA") : <span className="jl-muted">—</span>}
-                          </td>
-                          <td style={{ color: "var(--ink-500)" }}>
-                            {m.last_seen ? new Date(m.last_seen).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" }) : "Never"}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        )}
-
-        {/* Printer Performance tab — the Print Volumes graph lives here so the
-            Equipment/Printers lists stay uncluttered. PrintSection renders its own
-            titled surface. */}
-        {tab === "performance" && (
-        <div>
+        {/* The Print Volumes chart lives here so the Equipment and Printers lists stay uncluttered. */}
+        <TabsContent value="performance" className="pt-4">
           <PrintSection store={storeName} />
-        </div>
-        )}
-      </div>
-    </AppShell>
+        </TabsContent>
+      </Tabs>
+    </Page>
   );
 }

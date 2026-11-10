@@ -2,26 +2,33 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AppShell } from "@/components/layout/app-shell";
-import { EquipmentItemSkeleton } from "@/components/equipment/skeleton";
+import { Check, Save, Trash2, Upload, X } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { EquipmentErrorBoundary } from "@/components/equipment/error-boundary";
-import { useHotkeys } from "@/lib/use-hotkey";
-import { addRecentItem } from "@/lib/recently-viewed";
-import { useRole } from "@/lib/use-role";
-import { toast } from "sonner";
-import {
-  Save, Trash2, AlertTriangle, Clock, Package,
-  Wrench, ShoppingCart, Upload, X, Check,
-} from "lucide-react";
-import Link from "next/link";
-import {
-  EQUIPMENT_TYPES, EQUIPMENT_STATUSES, STATUS_CONFIG, ALL_XEROX_STORES,
-  type EquipmentStatus,
-} from "@/lib/equipment-utils";
-import { JlSelect } from "@/components/ui/jl-select";
-import { JlDate } from "@/components/ui/jl-date";
-import { ModelSuggest } from "@/components/equipment/model-suggest";
 import { FeedbackPanel } from "@/components/equipment/feedback-panel";
+import { ModelSuggest } from "@/components/equipment/model-suggest";
+import { Confirm } from "@/components/machines/confirm";
+import { DayField } from "@/components/machines/day-field";
+import { Field } from "@/components/machines/field";
+import { FilePicker } from "@/components/machines/file-picker";
+import { Loading } from "@/components/machines/loading";
+import { Page } from "@/components/machines/page";
+import { Panel } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
+import { ConditionBadge, EQUIPMENT_STATUS_LABEL, EquipmentStatusBadge } from "@/components/machines/status-badge";
+import { ALL_XEROX_STORES, EQUIPMENT_STATUSES, EQUIPMENT_TYPES, type EquipmentStatus } from "@/lib/equipment-utils";
+import { addRecentItem } from "@/lib/recently-viewed";
+import { toast } from "@/lib/toast";
+import { SURFACE, TYPE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
+import { useHotkeys } from "@/lib/use-hotkey";
+import { useRole } from "@/lib/use-role";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -80,17 +87,6 @@ function isBucket(v: string | null | undefined): v is ConditionBucket {
   return v === "Good" || v === "Fair" || v === "Poor";
 }
 
-// Map a condition / replace value onto a Jetline badge modifier.
-function conditionBadge(v: ConditionBucket): string {
-  return v === "Good" ? "jl-badge--green" : v === "Fair" ? "jl-badge--amber" : "jl-badge--red";
-}
-function statusBadge(s: EquipmentStatus): string {
-  if (s === "active") return "jl-badge--green";
-  if (s === "disposed") return "jl-badge--red";
-  if (s === "transferred") return "jl-badge--blue";
-  return "jl-badge";
-}
-
 /** Age in years+months from the install date, computed live. */
 function ageFromInstall(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -104,52 +100,6 @@ function ageFromInstall(iso: string | null | undefined): string {
   const m = months % 12;
   if (y === 0) return `${m} month${m !== 1 ? "s" : ""}`;
   return m > 0 ? `${y}y ${m}m` : `${y} year${y !== 1 ? "s" : ""}`;
-}
-
-// ─── Section card ─────────────────────────────────────────────────────────────
-
-function Section({ icon: Icon, title, children }: {
-  icon: React.ElementType;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="jl-card" style={{ display: "grid", gap: "var(--s-5)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--s-3)" }}>
-        <span className="jl-chip jl-chip--sm"><Icon /></span>
-        <h2 className="jl-h3">{title}</h2>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-// ─── Segmented control (Condition / Replace / Status) ─────────────────────────
-
-function Segment<T extends string>({
-  options, value, onSelect, labelFor, disabled,
-}: {
-  options: readonly T[];
-  value: T | null;
-  onSelect: (v: T) => void;
-  labelFor?: (v: T) => string;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="jl-segment" role="group">
-      {options.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          disabled={disabled}
-          aria-selected={value === opt}
-          onClick={() => onSelect(opt)}
-        >
-          {labelFor ? labelFor(opt) : opt}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -171,7 +121,6 @@ export default function EquipmentItemPage() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const loadedRef = useRef(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Role flag from the authenticated session. While the session loads,
   // isAdmin is false so admin-only cards stay hidden (least-privileged default).
@@ -296,12 +245,12 @@ export default function EquipmentItemPage() {
   };
 
   // ── Photos ──
-  const uploadPhotos = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const uploadPhotos = async (files: File[]) => {
+    if (files.length === 0) return;
     setUploading(true);
     try {
       const fd = new FormData();
-      Array.from(files).forEach((f) => fd.append("files", f));
+      files.forEach((f) => fd.append("files", f));
       const res = await fetch(`/api/equipment/items/${id}/photos`, { method: "POST", body: fd });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -312,7 +261,6 @@ export default function EquipmentItemPage() {
       toast.error("Upload failed");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -332,366 +280,203 @@ export default function EquipmentItemPage() {
     }
   };
 
-  if (loading) {
-    return <AppShell><EquipmentItemSkeleton /></AppShell>;
-  }
+  if (loading) return <Loading />;
   if (!item) return null;
 
-  const statCfg = STATUS_CONFIG[form.status ?? "active"];
   const conditionValue: ConditionBucket | null = isBucket(form.condition) ? form.condition : null;
   const legacyCondition = form.condition && !isBucket(form.condition) ? form.condition : null;
   const photos = form.photos ?? [];
   const itemLabel = [item.machine_type, item.make_model].filter(Boolean).join(" · ");
   const overdue = form.next_service_due != null && new Date(form.next_service_due) < new Date();
+  const storeHref = `/equipment/stores/${encodeURIComponent(item.store)}`;
 
   return (
-    <AppShell>
-      <EquipmentErrorBoundary>
-      <div style={{ background: "var(--canvas)", color: "var(--ink-900)", minHeight: "100vh" }}>
-        {/* ── Sticky top bar ── */}
-        <div style={{
-          position: "sticky", top: 0, zIndex: 10,
-          background: "var(--surface)", boxShadow: "var(--sh-sm)",
-          padding: "0 var(--s-8)",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: "var(--s-4)", height: 64,
-        }}>
-          <nav className="jl-breadcrumb" style={{ minWidth: 0 }}>
-            <Link href={`/equipment/stores/${encodeURIComponent(item.store)}`}>{item.store}</Link>
-            <span className="sep">/</span>
-            <span className="current" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {item.machine_type}
-            </span>
-
-            {saving && (
-              <span className="jl-badge" style={{ marginLeft: "var(--s-2)" }}>
-                <span className="jl-spinner jl-spinner--sm" style={{ width: 12, height: 12, borderWidth: 2 }} /> Saving
-              </span>
-            )}
-            {!saving && savedFlash && (
-              <span className="jl-badge jl-badge--green" style={{ marginLeft: "var(--s-2)" }}>
-                <Check /> Saved
-              </span>
-            )}
-            {!saving && !savedFlash && dirty && (
-              <span className="jl-badge jl-badge--amber" style={{ marginLeft: "var(--s-2)" }}>
-                Unsaved changes
-              </span>
-            )}
-          </nav>
-
-          <div style={{ display: "flex", gap: "var(--s-3)", flexShrink: 0 }}>
+    <EquipmentErrorBoundary>
+      <Page
+        title={item.machine_type}
+        titleExtra={
+          saving ? (
+            <Badge variant="secondary"><Spinner /> Saving</Badge>
+          ) : savedFlash ? (
+            <Badge status="success"><Check /> Saved</Badge>
+          ) : dirty ? (
+            <Badge status="warning">Unsaved changes</Badge>
+          ) : null
+        }
+        crumbs={[{ label: item.store, href: storeHref }, { label: itemLabel }]}
+        actions={
+          <>
             {isAdmin && (
-              <button type="button" className="jl-btn jl-btn--soft" onClick={() => setShowDelete(true)}>
+              <Button variant="outline" onClick={() => setShowDelete(true)}>
                 <Trash2 /> Delete
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              className="jl-btn jl-btn--primary"
-              onClick={save}
-              disabled={saving || !dirty}
-              data-loading={saving ? true : undefined}
-            >
-              <Save /> Save
-            </button>
-          </div>
-        </div>
-
-        {/* ── Content ── */}
-        <div style={{ maxWidth: 980, margin: "0 auto", padding: "var(--s-7) var(--s-8)", display: "grid", gap: "var(--s-6)" }}>
-
-          {/* Record header — identity on the left, a big hero photo on the right
-              so you instantly SEE which machine this is (product-page style). */}
-          <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--s-6)", flexWrap: "wrap" }}>
-            <div style={{ minWidth: 0, flex: "1 1 320px" }}>
-              <h1 className="jl-display">
-                {item.machine_type}
-                {item.make_model && (
-                  <span className="jl-muted" style={{ fontWeight: "var(--fw-medium)", fontSize: "var(--fs-h2)", marginLeft: "var(--s-3)" }}>
-                    {item.make_model}
-                  </span>
-                )}
-              </h1>
-              <div style={{ display: "flex", gap: "var(--s-2)", marginTop: "var(--s-3)", flexWrap: "wrap", alignItems: "center" }}>
-                <span className={`jl-badge ${statusBadge(form.status ?? "active")}`}>{statCfg.label}</span>
-                {conditionValue && (
-                  <span className={`jl-badge ${conditionBadge(conditionValue)}`}>{conditionValue} condition</span>
-                )}
-                {item.serial && (
-                  <span className="jl-badge jl-mono">S/N {item.serial}</span>
-                )}
+            <Button onClick={save} disabled={saving || !dirty}>
+              {saving ? <Spinner /> : <Save />} Save
+            </Button>
+          </>
+        }
+      >
+        <div className="flex w-full max-w-5xl flex-col gap-5">
+          {/* Record header: what it is on the left, the first photo on the right, so you see which machine this is. */}
+          <header className="flex flex-wrap items-start justify-between gap-5">
+            <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+              {item.make_model && <span className={TYPE.section}>{item.make_model}</span>}
+              <div className="flex flex-wrap items-center gap-2">
+                <EquipmentStatusBadge status={form.status ?? "active"} />
+                {conditionValue && <ConditionBadge condition={conditionValue} />}
+                {item.serial && <Badge variant="secondary">S/N {item.serial}</Badge>}
               </div>
             </div>
-
-            {/* Hero photo (first image). Clickable to open full size. */}
             {photos.length > 0 && (
-              <a
-                href={photos[0]}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  flex: "0 0 auto", width: 220, height: 165, borderRadius: "var(--r-lg)",
-                  overflow: "hidden", background: "var(--surface-sunken)", boxShadow: "var(--sh-sm)",
-                  display: "block", position: "relative",
-                }}
-                title="View photo"
-              >
+              <a href={photos[0]} target="_blank" rel="noreferrer" title="View photo" className={cn(SURFACE.cardRaised, "relative block h-40 w-56 shrink-0 overflow-hidden")}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photos[0]} alt={itemLabel} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                {photos.length > 1 && (
-                  <span style={{
-                    position: "absolute", bottom: 6, right: 6, padding: "2px 8px", borderRadius: "var(--r-pill)",
-                    background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 11, fontWeight: 700,
-                  }}>+{photos.length - 1}</span>
-                )}
+                <img src={photos[0]} alt={itemLabel} className="block size-full object-cover" />
+                {photos.length > 1 && <Badge variant="secondary" className="absolute right-1.5 bottom-1.5">+{photos.length - 1}</Badge>}
               </a>
             )}
           </header>
 
-          {/* ── Identity ── */}
-          <Section icon={Package} title="Identity">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-5)" }}>
-              <div className="jl-field">
-                <label>Equipment type</label>
-                <JlSelect
+          <Panel caption="Identity" bodyClassName="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Equipment type" htmlFor="item-type">
+                <Pick
+                  id="item-type"
                   value={form.machine_type ?? ""}
                   onChange={(v) => set("machine_type", v)}
                   placeholder="Select type"
-                  options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: t }))}
+                  options={Array.from(new Set([...EQUIPMENT_TYPES, ...(form.machine_type ? [form.machine_type] : [])])).map((t) => ({ value: t, label: t }))}
                   disabled={!isAdmin}
                 />
-              </div>
-              <div className="jl-field">
-                <label>Store</label>
-                <JlSelect
+              </Field>
+              <Field label="Store" htmlFor="item-store">
+                <Pick
+                  id="item-store"
                   value={form.store ?? ""}
                   onChange={(v) => set("store", v)}
                   placeholder="Select store"
-                  // Real store list only — free text would create phantom stores.
+                  // Real store list only: free text would create phantom stores.
                   // Union with the current value so an existing off-list store still shows.
                   options={Array.from(new Set([...ALL_XEROX_STORES, ...(form.store ? [form.store] : [])]))
                     .sort((a, b) => a.localeCompare(b))
                     .map((s) => ({ value: s, label: s }))}
                   disabled={!isAdmin}
                 />
-              </div>
-              <div className="jl-field">
-                <label>Make / model</label>
-                <ModelSuggest
-                  value={form.make_model ?? ""}
-                  onChange={(v) => set("make_model", v)}
-                  placeholder="e.g. Polar Mohr 76EM"
-                />
-              </div>
-              <div className="jl-field">
-                <label>Serial number</label>
-                <input
-                  className="jl-input jl-mono"
-                  value={form.serial ?? ""}
-                  onChange={(e) => set("serial", e.target.value)}
-                  placeholder="Serial"
-                  disabled={!isAdmin}
-                />
-              </div>
+              </Field>
+              <Field label="Make / model">
+                <ModelSuggest value={form.make_model ?? ""} onChange={(v) => set("make_model", v)} placeholder="e.g. Polar Mohr 76EM" />
+              </Field>
+              <Field label="Serial number" htmlFor="item-serial">
+                <Input id="item-serial" value={form.serial ?? ""} onChange={(e) => set("serial", e.target.value)} placeholder="Serial" disabled={!isAdmin} />
+              </Field>
             </div>
-            <div className="jl-field">
-              <label>Status</label>
-              <Segment
-                options={EQUIPMENT_STATUSES}
-                value={form.status ?? null}
-                onSelect={(s) => set("status", s)}
-                labelFor={(s) => STATUS_CONFIG[s].label}
+            <Field label="Status">
+              <Segmented
+                label="Status"
+                value={form.status ?? ""}
+                onValueChange={(s) => set("status", s)}
+                options={EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))}
                 disabled={!isAdmin}
               />
-            </div>
-          </Section>
+            </Field>
+          </Panel>
 
-          {/* ── Condition (all users) ── */}
-          <Section icon={AlertTriangle} title="Condition">
-            <div className="jl-field">
-              <label>Condition</label>
-              <Segment
-                options={CONDITION_BUCKETS}
-                value={conditionValue}
-                onSelect={selectCondition}
-              />
-            </div>
-            {legacyCondition && (
-              <p className="jl-xs jl-faint">Legacy notes: {legacyCondition}</p>
-            )}
-            <div className="jl-field">
-              <label>Replace</label>
-              <Segment
-                options={REPLACE_OPTIONS}
-                value={currentReplace}
-                onSelect={selectReplace}
-              />
-            </div>
-            <div className="jl-field">
-              <label>Notes</label>
-              <textarea
-                className="jl-textarea"
-                value={notesBody}
-                onChange={(e) => setNotesBody(e.target.value)}
-                placeholder="Comments, faults observed, operator instructions, repair details"
-                rows={4}
-              />
-            </div>
-          </Section>
+          {/* Condition: every user. */}
+          <Panel caption="Condition" bodyClassName="flex flex-col gap-4">
+            <Field label="Condition" hint={legacyCondition ? `Legacy notes: ${legacyCondition}` : undefined}>
+              <Segmented label="Condition" value={conditionValue ?? ""} onValueChange={(c) => selectCondition(c as ConditionBucket)} options={CONDITION_BUCKETS.map((c) => ({ value: c, label: c }))} />
+            </Field>
+            <Field label="Replace">
+              <Segmented label="Replace" value={currentReplace ?? ""} onValueChange={(r) => selectReplace(r as ReplaceValue)} options={REPLACE_OPTIONS.map((r) => ({ value: r, label: r }))} />
+            </Field>
+            <Field label="Notes" htmlFor="item-notes">
+              <Textarea id="item-notes" value={notesBody} onChange={(e) => setNotesBody(e.target.value)} placeholder="Comments, faults observed, operator instructions, repair details" rows={4} />
+            </Field>
+          </Panel>
 
-          {/* ── Lifecycle (admin) — we track assets from when they go into
-                service, not when they were bought (that's depreciation, not us). ── */}
+          {/* Lifecycle (admin): assets are tracked from when they go into service, not when they were bought. */}
           {isAdmin && (
-            <Section icon={ShoppingCart} title="Lifecycle">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--s-5)" }}>
-                <div className="jl-field">
-                  <label>Installed</label>
-                  <JlDate value={form.purchase_date ?? null} onChange={(v) => set("purchase_date", v)} placeholder="First install date" />
-                  <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>When it first entered service.</span>
-                </div>
-                <div className="jl-field">
-                  <label>Age</label>
-                  <div className="jl-input" style={{ display: "flex", alignItems: "center", background: "var(--surface-sunken)", color: "var(--ink-700)", fontWeight: 600 }}>
-                    {ageFromInstall(form.purchase_date)}
-                  </div>
-                  <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>Calculated from the install date.</span>
-                </div>
-                <div className="jl-field">
-                  <label>Warranty expiry</label>
-                  <JlDate value={form.warranty_expiry ?? null} onChange={(v) => set("warranty_expiry", v)} placeholder="Select date" />
-                </div>
-                <div className="jl-field">
-                  <label>Supplier</label>
-                  <ModelSuggest
-                    source="suppliers"
-                    value={form.supplier ?? ""}
-                    onChange={(v) => set("supplier", v)}
-                    placeholder="Where it came from"
-                  />
-                </div>
+            <Panel caption="Lifecycle">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Installed" htmlFor="item-installed" hint="When it first entered service.">
+                  <DayField id="item-installed" value={form.purchase_date ?? null} onChange={(v) => set("purchase_date", v)} placeholder="First install date" />
+                </Field>
+                <Field label="Age" htmlFor="item-age" hint="Calculated from the install date.">
+                  <Input id="item-age" value={ageFromInstall(form.purchase_date)} readOnly disabled />
+                </Field>
+                <Field label="Warranty expiry" htmlFor="item-warranty">
+                  <DayField id="item-warranty" value={form.warranty_expiry ?? null} onChange={(v) => set("warranty_expiry", v)} placeholder="Select date" />
+                </Field>
+                <Field label="Supplier">
+                  <ModelSuggest source="suppliers" value={form.supplier ?? ""} onChange={(v) => set("supplier", v)} placeholder="Where it came from" />
+                </Field>
               </div>
-            </Section>
+            </Panel>
           )}
 
-          {/* ── Service (admin) ── */}
           {isAdmin && (
-            <Section icon={Wrench} title="Service and maintenance">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--s-5)" }}>
-                <div className="jl-field">
-                  <label>Last serviced</label>
-                  <JlDate value={form.last_serviced ?? null} onChange={(v) => set("last_serviced", v)} placeholder="Select date" />
-                </div>
-                <div className="jl-field">
-                  <label>Next service due</label>
-                  <JlDate value={form.next_service_due ?? null} onChange={(v) => set("next_service_due", v)} placeholder="Select date" />
-                </div>
-                <div className="jl-field">
-                  <label>Service provider</label>
-                  <input
-                    className="jl-input"
-                    value={form.service_provider ?? ""}
-                    onChange={(e) => set("service_provider", e.target.value)}
-                    placeholder="Company or technician"
-                  />
-                </div>
+            <Panel caption="Service and maintenance" bodyClassName="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Last serviced" htmlFor="item-serviced">
+                  <DayField id="item-serviced" value={form.last_serviced ?? null} onChange={(v) => set("last_serviced", v)} placeholder="Select date" />
+                </Field>
+                <Field label="Next service due" htmlFor="item-due">
+                  <DayField id="item-due" value={form.next_service_due ?? null} onChange={(v) => set("next_service_due", v)} placeholder="Select date" />
+                </Field>
+                <Field label="Service provider" htmlFor="item-provider">
+                  <Input id="item-provider" value={form.service_provider ?? ""} onChange={(e) => set("service_provider", e.target.value)} placeholder="Company or technician" />
+                </Field>
               </div>
               {overdue && form.next_service_due && (
-                <div className="jl-alert jl-alert--amber">
-                  <span className="jl-chip jl-chip--amber"><AlertTriangle /></span>
-                  <div className="jl-alert__body">
-                    <div className="jl-alert__title">Service overdue</div>
-                    <div className="jl-alert__text">
-                      Due {new Date(form.next_service_due).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}
-                    </div>
-                  </div>
-                </div>
+                <Alert variant="warning">
+                  <AlertTitle>Service overdue</AlertTitle>
+                  <AlertDescription>
+                    Due {new Date(form.next_service_due).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}
+                  </AlertDescription>
+                </Alert>
               )}
-            </Section>
+            </Panel>
           )}
 
-          {/* ── Photos (admin) ── */}
           {isAdmin && (
-            <Section icon={Package} title="Photos">
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(e) => uploadPhotos(e.target.files)}
-                  style={{ display: "none" }}
-                />
-                <button
-                  type="button"
-                  className="jl-btn jl-btn--secondary"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  data-loading={uploading ? true : undefined}
-                >
-                  <Upload /> Upload photos
-                </button>
-              </div>
+            <Panel
+              caption="Photos"
+              right={
+                <FilePicker accept="image/*" multiple disabled={uploading} onFiles={uploadPhotos}>
+                  {uploading ? <Spinner /> : <Upload />} Upload photos
+                </FilePicker>
+              }
+            >
               {photos.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "var(--s-3)" }}>
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-6">
                   {photos.map((url, i) => (
-                    <div key={url} style={{
-                      position: "relative", aspectRatio: "1 / 1",
-                      borderRadius: "var(--r-md)", overflow: "hidden",
-                      background: "var(--surface-sunken)", boxShadow: "var(--sh-inset)",
-                    }}>
+                    <div key={url} className="relative aspect-square overflow-hidden rounded-xl bg-muted">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="Equipment" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      <button
-                        type="button"
-                        onClick={() => deletePhoto(i)}
-                        aria-label="Remove photo"
-                        style={{
-                          position: "absolute", top: 6, right: 6,
-                          width: 26, height: 26, borderRadius: "50%",
-                          background: "var(--ink-900)", color: "#fff",
-                          boxShadow: "var(--sh-sm)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
+                      <img src={url} alt="Equipment" className="block size-full object-cover" />
+                      <Button variant="secondary" size="icon-xs" className="absolute top-1.5 right-1.5" onClick={() => deletePhoto(i)} aria-label="Remove photo">
+                        <X />
+                      </Button>
                     </div>
                   ))}
                 </div>
               )}
-            </Section>
+            </Panel>
           )}
 
-          {/* ── Activity: comments + field changes + requests, one timeline ── */}
+          {/* Activity: comments, field changes and requests in one timeline. */}
           <FeedbackPanel type="equipment" refId={String(id)} />
-
-          <div style={{ height: "var(--s-8)" }} />
         </div>
-      </div>
 
-      {/* ── Delete confirm modal ── */}
-      <div className="jl-overlay" data-open={showDelete ? true : undefined} onClick={() => setShowDelete(false)}>
-        <div className="jl-modal" onClick={(e) => e.stopPropagation()}>
-          <div style={{ display: "flex", gap: "var(--s-3)", alignItems: "flex-start" }}>
-            <span className="jl-chip jl-chip--solid"><AlertTriangle /></span>
-            <div>
-              <h3 className="jl-modal__title">Delete equipment item</h3>
-              <p className="jl-modal__text">
-                Permanently delete <strong style={{ color: "var(--ink-900)" }}>{itemLabel}</strong>?
-                This removes all associated change history. This cannot be undone.
-              </p>
-            </div>
-          </div>
-          <div className="jl-modal__foot">
-            <button type="button" className="jl-btn jl-btn--ghost" onClick={() => setShowDelete(false)}>Cancel</button>
-            <button type="button" className="jl-btn jl-btn--primary" onClick={deleteItem}>
-              <Trash2 /> Delete permanently
-            </button>
-          </div>
-        </div>
-      </div>
-      </EquipmentErrorBoundary>
-    </AppShell>
+        <Confirm
+          open={showDelete}
+          onOpenChange={setShowDelete}
+          title="Delete equipment item"
+          detail={`Permanently delete ${itemLabel}? This removes all associated change history. This cannot be undone.`}
+          action="Delete permanently"
+          destructive
+          onConfirm={deleteItem}
+        />
+      </Page>
+    </EquipmentErrorBoundary>
   );
 }

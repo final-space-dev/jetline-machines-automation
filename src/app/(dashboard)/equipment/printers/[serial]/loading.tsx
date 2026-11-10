@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/layout/app-shell";
-import { PrinterPageSkeleton } from "@/components/equipment/skeleton";
+import { Loading } from "@/components/machines/loading";
 
-export default function Loading() {
-  return (
-    <AppShell>
-      <PrinterPageSkeleton />
-    </AppShell>
-  );
+export default function LoadingPage() {
+  return <Loading />;
 }

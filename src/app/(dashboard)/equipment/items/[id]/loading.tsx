@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/layout/app-shell";
-import { EquipmentItemSkeleton } from "@/components/equipment/skeleton";
+import { Loading } from "@/components/machines/loading";
 
-export default function Loading() {
-  return (
-    <AppShell>
-      <EquipmentItemSkeleton />
-    </AppShell>
-  );
+export default function LoadingPage() {
+  return <Loading />;
 }

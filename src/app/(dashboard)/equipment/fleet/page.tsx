@@ -1,15 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
 import Link from "next/link";
-import { AppShell } from "@/components/layout/app-shell";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Empty } from "@/components/machines/empty";
+import { Loading } from "@/components/machines/loading";
+import { ConditionBar } from "@/components/machines/mix-bar";
+import { Page } from "@/components/machines/page";
+import { Muted, Panel } from "@/components/machines/panel";
+import { CompletenessBadge } from "@/components/machines/status-badge";
+import { TextLink } from "@/components/machines/text-link";
+import { Tile, TileRow } from "@/components/machines/tile";
+import { GRID, TYPE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
 import { useAdminGuard } from "@/lib/use-admin-guard";
-import { AttentionList, type AttentionTab } from "@/components/dashboard/attention-list";
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
-} from "recharts";
-import { CompletenessBadge } from "@/components/equipment/completeness-badge";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -85,22 +91,6 @@ interface DataQualityRow {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Red link, used for the primary identifier in a cell. */
-const linkStyle: CSSProperties = { color: "var(--red-600)", fontWeight: 700, textDecoration: "none" };
-/** Neutral link, used for the secondary identifier in a cell. */
-const linkMuted: CSSProperties = { color: "var(--ink-800)", fontWeight: 600, textDecoration: "none" };
-
-const COND_COLORS = {
-  good: "var(--green-500)",
-  fair: "var(--amber-500)",
-  poor: "var(--red-500)",
-  unknown: "var(--ink-200)",
-};
-
-const CONDITION_TO_TAB: Record<string, string> = {
-  poor: "poorCondition",
-};
-
 function fmtDate(v: string | null | undefined): string {
   if (!v) return "";
   const d = new Date(v);
@@ -108,35 +98,93 @@ function fmtDate(v: string | null | undefined): string {
   return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Traffic-light badge variant for a 0–1 store score. */
-function scoreBadgeClass(score: number): string {
-  if (score < 0.6) return "jl-badge jl-badge--red";
-  if (score < 0.85) return "jl-badge jl-badge--amber";
-  return "jl-badge jl-badge--green";
+const time = (v: string | null | undefined) => (v ? new Date(v).getTime() || 0 : 0);
+
+/** Traffic-light status for a 0 to 1 store score. */
+function scoreStatus(score: number): "danger" | "warning" | "success" {
+  if (score < 0.6) return "danger";
+  if (score < 0.85) return "warning";
+  return "success";
 }
+
+// ─── Attention columns ───────────────────────────────────────────────────────
+
+const equipmentColumns = (last: Column<EquipmentAttention>): Column<EquipmentAttention>[] => [
+  { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
+  { key: "machine_type", label: "Type", sortValue: (r) => r.machine_type ?? "", cell: (r) => <TextLink quiet href={`/equipment/items/${r.id}`}>{r.machine_type ?? "Equipment"}</TextLink> },
+  { key: "make_model", label: "Model", hideBelow: "md", sortValue: (r) => r.make_model ?? "", cell: (r) => r.make_model ?? "" },
+  { key: "condition", label: "Condition", hideBelow: "sm", sortValue: (r) => r.condition ?? "", cell: (r) => r.condition ?? "" },
+  last,
+];
+
+const POOR_COLUMNS = equipmentColumns({
+  key: "updated_at", label: "Updated", align: "right", hideBelow: "sm",
+  sortValue: (r) => time(r.updated_at), cell: (r) => fmtDate(r.updated_at),
+});
+
+const OVERDUE_COLUMNS = equipmentColumns({
+  key: "next_service_due", label: "Due", align: "right",
+  sortValue: (r) => time(r.next_service_due), cell: (r) => <span className="font-semibold text-deficit">{fmtDate(r.next_service_due)}</span>,
+});
+
+const REPLACE_COLUMNS: Column<ReplaceRow>[] = [
+  {
+    key: "ref", label: "Item",
+    sortValue: (r) => (r.kind === "printer" ? r.serial : r.machine_type ?? ""),
+    cell: (r) =>
+      r.kind === "printer" ? (
+        <TextLink href={`/equipment/printers/${encodeURIComponent(r.serial)}`}>{r.serial}</TextLink>
+      ) : (
+        <TextLink href={`/equipment/items/${r.id}`}>{r.machine_type ?? "Equipment"}</TextLink>
+      ),
+  },
+  { key: "kind", label: "Kind", hideBelow: "sm", sortValue: (r) => r.kind, cell: (r) => (r.kind === "printer" ? "Printer" : "Equipment") },
+  {
+    key: "store", label: "Store",
+    sortValue: (r) => r.store ?? "",
+    cell: (r) => (r.store ? <TextLink quiet href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> : ""),
+  },
+  { key: "detail", label: "Detail", hideBelow: "md", cell: (r) => (r.kind === "printer" ? r.model ?? "" : r.make_model ?? "") },
+];
+
+const CONTRACT_COLUMNS: Column<PrinterAttention>[] = [
+  { key: "serial", label: "Serial", sortValue: (r) => r.serial, cell: (r) => <TextLink href={`/equipment/printers/${encodeURIComponent(r.serial)}`}>{r.serial}</TextLink> },
+  { key: "store", label: "Store", sortValue: (r) => r.store ?? "", cell: (r) => (r.store ? <TextLink quiet href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> : "") },
+  { key: "model", label: "Model", hideBelow: "md", sortValue: (r) => r.model ?? "", cell: (r) => r.model ?? "" },
+  { key: "contract_end", label: "Contract End", hideBelow: "sm", sortValue: (r) => time(r.contract_end), cell: (r) => fmtDate(r.contract_end) },
+  {
+    key: "days_remaining", label: "Days Left", align: "right",
+    sortValue: (r) => r.days_remaining ?? 9999,
+    cell: (r) => {
+      const d = r.days_remaining ?? 0;
+      return <span className={cn(GRID.num, "font-semibold", d <= 7 ? "text-deficit" : d <= 30 ? "text-foreground" : "text-muted-foreground")}>{d}</span>;
+    },
+  },
+];
+
+const STORE_COLUMNS: Column<StoreHealthRow>[] = [
+  { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
+  { key: "group", label: "Group", hideBelow: "md", sortValue: (r) => r.group ?? "", cell: (r) => <Muted>{r.group ?? ""}</Muted> },
+  { key: "equipment", label: "Equipment", align: "right", sortValue: (r) => r.equipment, cell: (r) => <span className={cn(GRID.num, "font-medium")}>{r.equipment}</span> },
+  { key: "poor", label: "Poor", align: "right", sortValue: (r) => r.poor, cell: (r) => <span className={cn(GRID.num, r.poor > 0 ? "font-semibold text-deficit" : "text-faint")}>{r.poor}</span> },
+  { key: "printers", label: "Printers", align: "right", hideBelow: "sm", sortValue: (r) => r.printers, cell: (r) => <span className={GRID.num}>{r.printers}</span> },
+  { key: "replace", label: "Replace", align: "right", hideBelow: "sm", sortValue: (r) => r.replace, cell: (r) => <span className={cn(GRID.num, r.replace > 0 ? "font-semibold" : "text-faint")}>{r.replace}</span> },
+  { key: "score", label: "Score", align: "right", sortValue: (r) => r.score, cell: (r) => <Badge status={scoreStatus(r.score)}>{Math.round(r.score * 100)}%</Badge> },
+  { key: "lastActivity", label: "Last Activity", align: "right", hideBelow: "lg", sortValue: (r) => time(r.lastActivity), cell: (r) => <Muted>{fmtDate(r.lastActivity)}</Muted> },
+];
+
+const NOTHING = "Nothing needs attention here right now";
 
 // ─── Completeness leaderboard (P19) ────────────────────────────────────────────
 
-function LeaderRow({ rank, row, tone }: { rank: number; row: DataQualityRow; tone: "top" | "bottom" }) {
+function LeaderRow({ rank, row }: { rank: number; row: DataQualityRow }) {
   return (
     <Link
       href={`/stores/${encodeURIComponent(row.store)}/completeness`}
-      style={{
-        display: "flex", alignItems: "center", gap: "var(--s-3)", padding: "9px 12px",
-        borderRadius: "var(--r-md)", textDecoration: "none",
-        background: "var(--surface-sunken)", boxShadow: "var(--sh-inset)",
-      }}
+      className="flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none hover:bg-muted focus-visible:bg-muted"
     >
-      <span style={{
-        width: 22, height: 22, borderRadius: "var(--r-pill)", flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 11, fontWeight: 800,
-        color: tone === "top" ? "var(--green-700)" : "var(--red-600)",
-        background: tone === "top" ? "var(--green-tint)" : "var(--red-tint)",
-      }}>{rank}</span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: "var(--ink-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {row.store}
-      </span>
+      <span className={cn(TYPE.micro, "w-4 shrink-0 text-right font-semibold text-muted-foreground tabular-nums")}>{rank}</span>
+      <span className={cn(TYPE.data, "min-w-0 flex-1 truncate font-medium")}>{row.store}</span>
       <CompletenessBadge score={row.overallScore} />
     </Link>
   );
@@ -150,35 +198,14 @@ function CompletenessLeaderboard({ rows }: { rows: DataQualityRow[] }) {
 
   if (scored.length === 0) return null;
 
-  const best = top5[0];
-  const worst = bottom5[0];
-  const summary =
-    best && worst && best.store !== worst.store
-      ? `${best.store} is your most complete store (${Math.round(best.overallScore)}%). ${worst.store} needs attention (${Math.round(worst.overallScore)}%).`
-      : best
-        ? `${best.store} leads on data completeness (${Math.round(best.overallScore)}%).`
-        : "";
-
   return (
-    <div className="jl-card" style={{ marginBottom: "var(--s-5)" }}>
-      <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Completeness Leaderboard</h2>
-      {summary && (
-        <p className="jl-sm jl-muted" style={{ marginBottom: "var(--s-5)" }}>{summary}</p>
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--s-6)" }}>
-        <div>
-          <p className="jl-sm" style={{ color: "var(--green-700)", fontWeight: "var(--fw-bold)", marginBottom: "var(--s-3)" }}>Most Complete</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2)" }}>
-            {top5.map((r, i) => <LeaderRow key={r.store} rank={i + 1} row={r} tone="top" />)}
-          </div>
-        </div>
-        <div>
-          <p className="jl-sm" style={{ color: "var(--red-600)", fontWeight: "var(--fw-bold)", marginBottom: "var(--s-3)" }}>Needs Attention</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2)" }}>
-            {bottom5.map((r, i) => <LeaderRow key={r.store} rank={i + 1} row={r} tone="bottom" />)}
-          </div>
-        </div>
-      </div>
+    <div className="grid gap-3 lg:grid-cols-2">
+      <Panel caption="Most complete">
+        {top5.map((r, i) => <LeaderRow key={r.store} rank={i + 1} row={r} />)}
+      </Panel>
+      <Panel caption="Least complete">
+        {bottom5.map((r, i) => <LeaderRow key={r.store} rank={i + 1} row={r} />)}
+      </Panel>
     </div>
   );
 }
@@ -195,7 +222,7 @@ export default function FleetHealthPage() {
   const [quality, setQuality] = useState<DataQualityRow[]>([]);
 
   useEffect(() => {
-    // Only fetch once we've confirmed admin — the API 403s staff and the error
+    // Only fetch once we've confirmed admin: the API 403s staff and the error
     // body would crash the breakdown render.
     if (!allowed) return;
     fetch("/api/equipment/fleet-health")
@@ -205,7 +232,7 @@ export default function FleetHealthPage() {
       .finally(() => setLoading(false));
   }, [allowed]);
 
-  // P19 leaderboard source — single call, already sorted worst-first.
+  // P19 leaderboard source: single call, already sorted worst-first.
   useEffect(() => {
     let alive = true;
     fetch("/api/reports/data-quality")
@@ -215,279 +242,83 @@ export default function FleetHealthPage() {
     return () => { alive = false; };
   }, []);
 
-  const barData = useMemo(() => {
-    const c = data?.conditionBreakdown;
-    if (!c) return [];
-    return [{ name: "Fleet", good: c.good, fair: c.fair, poor: c.poor, unknown: c.unknown }];
-  }, [data]);
-
-  const tabs: AttentionTab[] = useMemo(() => {
-    if (!data) return [];
-    const ai = data.attentionItems;
-
-    const equipCols = (extra?: { key: string; label: string; render: (r: EquipmentAttention) => React.ReactNode; align?: "left" | "right" }) => [
-      {
-        key: "store", label: "Store", sortable: true,
-        render: (r: EquipmentAttention) => (
-          <Link href={`/stores/${encodeURIComponent(r.store)}`} style={linkStyle} onClick={(e) => e.stopPropagation()}>{r.store}</Link>
-        ),
-      },
-      {
-        key: "machine_type", label: "Type", sortable: true,
-        render: (r: EquipmentAttention) => (
-          <Link href={`/equipment/items/${r.id}`} style={linkMuted} onClick={(e) => e.stopPropagation()}>
-            {r.machine_type ?? "Equipment"}
-          </Link>
-        ),
-      },
-      { key: "make_model", label: "Model", sortable: true, render: (r: EquipmentAttention) => r.make_model ?? "" },
-      { key: "condition", label: "Condition", sortable: true, render: (r: EquipmentAttention) => r.condition ?? "" },
-      ...(extra ? [extra] : []),
-    ];
-
-    const printerCols = (opts: { showDays?: boolean } = {}) => [
-      {
-        key: "serial", label: "Serial", sortable: true,
-        render: (r: PrinterAttention) => (
-          <Link href={`/equipment/printers/${encodeURIComponent(r.serial)}`} style={linkStyle} onClick={(e) => e.stopPropagation()}>{r.serial}</Link>
-        ),
-      },
-      {
-        key: "store", label: "Store", sortable: true,
-        render: (r: PrinterAttention) => r.store
-          ? <Link href={`/stores/${encodeURIComponent(r.store)}`} style={linkMuted} onClick={(e) => e.stopPropagation()}>{r.store}</Link>
-          : "",
-      },
-      { key: "model", label: "Model", sortable: true, render: (r: PrinterAttention) => r.model ?? "" },
-      ...(opts.showDays
-        ? [
-            { key: "contract_end", label: "Contract End", sortable: true, render: (r: PrinterAttention) => fmtDate(r.contract_end) },
-            {
-              key: "days_remaining", label: "Days Left", align: "right" as const, sortable: true,
-              sortValue: (r: PrinterAttention) => r.days_remaining ?? 9999,
-              render: (r: PrinterAttention) => {
-                const d = r.days_remaining ?? 0;
-                const color = d <= 7 ? "var(--red-500)" : d <= 30 ? "var(--amber-700)" : "var(--ink-600)";
-                return <span style={{ fontWeight: 800, color }}>{d}</span>;
-              },
-            },
-          ]
-        : []),
-    ];
-
-    return [
-      {
-        key: "poorCondition",
-        label: "Poor Condition",
-        rows: ai.poorCondition,
-        rowKey: (r: EquipmentAttention) => `eq-${r.id}`,
-        columns: equipCols({
-          key: "updated_at", label: "Updated", align: "right",
-          render: (r: EquipmentAttention) => fmtDate(r.updated_at),
-        }),
-      },
-      {
-        key: "serviceOverdue",
-        label: "Service Overdue",
-        rows: ai.serviceOverdue,
-        rowKey: (r: EquipmentAttention) => `sv-${r.id}`,
-        columns: equipCols({
-          key: "next_service_due", label: "Due", align: "right",
-          render: (r: EquipmentAttention) => (
-            <span style={{ color: "var(--red-500)", fontWeight: 700 }}>{fmtDate(r.next_service_due)}</span>
-          ),
-        }),
-      },
-      {
-        key: "replaceFlagged",
-        label: "Replace Flagged",
-        rows: ai.replaceFlagged,
-        rowKey: (r: ReplaceRow) => (r.kind === "printer" ? `p-${r.serial}` : `e-${r.id}`),
-        columns: [
-          {
-            key: "ref", label: "Item", sortable: true,
-            sortValue: (r: ReplaceRow) => (r.kind === "printer" ? r.serial : r.machine_type ?? ""),
-            render: (r: ReplaceRow) =>
-              r.kind === "printer" ? (
-                <Link href={`/equipment/printers/${encodeURIComponent(r.serial)}`} style={linkStyle} onClick={(e) => e.stopPropagation()}>{r.serial}</Link>
-              ) : (
-                <Link href={`/equipment/items/${r.id}`} style={linkStyle} onClick={(e) => e.stopPropagation()}>{r.machine_type ?? "Equipment"}</Link>
-              ),
-          },
-          {
-            key: "kind", label: "Kind", sortable: true,
-            render: (r: ReplaceRow) => (r.kind === "printer" ? "Printer" : "Equipment"),
-          },
-          {
-            key: "store", label: "Store", sortable: true,
-            sortValue: (r: ReplaceRow) => r.store ?? "",
-            render: (r: ReplaceRow) => r.store
-              ? <Link href={`/stores/${encodeURIComponent(r.store)}`} style={linkMuted} onClick={(e) => e.stopPropagation()}>{r.store}</Link>
-              : "",
-          },
-          {
-            key: "detail", label: "Detail", sortable: false,
-            render: (r: ReplaceRow) => (r.kind === "printer" ? r.model ?? "" : r.make_model ?? ""),
-          },
-        ],
-      },
-      {
-        key: "contractsExpiring",
-        label: "Contracts Expiring",
-        rows: ai.contractsExpiring,
-        rowKey: (r: PrinterAttention) => `c-${r.serial}`,
-        columns: printerCols({ showDays: true }),
-      },
-    ] as AttentionTab[];
-  }, [data]);
-
   // Block non-admins from the fleet render path entirely (they're being redirected).
-  if (guardLoading || !allowed) {
+  if (guardLoading || !allowed || loading) {
     return (
-      <AppShell>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-          <p className="jl-sm jl-faint">Loading…</p>
-        </div>
-      </AppShell>
-    );
-  }
-
-  if (loading) {
-    return (
-      <AppShell>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-          <p className="jl-sm jl-faint">Loading fleet health</p>
-        </div>
-      </AppShell>
+      <Page title="Fleet Health">
+        <Loading label={guardLoading || !allowed ? "Loading" : "Loading fleet health"} />
+      </Page>
     );
   }
 
   if (!data) {
     return (
-      <AppShell>
-        <div>
-          <h1 className="jl-h1" style={{ marginBottom: "var(--s-5)" }}>Fleet Health</h1>
-          <p className="jl-sm jl-faint">Could not load fleet health data.</p>
-        </div>
-      </AppShell>
+      <Page title="Fleet Health">
+        <Empty title="Could not load fleet health data" />
+      </Page>
     );
   }
 
-  const kpis: { key: keyof Kpi; label: string; color: string }[] = [
-    { key: "total", label: "Total Equipment", color: "var(--ink-900)" },
-    { key: "poor", label: "Poor Condition", color: "var(--red-500)" },
-    { key: "serviceOverdue", label: "Service Overdue", color: "var(--amber-700)" },
-    { key: "replaceFlagged", label: "Replace Flagged", color: "var(--red-500)" },
-    { key: "contractsExpiring30d", label: "Contracts Expiring", color: "var(--amber-700)" },
+  const ai = data.attentionItems;
+  const c = data.conditionBreakdown;
+  const legend: [string, string, number][] = [
+    ["bg-proven", "Good", c.good],
+    ["bg-pending", "Fair", c.fair],
+    ["bg-deficit", "Poor", c.poor],
+    ["bg-track", "Unassessed", c.unknown],
   ];
 
   return (
-    <AppShell>
-      <div>
-        <h1 className="jl-h1" style={{ marginBottom: "var(--s-6)" }}>Fleet Health</h1>
+    <Page title="Fleet Health">
+      <TileRow>
+        <Tile label="Total Equipment" value={data.kpi.total} />
+        <Tile label="Poor Condition" value={data.kpi.poor} tone={data.kpi.poor > 0 ? "danger" : "default"} />
+        <Tile label="Service Overdue" value={data.kpi.serviceOverdue} tone={data.kpi.serviceOverdue > 0 ? "danger" : "default"} />
+        <Tile label="Replace Flagged" value={data.kpi.replaceFlagged} tone={data.kpi.replaceFlagged > 0 ? "danger" : "default"} />
+        <Tile label="Contracts Expiring" value={data.kpi.contractsExpiring30d} tone={data.kpi.contractsExpiring30d > 0 ? "danger" : "default"} />
+      </TileRow>
 
-        {/* KPI row — value + label only, no sub-labels */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "var(--s-4)", marginBottom: "var(--s-5)" }}>
-          {kpis.map((k) => (
-            <div key={k.key} className="jl-kpi">
-              <p className="jl-kpi__value" style={{ color: k.color }}>{data.kpi[k.key]}</p>
-              <p className="jl-kpi__label">{k.label}</p>
-            </div>
+      <Panel caption="Condition breakdown" bodyClassName="flex flex-col gap-3">
+        <ConditionBar good={c.good} fair={c.fair} poor={c.poor} unknown={c.unknown} className="h-3" />
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+          {legend.map(([swatch, label, n]) => (
+            <span key={label} className={cn(TYPE.data, "inline-flex items-center gap-1.5")}>
+              <span className={cn("size-2.5 rounded-sm", swatch)} />
+              <span className="text-muted-foreground">{label}</span>
+              <span className="font-semibold tabular-nums">{n}</span>
+            </span>
           ))}
         </div>
+      </Panel>
 
-        {/* Condition breakdown — full-width horizontal stacked bar in a card */}
-        <div className="jl-card" style={{ marginBottom: "var(--s-5)" }}>
-          <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Condition Breakdown</h2>
-          <div style={{ width: "100%", height: 88 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={barData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" hide />
-                <Tooltip
-                  cursor={{ fill: "var(--ink-50)" }}
-                  contentStyle={{ background: "var(--surface)", borderRadius: 10, border: "none", boxShadow: "var(--sh-lg)", fontSize: 12, fontFamily: "var(--font)", color: "var(--ink-900)" }}
-                />
-                <Bar dataKey="good" stackId="c" name="Good" fill={COND_COLORS.good} radius={[6, 0, 0, 6]} cursor="pointer" onClick={() => setActiveTab(CONDITION_TO_TAB.poor)}>
-                  <Cell fill={COND_COLORS.good} />
-                </Bar>
-                <Bar dataKey="fair" stackId="c" name="Fair" fill={COND_COLORS.fair} cursor="pointer" onClick={() => setActiveTab("poorCondition")}>
-                  <Cell fill={COND_COLORS.fair} />
-                </Bar>
-                <Bar dataKey="poor" stackId="c" name="Poor" fill={COND_COLORS.poor} cursor="pointer" onClick={() => setActiveTab("poorCondition")}>
-                  <Cell fill={COND_COLORS.poor} />
-                </Bar>
-                <Bar dataKey="unknown" stackId="c" name="Unassessed" fill={COND_COLORS.unknown} radius={[0, 6, 6, 0]} cursor="pointer" onClick={() => setActiveTab("poorCondition")}>
-                  <Cell fill={COND_COLORS.unknown} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          {/* Legend */}
-          <div style={{ display: "flex", gap: "var(--s-5)", marginTop: "var(--s-3)", flexWrap: "wrap" }}>
-            {([
-              ["good", "Good", data.conditionBreakdown.good],
-              ["fair", "Fair", data.conditionBreakdown.fair],
-              ["poor", "Poor", data.conditionBreakdown.poor],
-              ["unknown", "Unassessed", data.conditionBreakdown.unknown],
-            ] as const).map(([k, label, count]) => (
-              <div key={k} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: COND_COLORS[k], flexShrink: 0 }} />
-                <span style={{ color: "var(--ink-600)", fontWeight: 600 }}>{label}</span>
-                <span style={{ color: "var(--ink-900)", fontWeight: 800 }}>{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <CompletenessLeaderboard rows={quality} />
 
-        {/* Completeness leaderboard (P19) */}
-        <CompletenessLeaderboard rows={quality} />
+      <Panel caption="Needs attention">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="poorCondition">Poor Condition <Badge variant="secondary">{ai.poorCondition.length}</Badge></TabsTrigger>
+            <TabsTrigger value="serviceOverdue">Service Overdue <Badge variant="secondary">{ai.serviceOverdue.length}</Badge></TabsTrigger>
+            <TabsTrigger value="replaceFlagged">Replace Flagged <Badge variant="secondary">{ai.replaceFlagged.length}</Badge></TabsTrigger>
+            <TabsTrigger value="contractsExpiring">Contracts Expiring <Badge variant="secondary">{ai.contractsExpiring.length}</Badge></TabsTrigger>
+          </TabsList>
+          <TabsContent value="poorCondition" className="pt-3">
+            <DataTable columns={POOR_COLUMNS} rows={ai.poorCondition} rowKey={(r) => `eq-${r.id}`} empty={NOTHING} pageSize={25} card={false} />
+          </TabsContent>
+          <TabsContent value="serviceOverdue" className="pt-3">
+            <DataTable columns={OVERDUE_COLUMNS} rows={ai.serviceOverdue} rowKey={(r) => `sv-${r.id}`} empty={NOTHING} pageSize={25} card={false} />
+          </TabsContent>
+          <TabsContent value="replaceFlagged" className="pt-3">
+            <DataTable columns={REPLACE_COLUMNS} rows={ai.replaceFlagged} rowKey={(r) => (r.kind === "printer" ? `p-${r.serial}` : `e-${r.id}`)} empty={NOTHING} pageSize={25} card={false} />
+          </TabsContent>
+          <TabsContent value="contractsExpiring" className="pt-3">
+            <DataTable columns={CONTRACT_COLUMNS} rows={ai.contractsExpiring} rowKey={(r) => `c-${r.serial}`} empty={NOTHING} pageSize={25} card={false} />
+          </TabsContent>
+        </Tabs>
+      </Panel>
 
-        {/* Attention list */}
-        <div className="jl-card" style={{ marginBottom: "var(--s-5)" }}>
-          <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Needs Attention</h2>
-          <AttentionList tabs={tabs} activeKey={activeTab} onTabChange={setActiveTab} />
-        </div>
-
-        {/* Store health table */}
-        <div className="jl-card">
-          <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Store Health</h2>
-          <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
-            <table className="jl-table">
-              <thead>
-                <tr>
-                  <th>Store</th>
-                  <th>Group</th>
-                  <th className="num">Equipment</th>
-                  <th className="num">Poor</th>
-                  <th className="num">Printers</th>
-                  <th className="num">Replace</th>
-                  <th className="num">Score</th>
-                  <th className="num">Last Activity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.storeHealth.map((row) => (
-                  <tr key={row.store}>
-                    <td>
-                      <Link href={`/stores/${encodeURIComponent(row.store)}`} style={linkStyle}>{row.store}</Link>
-                    </td>
-                    <td style={{ color: "var(--ink-500)" }}>{row.group ?? ""}</td>
-                    <td className="num cell-strong">{row.equipment}</td>
-                    <td className="num" style={{ color: row.poor > 0 ? "var(--red-500)" : "var(--ink-300)", fontWeight: row.poor > 0 ? 700 : 500 }}>{row.poor}</td>
-                    <td className="num" style={{ color: "var(--ink-600)" }}>{row.printers}</td>
-                    <td className="num" style={{ color: row.replace > 0 ? "var(--amber-700)" : "var(--ink-300)", fontWeight: row.replace > 0 ? 700 : 500 }}>{row.replace}</td>
-                    <td className="num">
-                      <span className={scoreBadgeClass(row.score)}>{Math.round(row.score * 100)}%</span>
-                    </td>
-                    <td className="num" style={{ color: "var(--ink-400)", fontSize: 12 }}>{fmtDate(row.lastActivity)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </AppShell>
+      <Panel caption="Store health">
+        <DataTable columns={STORE_COLUMNS} rows={data.storeHealth} rowKey={(r) => r.store} card={false} />
+      </Panel>
+    </Page>
   );
 }

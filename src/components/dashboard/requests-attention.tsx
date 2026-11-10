@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertOctagon, Clock, UserX, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { Muted } from "@/components/machines/panel";
+import { SURFACE, TYPE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
 
 /**
- * "Needs your attention" strip for the head-office dashboard — the response side
- * of the store feedback loop, summarised. Shows open / overdue / unassigned
+ * "Needs your attention" strip for the head-office dashboard: the response side
+ * of the store feedback loop, summarised. Shows open, overdue and unassigned
  * replacement requests at a glance and links into the triage report. Admin-only
  * data (the requests API scopes it); renders nothing if there's nothing open.
  */
@@ -36,43 +39,36 @@ export function RequestsAttention() {
     return () => { alive = false; };
   }, []);
 
-  if (reqs === null) return null; // loading — stay quiet
+  if (reqs === null) return null; // loading: stay quiet
   const active = reqs.filter((r) => r.status === "open" || r.status === "reviewing");
-  if (active.length === 0) return null; // nothing needs attention → no noise
+  if (active.length === 0) return null; // nothing needs attention: no noise
 
   const openCount = reqs.filter((r) => r.status === "open").length;
   const overdueCount = active.filter(overdue).length;
   const unassignedCount = active.filter((r) => !r.assigned_to_name).length;
 
-  const tiles: { icon: typeof Clock; label: string; value: number; tone: string }[] = [
-    { icon: AlertOctagon, label: "Open requests", value: openCount, tone: "var(--amber-600)" },
-    { icon: Clock, label: "Overdue", value: overdueCount, tone: "var(--red-600)" },
-    { icon: UserX, label: "Unassigned", value: unassignedCount, tone: "var(--ink-600)" },
+  const figures: { label: string; value: number; alarm?: boolean }[] = [
+    { label: "Open requests", value: openCount },
+    { label: "Overdue", value: overdueCount, alarm: true },
+    { label: "Unassigned", value: unassignedCount },
   ];
 
   return (
     <Link
       href="/reports/replacements"
-      className="jl-card"
-      style={{
-        display: "flex", alignItems: "center", gap: 20, padding: "14px 18px",
-        textDecoration: "none", border: overdueCount > 0 ? "1px solid var(--red-tint)" : undefined,
-      }}
+      className={cn(SURFACE.cardRaised, "flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 outline-none hover:bg-muted focus-visible:bg-muted")}
     >
-      <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ink-900)", whiteSpace: "nowrap" }}>
-        Needs your attention
-      </span>
-      <div style={{ display: "flex", gap: 22, flexWrap: "wrap", flex: 1 }}>
-        {tiles.map((t) => (
-          <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            <t.icon size={16} style={{ color: t.tone }} />
-            <span style={{ fontSize: 18, fontWeight: 800, color: t.value > 0 ? t.tone : "var(--ink-400)", fontVariantNumeric: "tabular-nums" }}>{t.value}</span>
-            <span style={{ fontSize: 12, color: "var(--ink-500)" }}>{t.label}</span>
+      <span className={TYPE.section}>Needs your attention</span>
+      <span className="flex flex-1 flex-wrap gap-x-6 gap-y-1">
+        {figures.map((f) => (
+          <span key={f.label} className="inline-flex items-baseline gap-1.5">
+            <span className={cn(TYPE.section, "tabular-nums", f.value === 0 ? "text-faint" : f.alarm && "text-deficit")}>{f.value}</span>
+            <Muted>{f.label}</Muted>
           </span>
         ))}
-      </div>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "var(--red-500)", whiteSpace: "nowrap" }}>
-        Review <ArrowRight size={14} />
+      </span>
+      <span className={cn(TYPE.data, "inline-flex items-center gap-1 font-medium text-primary")}>
+        Review <ArrowRight className="size-3.5" />
       </span>
     </Link>
   );

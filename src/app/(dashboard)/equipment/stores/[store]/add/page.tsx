@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { AppShell } from "@/components/layout/app-shell";
-import { toast } from "sonner";
-import { ChevronLeft, Plus } from "lucide-react";
-import {
-  EQUIPMENT_STATUSES, STATUS_CONFIG, EQUIPMENT_TYPES,
-  type EquipmentStatus,
-} from "@/lib/equipment-utils";
-import { JlSelect } from "@/components/ui/jl-select";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
+import { Spinner } from "@/components/ui/spinner";
 import { ModelSuggest } from "@/components/equipment/model-suggest";
+import { Field } from "@/components/machines/field";
+import { LinkButton } from "@/components/machines/link-button";
+import { Page } from "@/components/machines/page";
+import { Panel } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
+import { EQUIPMENT_STATUS_LABEL } from "@/components/machines/status-badge";
+import { EQUIPMENT_STATUSES, EQUIPMENT_TYPES, type EquipmentStatus } from "@/lib/equipment-utils";
+import { toast } from "@/lib/toast";
 
 const CONDITION_OPTIONS = [
   { value: "Good", label: "Good" },
@@ -61,124 +65,39 @@ export default function AddEquipmentPage() {
   };
 
   return (
-    <AppShell>
-      {/* Sticky top bar with breadcrumb + save */}
-      <div
-        className="jl-page-pad"
-        style={{
-          position: "sticky", top: 0, zIndex: 30,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12, height: 64, padding: "0 40px", background: "var(--surface)",
-          boxShadow: "var(--sh-sm)",
-        }}
-      >
-        <nav className="jl-breadcrumb">
-          <Link href="/equipment">Stores</Link>
-          <span className="sep">/</span>
-          <Link href={storeHref}>{storeName}</Link>
-          <span className="sep">/</span>
-          <span className="current">Add Equipment</span>
-        </nav>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="jl-btn jl-btn--primary jl-btn--sm jl-touch-btn"
-          data-loading={saving ? "" : undefined}
-        >
-          <Plus /> Save Equipment
-        </button>
-      </div>
-
-      <div
-        className="jl-page-pad"
-        style={{ padding: "28px 40px 60px", maxWidth: 720, margin: "0 auto" }}
-      >
-        <div style={{ marginBottom: 20 }}>
-          <Link
-            href={storeHref}
-            className="jl-btn jl-btn--ghost jl-btn--sm jl-touch-btn"
-            style={{ marginBottom: 14 }}
-          >
-            <ChevronLeft /> Back to {storeName}
-          </Link>
-          <h1 className="jl-h1">Add Equipment</h1>
-        </div>
-
-        <div className="jl-card">
-          <div style={{ display: "grid", gap: 18 }}>
-            <div
-              className="jl-add-grid"
-              style={{ display: "grid", gridTemplateColumns: "1.2fr 1.5fr 1fr", gap: 14 }}
-            >
-              <div className="jl-field">
-                <label>Type *</label>
-                <JlSelect
-                  value={type}
-                  onChange={setType}
-                  placeholder="Select type…"
-                  options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: t }))}
-                />
-              </div>
-              <div className="jl-field">
-                <label>Make / Model</label>
-                <ModelSuggest value={makeModel} onChange={setMakeModel} placeholder="Search or add model…" />
-              </div>
-              <div className="jl-field">
-                <label>Serial</label>
-                <input
-                  className="jl-input jl-mono"
-                  value={serial}
-                  onChange={(e) => setSerial(e.target.value)}
-                  placeholder="Serial…"
-                />
-              </div>
-            </div>
-
-            <div
-              className="jl-add-grid"
-              style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: 24, alignItems: "flex-start" }}
-            >
-              <div className="jl-field">
-                <label>Status</label>
-                <div className="jl-segment" role="tablist" aria-label="Status">
-                  {EQUIPMENT_STATUSES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      role="tab"
-                      aria-selected={status === s}
-                      onClick={() => setStatus(s)}
-                      className="jl-touch-toggle"
-                    >
-                      {STATUS_CONFIG[s].label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="jl-field">
-                <label>Condition</label>
-                <JlSelect value={condition} onChange={setCondition} options={CONDITION_OPTIONS} />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-              <Link href={storeHref} className="jl-btn jl-btn--ghost jl-touch-btn">
-                Cancel
-              </Link>
-              <button
-                type="button"
-                onClick={save}
-                disabled={saving}
-                className="jl-btn jl-btn--primary jl-touch-btn"
-                data-loading={saving ? "" : undefined}
-              >
-                <Plus /> Save Equipment
-              </button>
-            </div>
+    <Page
+      title="Add Equipment"
+      crumbs={[{ label: "Stores", href: "/equipment" }, { label: storeName, href: storeHref }, { label: "Add Equipment" }]}
+    >
+      <Panel className="w-full max-w-3xl">
+        <div className="flex flex-col gap-4 pt-1">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Type *" htmlFor="eq-type">
+              <Pick id="eq-type" value={type} onChange={setType} placeholder="Select type" options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: t }))} />
+            </Field>
+            <Field label="Make / Model">
+              <ModelSuggest value={makeModel} onChange={setMakeModel} placeholder="Search or add model" />
+            </Field>
+            <Field label="Serial" htmlFor="eq-serial">
+              <Input id="eq-serial" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="Serial" />
+            </Field>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Status" className="sm:col-span-2">
+              <Segmented label="Status" value={status} onValueChange={(v) => setStatus(v as EquipmentStatus)} options={EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))} />
+            </Field>
+            <Field label="Condition" htmlFor="eq-condition">
+              <Pick id="eq-condition" value={condition} onChange={setCondition} options={CONDITION_OPTIONS} />
+            </Field>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2.5">
+            <LinkButton href={storeHref} variant="outline">Cancel</LinkButton>
+            <Button onClick={save} disabled={saving}>
+              {saving ? <Spinner /> : <Plus />} Save Equipment
+            </Button>
           </div>
         </div>
-      </div>
-    </AppShell>
+      </Panel>
+    </Page>
   );
 }

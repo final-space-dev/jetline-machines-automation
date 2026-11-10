@@ -1,18 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AppShell } from "@/components/layout/app-shell";
+import { ChevronDown, ChevronRight, Download, Plus, Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { Empty } from "@/components/machines/empty";
+import { Field } from "@/components/machines/field";
+import { LinkButton } from "@/components/machines/link-button";
+import { Loading } from "@/components/machines/loading";
+import { ConditionBar } from "@/components/machines/mix-bar";
+import { Page } from "@/components/machines/page";
+import { Pick } from "@/components/machines/pick";
+import { EQUIPMENT_STATUS_LABEL } from "@/components/machines/status-badge";
+import { Tile, TileRow } from "@/components/machines/tile";
+import { EQUIPMENT_STATUSES, EQUIPMENT_TYPES, type EquipmentStatus } from "@/lib/equipment-utils";
+import { getMainGroups, getStoreGroup, getStoreGroupsByMain } from "@/lib/store-groups";
+import { toast } from "@/lib/toast";
+import { SURFACE, TYPE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
 import { useRole } from "@/lib/use-role";
-import { EQUIPMENT_TYPES, EQUIPMENT_STATUSES, STATUS_CONFIG, type EquipmentStatus } from "@/lib/equipment-utils";
-import { JlSelect } from "@/components/ui/jl-select";
-import { getStoreGroup, getMainGroups, getStoreGroupsByMain } from "@/lib/store-groups";
-import { toast } from "sonner";
-import {
-  Plus, Search, ChevronRight, ChevronDown, Package,
-  X, Download,
-} from "lucide-react";
-import { CompletenessBadge } from "@/components/equipment/completeness-badge";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,16 +70,15 @@ const UNGROUPED_SUB = "Ungrouped";
 
 const STORE_NAMES = ["Alberton","Bedfordview","Benoni","Blackheath","Boksburg","Brooklyn","Bryanston","Centurion","Century City","Constantia","Die Bult","Durban","Fixtrade","Fourways","Fox Street","Foxstreet","Gardens","George","Greenpoint","Hillcrest","Hydepark","Illovo","Klerksdorp","Kyalami","Loftus","Melrose","Menlyn","Midrand","Mmabatho","Modderfontein","Montana","Nelspruit","Parktown","Pietermaritzburg","Polokwane","Potchefstroom","Randburg","Rivonia","Rosebank","Rustenburg","Sandown","Stellenbosch","Sunninghill","Tygervalley","Umhlanga","Waterfront","Wits","Woodmead"];
 
-// Responsive store grid — cards lift on canvas via shadow (no white-on-white).
-const GRID: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 };
+// ─── Add Equipment dialog ─────────────────────────────────────────────────────
 
-// ─── Add Equipment Modal ──────────────────────────────────────────────────────
-
-function AddEquipmentModal({
+function AddEquipmentDialog({
+  open,
   defaultStore,
   onClose,
   onSaved,
 }: {
+  open: boolean;
   defaultStore?: string;
   onClose: () => void;
   onSaved: () => void;
@@ -81,7 +93,6 @@ function AddEquipmentModal({
     status: "active",
   });
   const [saving, setSaving] = useState(false);
-  const backdropRef = useRef<HTMLDivElement>(null);
 
   const set = (k: keyof EquipmentItem, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -109,158 +120,77 @@ function AddEquipmentModal({
   };
 
   return (
-    <div
-      className="jl-overlay"
-      data-open
-      ref={backdropRef}
-      onClick={(e) => { if (e.target === backdropRef.current) onClose(); }}
-    >
-      <div className="jl-modal" style={{ maxWidth: 520 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
-          <h2 className="jl-modal__title">Add Equipment</h2>
-          <button onClick={onClose} className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm" aria-label="Close"><X size={16} /></button>
-        </div>
-
-        <div style={{ display: "grid", gap: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div className="jl-field">
-              <label>Store *</label>
-              <JlSelect
-                value={form.store}
-                onChange={(v) => set("store", v)}
-                placeholder="Select store"
-                options={STORE_NAMES.map((s) => ({ value: s, label: s }))}
-              />
-            </div>
-            <div className="jl-field">
-              <label>Type *</label>
-              <JlSelect
-                value={form.machine_type}
-                onChange={(v) => set("machine_type", v)}
-                placeholder="Select type"
-                options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: t }))}
-              />
-            </div>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent size="form">
+        <DialogHeader>
+          <DialogTitle>Add Equipment</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Store *" htmlFor="add-store">
+              <Pick id="add-store" value={form.store} onChange={(v) => set("store", v)} placeholder="Select store" options={STORE_NAMES.map((s) => ({ value: s, label: s }))} />
+            </Field>
+            <Field label="Type *" htmlFor="add-type">
+              <Pick id="add-type" value={form.machine_type} onChange={(v) => set("machine_type", v)} placeholder="Select type" options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: t }))} />
+            </Field>
           </div>
-
-          <div className="jl-field">
-            <label>Make / Model</label>
-            <input className="jl-input" value={form.make_model} onChange={(e) => set("make_model", e.target.value)} placeholder="e.g. Polar Mohr 76EM" />
+          <Field label="Make / Model" htmlFor="add-model">
+            <Input id="add-model" value={form.make_model} onChange={(e) => set("make_model", e.target.value)} placeholder="e.g. Polar Mohr 76EM" />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Serial Number" htmlFor="add-serial">
+              <Input id="add-serial" value={form.serial} onChange={(e) => set("serial", e.target.value)} placeholder="Serial" />
+            </Field>
+            <Field label="Located At" htmlFor="add-located">
+              <Input id="add-located" value={form.located_at} onChange={(e) => set("located_at", e.target.value)} placeholder="If different from store" />
+            </Field>
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div className="jl-field">
-              <label>Serial Number</label>
-              <input className="jl-input" value={form.serial} onChange={(e) => set("serial", e.target.value)} placeholder="Serial" />
-            </div>
-            <div className="jl-field">
-              <label>Located At</label>
-              <input className="jl-input" value={form.located_at} onChange={(e) => set("located_at", e.target.value)} placeholder="If different from store" />
-            </div>
-          </div>
-
-          <div className="jl-field">
-            <label>Condition</label>
-            <textarea
-              className="jl-textarea"
-              value={form.condition}
-              onChange={(e) => set("condition", e.target.value)}
-              placeholder="Describe the condition"
-              rows={3}
+          <Field label="Condition" htmlFor="add-condition">
+            <Textarea id="add-condition" value={form.condition} onChange={(e) => set("condition", e.target.value)} placeholder="Describe the condition" rows={3} />
+          </Field>
+          <Field label="Status">
+            <Segmented
+              label="Status"
+              value={form.status}
+              onValueChange={(v) => set("status", v)}
+              options={EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))}
             />
-          </div>
-
-          <div className="jl-field">
-            <label>Status</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {EQUIPMENT_STATUSES.map((s) => {
-                const cfg = STATUS_CONFIG[s];
-                const active = form.status === s;
-                return (
-                  <button
-                    key={s}
-                    onClick={() => set("status", s)}
-                    className="jl-touch-btn"
-                    style={{
-                      padding: "6px 14px", borderRadius: "var(--r-pill)", fontSize: 12, fontWeight: 700,
-                      cursor: "pointer",
-                      background: active ? cfg.bg : "var(--ink-50)",
-                      color: active ? cfg.color : "var(--ink-500)",
-                      boxShadow: active ? `inset 0 0 0 1.5px ${cfg.color}` : "none",
-                      transition: "all var(--t-fast) var(--ease)",
-                    }}
-                  >{cfg.label}</button>
-                );
-              })}
-            </div>
-          </div>
+          </Field>
         </div>
-
-        <div className="jl-modal__foot">
-          <button onClick={onClose} className="jl-btn jl-btn--ghost jl-touch-btn">Cancel</button>
-          <button onClick={save} disabled={saving} data-loading={saving ? "" : undefined} className="jl-btn jl-btn--primary jl-touch-btn">
-            <Plus size={15} />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? <Spinner /> : <Plus />}
             Add Equipment
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-// ─── Condition health bar (8px desktop, 12px mobile via .jl-health-bar) ───────
+// ─── Store row ────────────────────────────────────────────────────────────────
 
-function ConditionBar({ good, fair, poor, unknown }: { good: number; fair: number; poor: number; unknown: number }) {
-  return (
-    <div className="jl-health-bar" style={{ display: "flex", gap: 3, height: 8 }}>
-      {good > 0 && (
-        <div title={`${good} in good condition`} style={{ flex: good, background: "var(--green-500)", borderRadius: 99, transition: "flex var(--t-slow)" }} />
-      )}
-      {fair > 0 && (
-        <div title={`${fair} in fair condition`} style={{ flex: fair, background: "var(--amber-500)", borderRadius: 99 }} />
-      )}
-      {poor > 0 && (
-        <div title={`${poor} in poor condition`} style={{ flex: poor, background: "var(--red-500)", borderRadius: 99 }} />
-      )}
-      {unknown > 0 && (
-        <div title={`${unknown} not assessed`} style={{ flex: unknown, background: "var(--ink-200)", borderRadius: 99 }} />
-      )}
-    </div>
-  );
-}
-
-// ─── Store Card ───────────────────────────────────────────────────────────────
-
-function StoreCard({ store }: { store: ResolvedStore; onAdd?: (storeName: string) => void; score?: number | null }) {
+function StoreRow({ store, score }: { store: ResolvedStore; score?: number }) {
   const total = store.equipment_count;
   const { good, fair, poor } = store.condition;
   const unknown = Math.max(0, total - good - fair - poor);
-  const hasData = store.has_data;
 
   return (
-    <a
+    <Link
       href={`/equipment/stores/${encodeURIComponent(store.name)}`}
-      className="jl-card jl-card--interactive"
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", textDecoration: "none", color: "inherit" }}
-      title={`Open ${store.name}`}
+      title={typeof score === "number" ? `Open ${store.name} · ${Math.round(score)}% complete` : `Open ${store.name}`}
+      className="flex items-center gap-2.5 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:bg-muted"
     >
-      <span
-        className={hasData ? "jl-dot jl-dot--green" : "jl-dot jl-dot--amber"}
-        style={{ flexShrink: 0 }}
-        title={hasData ? "Has equipment data" : "No equipment data yet"}
-      />
-      <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 0, maxWidth: "45%" }}>
-        {store.name}
+      <span className={cn(TYPE.data, "max-w-1/2 shrink-0 truncate font-semibold")}>{store.name}</span>
+      <span className="min-w-0 flex-1">
+        {store.has_data && total > 0 ? <ConditionBar good={good} fair={fair} poor={poor} unknown={unknown} /> : null}
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {hasData && total > 0 && <ConditionBar good={good} fair={fair} poor={poor} unknown={unknown} />}
-      </div>
-      <ChevronRight size={16} style={{ color: "var(--ink-300)", flexShrink: 0 }} />
-    </a>
+      {!store.has_data && <Badge status="warning">No data</Badge>}
+      <ChevronRight className="size-4 shrink-0 text-faint" />
+    </Link>
   );
 }
-
-// ─── Group Header Card ─────────────────────────────────────────────────────────
 
 interface GroupBucket {
   key: string;
@@ -272,91 +202,10 @@ interface GroupBucket {
   poor: number;
 }
 
-function GroupHeaderCard({
-  bucket,
-  collapsed,
-  onToggle,
-}: {
-  bucket: GroupBucket;
-  collapsed: boolean;
-  onToggle: () => void;
-}) {
-  const unknown = Math.max(0, bucket.totalEquipment - bucket.good - bucket.fair - bucket.poor);
-  return (
-    <button
-      onClick={onToggle}
-      className="jl-card jl-card--pad-sm jl-card--interactive"
-      aria-expanded={!collapsed}
-      style={{
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        marginBottom: 14,
-      }}
-    >
-      <span className="jl-chip jl-chip--sm jl-chip--neutral">
-        {collapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
-      </span>
-
-      <div style={{ minWidth: 0, flex: "0 0 auto" }}>
-        <p className="jl-h3" style={{ whiteSpace: "nowrap" }}>
-          {bucket.title}{" "}
-          <span className="jl-muted" style={{ fontSize: 13, fontWeight: 600 }}>
-            ({bucket.stores.length} {bucket.stores.length === 1 ? "store" : "stores"})
-          </span>
-        </p>
-        <div style={{ marginTop: 6 }}>
-          <span className="jl-badge">
-            <Package size={12} /> {bucket.totalEquipment} items
-          </span>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, minWidth: 120, maxWidth: 360 }}>
-        {bucket.totalEquipment > 0 && (
-          <ConditionBar good={bucket.good} fair={bucket.fair} poor={bucket.poor} unknown={unknown} />
-        )}
-      </div>
-    </button>
-  );
-}
-
-// ─── KPI Card (jl-kpi) ────────────────────────────────────────────────────────
-
-function KpiCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
-  return (
-    <div className="jl-kpi">
-      <div className="jl-kpi__top">
-        <span className="jl-kpi__label">{label}</span>
-      </div>
-      <div className="jl-kpi__value" style={accent ? { color: accent } : undefined}>{value}</div>
-    </div>
-  );
-}
-
-// ─── Group View Toggle (jl-segment) ───────────────────────────────────────────
-
 const VIEW_OPTIONS: { value: GroupView; label: string }[] = [
   { value: "storeGroup", label: "By Store Group" },
   { value: "mainGroup", label: "By Main Group" },
 ];
-
-function GroupViewToggle({ view, onChange }: { view: GroupView; onChange: (v: GroupView) => void }) {
-  return (
-    <div className="jl-segment" role="tablist" style={{ flexWrap: "wrap" }}>
-      {VIEW_OPTIONS.map((o) => (
-        <button
-          key={o.value}
-          role="tab"
-          aria-selected={view === o.value}
-          onClick={() => onChange(o.value)}
-          className="jl-touch-btn"
-        >{o.label}</button>
-      ))}
-    </div>
-  );
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -365,11 +214,11 @@ export default function EquipmentCRMPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [modalStore, setModalStore] = useState<string | undefined>();
+  const [modalKey, setModalKey] = useState(0);
   const [view, setView] = useState<GroupView>("storeGroup");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  // P19: single admin call maps a completeness score per store onto the cards,
-  // avoiding one /completeness request per visible card (N+1). Keyed lowercase.
+  // P19: single admin call maps a completeness score per store onto the rows,
+  // avoiding one /completeness request per visible store (N+1). Keyed lowercase.
   const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
 
   // Role gate: the 48-store grid is admin-only. Store staff are sent straight
@@ -379,28 +228,24 @@ export default function EquipmentCRMPage() {
   const { isAdmin, role, store, loading: roleLoading } = useRole();
   const isStoreStaff = role === "store_staff";
 
-  // All Stores is admin-only. Store staff are redirected to their own store
-  // (defence-in-depth alongside the role-scoped APIs).
   useEffect(() => {
     if (!roleLoading && isStoreStaff) {
       router.replace(store ? `/equipment/stores/${encodeURIComponent(store)}` : "/");
     }
   }, [roleLoading, isStoreStaff, store, router]);
 
-  // SSR-safe: read persisted toggle after mount (default "store" on first render → no hydration mismatch)
+  // SSR-safe: read the persisted toggle after mount (no hydration mismatch).
   useEffect(() => {
     try {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY);
-      if (saved === "store" || saved === "storeGroup" || saved === "mainGroup") {
-        setView(saved);
-      }
+      if (saved === "storeGroup" || saved === "mainGroup") setView(saved);
     } catch {
-      // localStorage unavailable — keep default
+      // localStorage unavailable: keep the default
     }
   }, []);
 
-  const changeView = useCallback((v: GroupView) => {
-    setView(v);
+  const changeView = useCallback((v: string) => {
+    setView(v as GroupView);
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, v);
     } catch {
@@ -440,8 +285,6 @@ export default function EquipmentCRMPage() {
       .catch(() => { /* scores optional */ });
     return () => { alive = false; };
   }, []);
-
-  const openAdd = (storeName?: string) => { setModalStore(storeName); setShowModal(true); };
 
   // Resolve group fields: prefer API values, fall back to client-side getStoreGroup.
   const resolved = useMemo<ResolvedStore[]>(() => {
@@ -489,11 +332,10 @@ export default function EquipmentCRMPage() {
 
     for (const s of filtered) {
       // By Store Group buckets on storeGroup ALONE (holding group is irrelevant
-      // here — same-named store groups across holdings merge into one column).
+      // here: same-named store groups across holdings merge into one column).
       // By Main Group buckets on mainGroup.
       const key = view === "mainGroup" ? s.mainGroup : s.storeGroup;
-      const title = view === "mainGroup" ? s.mainGroup : s.storeGroup;
-      const b = ensure(key, title);
+      const b = ensure(key, key);
       b.stores.push(s);
       b.totalEquipment += s.equipment_count;
       b.good += s.condition.good;
@@ -520,119 +362,80 @@ export default function EquipmentCRMPage() {
     return [...ordered, ...rest];
   }, [view, filtered]);
 
-  const toggleGroup = (key: string) =>
-    setCollapsed((c) => ({ ...c, [key]: !c[key] }));
+  const toggleGroup = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }));
 
   // Never render the 48-store grid to store staff (or before the role resolves).
-  // Store staff are redirected by the effect above; render a neutral shell in
-  // the meantime so no store's data flashes.
+  // Store staff are redirected by the effect above; render the bare page in the
+  // meantime so no store's data flashes.
   if (roleLoading || !isAdmin) {
-    return (
-      <AppShell>
-        <div className="jl-page-pad" style={{ padding: "12px 24px" }} />
-      </AppShell>
-    );
+    return <Page title="Equipment"><span /></Page>;
   }
 
   return (
-    <AppShell>
-      <div className="jl-page-pad" style={{ padding: "12px 24px" }}>
+    <Page
+      title="Equipment"
+      actions={
+        <>
+          <LinkButton href="/api/equipment/export" download variant="outline">
+            <Download /> Export CSV
+          </LinkButton>
+          <Button onClick={() => { setModalKey((k) => k + 1); setShowModal(true); }}>
+            <Plus /> Add Equipment
+          </Button>
+        </>
+      }
+    >
+      <TileRow>
+        <Tile label="Total Items" value={totalItems} />
+        <Tile label="Stores with Data" value={storesWithData} />
+        <Tile label="Needs Attention" value={needingAttention} tone={needingAttention > 0 ? "danger" : "default"} />
+        <Tile label="Poor Condition" value={totalPoor} tone={totalPoor > 0 ? "danger" : "default"} />
+      </TileRow>
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28, gap: 16, flexWrap: "wrap" }}>
-          <h1 className="jl-h1">Equipment</h1>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <a href="/api/equipment/export" download className="jl-btn jl-btn--secondary jl-touch-btn">
-              <Download size={16} /> Export CSV
-            </a>
-            <button onClick={() => openAdd()} className="jl-btn jl-btn--primary jl-touch-btn">
-              <Plus size={16} /> Add Equipment
-            </button>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Segmented label="Group stores" value={view} onValueChange={changeView} options={VIEW_OPTIONS} />
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
+          <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search stores" aria-label="Search stores" className="pl-9" />
         </div>
-
-        {/* KPI strip */}
-        <div className="jl-grid-kpi" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
-          <KpiCard label="Total Items" value={totalItems} />
-          <KpiCard label="Stores with Data" value={storesWithData} accent="var(--green-700)" />
-          <KpiCard label="Needs Attention" value={needingAttention} accent={needingAttention > 0 ? "var(--amber-700)" : "var(--green-700)"} />
-          <KpiCard label="Poor Condition" value={totalPoor} accent={totalPoor > 0 ? "var(--red-600)" : "var(--green-700)"} />
-        </div>
-
-        {/* Controls: view toggle + search */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-          <GroupViewToggle view={view} onChange={changeView} />
-          <div className="jl-search" style={{ width: 340, maxWidth: "100%" }}>
-            <Search size={18} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search stores"
-              style={search ? { paddingRight: 42 } : undefined}
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                aria-label="Clear search"
-                className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                style={{ position: "absolute", right: 6 }}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, height: 160, color: "var(--ink-400)", fontSize: 13.5 }}>
-            <span className="jl-spinner jl-spinner--sm" /> Loading stores
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="jl-card" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160, color: "var(--ink-400)", fontSize: 13.5 }}>
-            No stores match your search.
-          </div>
-        ) : (
-          // ── Grouped views: columns of groups, stores stacked below each collapsible header ──
-          <div className="jl-group-columns">
-            {buckets.map((b) => {
-              const isCollapsed = !!collapsed[b.key];
-              return (
-                <div key={b.key} className="jl-group-col">
-                  <button
-                    type="button"
-                    className="jl-group-col__head"
-                    onClick={() => toggleGroup(b.key)}
-                    aria-expanded={!isCollapsed}
-                    title={isCollapsed ? "Expand" : "Collapse"}
-                  >
-                    <ChevronDown
-                      size={15}
-                      style={{ color: "var(--ink-400)", flexShrink: 0, transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform var(--t-fast) var(--ease)" }}
-                    />
-                    <div className="jl-group-col__title">{b.title}</div>
-                    <span className="jl-badge">{b.stores.length}</span>
-                  </button>
-                  {!isCollapsed && (
-                    <div className="jl-group-col__stores">
-                      {[...b.stores]
-                        .sort((a, s) => a.name.localeCompare(s.name))
-                        .map((s) => <StoreCard key={s.name} store={s} />)}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
-      {showModal && (
-        <AddEquipmentModal
-          defaultStore={modalStore}
-          onClose={() => { setShowModal(false); setModalStore(undefined); }}
-          onSaved={fetchStores}
-        />
+      {loading ? (
+        <Loading label="Loading stores" />
+      ) : filtered.length === 0 ? (
+        <Empty title="No stores match your search" />
+      ) : (
+        // Columns of groups; the stores stack under each collapsible heading.
+        <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {buckets.map((b) => {
+            const isCollapsed = !!collapsed[b.key];
+            return (
+              <section key={b.key} className={cn(SURFACE.card, "flex min-w-0 flex-col p-2")}>
+                <Button
+                  variant="ghost"
+                  className="h-auto w-full justify-start gap-2 px-2 py-2"
+                  onClick={() => toggleGroup(b.key)}
+                  aria-expanded={!isCollapsed}
+                  title={isCollapsed ? "Expand" : "Collapse"}
+                >
+                  {isCollapsed ? <ChevronRight /> : <ChevronDown />}
+                  <span className={cn(TYPE.section, "min-w-0 flex-1 truncate text-left")}>{b.title}</span>
+                  <Badge variant="secondary">{b.stores.length}</Badge>
+                </Button>
+                {!isCollapsed && (
+                  <div className="flex flex-col">
+                    {[...b.stores]
+                      .sort((a, s) => a.name.localeCompare(s.name))
+                      .map((s) => <StoreRow key={s.name} store={s} score={scoreMap[s.name.trim().toLowerCase()]} />)}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
-    </AppShell>
+
+      <AddEquipmentDialog key={modalKey} open={showModal} onClose={() => setShowModal(false)} onSaved={fetchStores} />
+    </Page>
   );
 }

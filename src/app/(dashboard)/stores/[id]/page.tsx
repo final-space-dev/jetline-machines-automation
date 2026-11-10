@@ -1,32 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { AppShell } from "@/components/layout/app-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useParams } from "next/navigation";
+import { Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { PageLoading } from "@/components/ui/page-loading";
-import { NotFoundState } from "@/components/ui/empty-state";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  ArrowLeft,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Target,
-  AlertTriangle,
-  CheckCircle,
-  Zap,
-} from "lucide-react";
-import { formatNumber, formatDate, cn, getStatusVariant } from "@/lib/utils";
-import { utilizationConfig, type UtilizationStatus } from "@/components/ui/utilization-badge";
-import type { MachineWithRelations, MachineUtilization } from "@/types";
+import { KeyValueList } from "@/components/ui/key-value-list";
+import { Progress } from "@/components/ui/progress";
+import { Tooltip } from "@/components/ui/tooltip";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Empty } from "@/components/machines/empty";
+import { LinkButton } from "@/components/machines/link-button";
+import { Loading } from "@/components/machines/loading";
+import { Page } from "@/components/machines/page";
+import { Muted, Panel } from "@/components/machines/panel";
+import { ReadField } from "@/components/machines/read-field";
+import { UTILIZATION, UtilizationBadge, type UtilizationStatus } from "@/components/machines/status-badge";
+import { GRID } from "@/lib/ui/ui-tokens";
+import { formatDate, formatNumber } from "@/lib/utils";
+import type { MachineUtilization, MachineWithRelations } from "@/types";
 
 interface MachineWithUtil extends MachineWithRelations {
   utilization?: MachineUtilization;
@@ -54,8 +45,54 @@ interface UtilizationSummary {
   avgUtilization: number;
 }
 
+const MACHINE_STATUS: Record<string, "success" | "neutral" | "info" | "danger"> = {
+  ACTIVE: "success",
+  INACTIVE: "neutral",
+  MAINTENANCE: "info",
+  DECOMMISSIONED: "danger",
+};
+
+const TREND = { up: "rising", down: "falling", stable: "steady" } as const;
+
+const MACHINE_COLUMNS: Column<MachineWithUtil>[] = [
+  { key: "serial", label: "Serial", sortValue: (m) => m.serialNumber, cell: (m) => <span className="tabular-nums">{m.serialNumber}</span> },
+  { key: "model", label: "Model", hideBelow: "sm", sortValue: (m) => m.modelName ?? "", cell: (m) => m.modelName || "-" },
+  {
+    key: "utilization",
+    label: "Utilization",
+    sortValue: (m) => m.utilization?.utilizationPercent ?? -1,
+    cell: (m) => {
+      const util = m.utilization;
+      if (!util) return <Muted>—</Muted>;
+      return (
+        <span className="inline-flex items-center gap-2" title={`Avg ${formatNumber(util.avgMonthlyVolume)} a month · Duty ${formatNumber(util.dutyCycle)} · ${TREND[util.trendDirection as keyof typeof TREND] ?? ""}`}>
+          <UtilizationBadge percent={util.utilizationPercent} status={util.utilizationStatus as UtilizationStatus} />
+        </span>
+      );
+    },
+  },
+  {
+    key: "lift",
+    label: "Lift",
+    hideBelow: "md",
+    sortValue: (m) => m.utilization?.liftScore ?? -1,
+    cell: (m) => {
+      const util = m.utilization;
+      if (!util || util.liftScore < 60) return <Muted>—</Muted>;
+      return (
+        <Tooltip content={[`Lift score ${util.liftScore} of 100`, ...util.insights.slice(0, 2)].join(". ")}>
+          <Badge status={util.liftScore >= 80 ? "danger" : "warning"}>
+            <Target /> {util.liftScore}
+          </Badge>
+        </Tooltip>
+      );
+    },
+  },
+  { key: "balance", label: "Balance", align: "right", hideBelow: "sm", sortValue: (m) => m.currentBalance || 0, cell: (m) => <span className={GRID.num}>{formatNumber(m.currentBalance)}</span> },
+  { key: "status", label: "Status", sortValue: (m) => m.status, cell: (m) => <Badge status={MACHINE_STATUS[m.status] ?? "neutral"}>{m.status}</Badge> },
+];
+
 export default function StoreDetailPage() {
-  const router = useRouter();
   const params = useParams();
   const storeId = params.id as string;
 
@@ -137,391 +174,115 @@ export default function StoreDetailPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <AppShell>
-        <PageLoading variant="detail" />
-      </AppShell>
-    );
-  }
+  if (isLoading) return <Loading />;
 
   if (!store) {
     return (
-      <AppShell>
-        <NotFoundState type="store" />
-        <div className="flex justify-center mt-4">
-          <Button onClick={() => router.push("/stores")}>
-            Back to Stores
-          </Button>
+      <Page title="Store not found">
+        <Empty title="This store does not exist or has been removed" />
+        <div className="flex justify-center">
+          <LinkButton href="/stores">Back to Stores</LinkButton>
         </div>
-      </AppShell>
+      </Page>
     );
   }
 
   const activeMachines = store.machines.filter((m) => m.status === "ACTIVE").length;
   const totalBalance = store.machines.reduce((sum, m) => sum + (m.currentBalance || 0), 0);
+  const byCategory = Object.entries(
+    store.machines.reduce((acc, m) => {
+      const cat = m.category?.name || "Uncategorized";
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  );
+  const avg = utilizationSummary?.avgUtilization ?? 0;
 
   return (
-    <AppShell>
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold">{store.name}</h1>
-              <Badge variant={store.isActive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
-                {store.isActive ? "Active" : "Inactive"}
-              </Badge>
-              {utilizationSummary && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-[10px] px-1.5 py-0",
-                    utilizationSummary.avgUtilization < 40
-                      ? "bg-amber-100 text-amber-700 border-amber-300"
-                      : utilizationSummary.avgUtilization <= 80
-                        ? "bg-emerald-100 text-emerald-700 border-emerald-300"
-                        : "bg-blue-100 text-blue-700 border-blue-300"
-                  )}
-                >
-                  {utilizationSummary.avgUtilization}% Avg Util
-                </Badge>
-              )}
+    <Page
+      title={store.name}
+      titleExtra={
+        <>
+          <Badge status={store.isActive ? "success" : "neutral"}>{store.isActive ? "Active" : "Inactive"}</Badge>
+          {utilizationSummary && <Badge status={avg < 40 ? "warning" : avg <= 80 ? "success" : "info"}>{avg}% Avg Util</Badge>}
+        </>
+      }
+      subtitle={`${store.machines.length} machines · ${activeMachines} active · ${formatNumber(totalBalance)} total balance`}
+      crumbs={[{ label: "Stores", href: "/stores" }, { label: store.name }]}
+    >
+      {utilizationSummary && (
+        <div className="flex flex-wrap gap-2">
+          {utilizationSummary.critical > 0 && <Badge status="danger">{utilizationSummary.critical} Critical</Badge>}
+          {utilizationSummary.low > 0 && <Badge status="warning">{utilizationSummary.low} Low</Badge>}
+          <Badge status="success">{utilizationSummary.optimal} Optimal</Badge>
+          {utilizationSummary.overworked > 0 && <Badge status="elim">{utilizationSummary.overworked} Overworked</Badge>}
+          {utilizationSummary.liftCandidates > 0 && (
+            <Badge status="warning">
+              <Target /> {utilizationSummary.liftCandidates} Lift Candidates
+            </Badge>
+          )}
+        </div>
+      )}
+
+      <div className="grid items-start gap-5 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
+          <Panel caption="Store information">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-3">
+              <ReadField label="Store Name" value={store.name} />
+              <ReadField label="Region" value={store.region || "-"} />
+              <ReadField label="BMS Schema" value={store.bmsSchema} />
+              <ReadField label="BMS Host" value={store.bmsHost || "default"} />
+              <ReadField label="Status" value={store.isActive ? "Active" : "Inactive"} />
+              <ReadField label="Created" value={formatDate(store.createdAt)} />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {store.machines.length} machines · {activeMachines} active · {formatNumber(totalBalance)} total balance
-            </p>
-          </div>
+          </Panel>
+
+          <Panel caption={`Machines (${store.machines.length})`}>
+            <DataTable
+              columns={MACHINE_COLUMNS}
+              rows={store.machines}
+              rowKey={(m) => m.id}
+              rowClassName={(m) => (m.utilization?.utilizationStatus === "critical" || (m.utilization && m.utilization.liftScore >= 80) ? "bg-muted" : undefined)}
+              empty="No machines in this store"
+              pageSize={50}
+              card={false}
+            />
+          </Panel>
         </div>
 
-        {/* Utilization Summary Badges */}
-        {utilizationSummary && (
-          <div className="flex flex-wrap gap-2">
-            {utilizationSummary.critical > 0 && (
-              <Badge
-                variant="outline"
-                className="text-xs px-2 py-1 gap-1.5 bg-red-50 text-red-700 border-red-200"
-              >
-                <AlertTriangle className="h-3 w-3" />
-                {utilizationSummary.critical} Critical
-              </Badge>
-            )}
-            {utilizationSummary.low > 0 && (
-              <Badge
-                variant="outline"
-                className="text-xs px-2 py-1 gap-1.5 bg-amber-50 text-amber-700 border-amber-200"
-              >
-                <TrendingDown className="h-3 w-3" />
-                {utilizationSummary.low} Low
-              </Badge>
-            )}
-            <Badge
-              variant="outline"
-              className="text-xs px-2 py-1 gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200"
-            >
-              <CheckCircle className="h-3 w-3" />
-              {utilizationSummary.optimal} Optimal
-            </Badge>
-            {utilizationSummary.overworked > 0 && (
-              <Badge
-                variant="outline"
-                className="text-xs px-2 py-1 gap-1.5 bg-purple-50 text-purple-700 border-purple-200"
-              >
-                <Zap className="h-3 w-3" />
-                {utilizationSummary.overworked} Overworked
-              </Badge>
-            )}
-            {utilizationSummary.liftCandidates > 0 && (
-              <Badge
-                variant="outline"
-                className="text-xs px-2 py-1 gap-1.5 bg-orange-50 text-orange-700 border-orange-200"
-              >
-                <Target className="h-3 w-3" />
-                {utilizationSummary.liftCandidates} Lift Candidates
-              </Badge>
-            )}
-          </div>
-        )}
+        <div className="flex min-w-0 flex-col gap-5">
+          <Panel caption="Summary">
+            <KeyValueList
+              items={[
+                { label: "Total Machines", value: store.machines.length },
+                { label: "Active", value: activeMachines, tone: "good" },
+                { label: "Inactive", value: store.machines.length - activeMachines },
+                { label: "Total Balance", value: formatNumber(totalBalance) },
+              ]}
+            />
+          </Panel>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          {/* Left Column - Store Info & Machines */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Store Information */}
-            <Card>
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm">Store Information</CardTitle>
-              </CardHeader>
-              <CardContent className="px-3 pb-3">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs">
-                  <div>
-                    <p className="text-muted-foreground">Store Name</p>
-                    <p className="font-medium">{store.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Region</p>
-                    <p className="font-medium">{store.region || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">BMS Schema</p>
-                    <p className="font-mono">{store.bmsSchema}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">BMS Host</p>
-                    <p className="font-mono">{store.bmsHost || "default"}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Status</p>
-                    <p>{store.isActive ? "Active" : "Inactive"}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Created</p>
-                    <p>{formatDate(store.createdAt)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {utilizationSummary && (
+            <Panel caption="Utilization overview" bodyClassName="flex flex-col gap-3">
+              <Progress label="Avg Utilization" value={Math.min(avg, 100)} valueLabel={`${avg}%`} tone={avg < 40 ? "warning" : avg <= 80 ? "success" : "accent"} />
+              <KeyValueList
+                items={[
+                  ...(["critical", "low", "optimal", "high", "overworked"] as const).map((band) => ({
+                    label: UTILIZATION[band].label,
+                    value: utilizationSummary[band],
+                    tone: band === "critical" && utilizationSummary.critical > 0 ? ("bad" as const) : undefined,
+                  })),
+                  ...(utilizationSummary.liftCandidates > 0 ? [{ label: "Lift Candidates", value: utilizationSummary.liftCandidates }] : []),
+                ]}
+              />
+            </Panel>
+          )}
 
-            {/* Machines Table */}
-            <Card>
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm">Machines ({store.machines.length})</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50 border-y">
-                      <tr>
-                        <th className="px-3 py-1.5 text-left font-medium">Serial</th>
-                        <th className="px-3 py-1.5 text-left font-medium">Model</th>
-                        <th className="px-3 py-1.5 text-center font-medium">Utilization</th>
-                        <th className="px-3 py-1.5 text-center font-medium">Lift</th>
-                        <th className="px-3 py-1.5 text-right font-medium">Balance</th>
-                        <th className="px-3 py-1.5 text-center font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {store.machines.map((machine) => {
-                        const util = machine.utilization;
-                        const utilStatus = util?.utilizationStatus as UtilizationStatus | undefined;
-                        const config = utilStatus ? utilizationConfig[utilStatus] : null;
-
-                        return (
-                          <tr
-                            key={machine.id}
-                            className={cn(
-                              "hover:bg-muted/50",
-                              util?.utilizationStatus === "critical" && "bg-red-50/30",
-                              util && util.liftScore >= 80 && "bg-orange-50/30"
-                            )}
-                          >
-                            <td className="px-3 py-1.5 font-mono">{machine.serialNumber}</td>
-                            <td className="px-3 py-1.5 truncate max-w-[120px]">{machine.modelName || "-"}</td>
-                            <td className="px-3 py-1.5">
-                              {util && config ? (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="flex items-center justify-center gap-1.5">
-                                        <div className="w-12">
-                                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                            <div
-                                              className={cn("h-full rounded-full", config.bgColor)}
-                                              style={{ width: `${Math.min(util.utilizationPercent, 100)}%` }}
-                                            />
-                                          </div>
-                                        </div>
-                                        <span className={cn("text-[10px] font-medium w-8", config.color)}>
-                                          {util.utilizationPercent}%
-                                        </span>
-                                        {util.trendDirection === "up" && <TrendingUp className="h-2.5 w-2.5 text-emerald-500" />}
-                                        {util.trendDirection === "down" && <TrendingDown className="h-2.5 w-2.5 text-red-500" />}
-                                        {util.trendDirection === "stable" && <Minus className="h-2.5 w-2.5 text-muted-foreground" />}
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className="font-medium">{config.label}: {util.utilizationPercent}%</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Avg: {formatNumber(util.avgMonthlyVolume)}/mo · Duty: {formatNumber(util.dutyCycle)}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              ) : (
-                                <span className="text-muted-foreground flex justify-center">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-1.5 text-center">
-                              {util && util.liftScore >= 60 ? (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          "text-[9px] px-1 py-0",
-                                          util.liftScore >= 80
-                                            ? "bg-red-100 text-red-700 border-red-300"
-                                            : "bg-amber-100 text-amber-700 border-amber-300"
-                                        )}
-                                      >
-                                        <Target className="h-2 w-2 mr-0.5" />
-                                        {util.liftScore}
-                                      </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className="font-medium">Lift Score: {util.liftScore}/100</p>
-                                      {util.insights.slice(0, 2).map((i, idx) => (
-                                        <p key={idx} className="text-xs text-muted-foreground">• {i}</p>
-                                      ))}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-1.5 text-right font-mono">{formatNumber(machine.currentBalance)}</td>
-                            <td className="px-3 py-1.5 text-center">
-                              <Badge variant={getStatusVariant(machine.status as "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "DECOMMISSIONED")} className="text-[10px] px-1.5 py-0">
-                                {machine.status}
-                              </Badge>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {store.machines.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">
-                            No machines in this store
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column - Summary */}
-          <div className="space-y-4">
-            {/* Summary */}
-            <Card>
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm">Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 px-3 pb-3 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Total Machines</span>
-                  <span className="font-mono font-bold">{store.machines.length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Active</span>
-                  <span className="font-mono text-green-600">{activeMachines}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Inactive</span>
-                  <span className="font-mono text-yellow-600">{store.machines.length - activeMachines}</span>
-                </div>
-                <div className="border-t pt-2 mt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Total Balance</span>
-                    <span className="font-mono font-bold">{formatNumber(totalBalance)}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Utilization Overview */}
-            {utilizationSummary && (
-              <Card>
-                <CardHeader className="pb-2 pt-3 px-3">
-                  <CardTitle className="text-sm">Utilization Overview</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 px-3 pb-3 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Avg Utilization</span>
-                    <span className={cn(
-                      "font-mono font-bold",
-                      utilizationSummary.avgUtilization < 40 ? "text-amber-600" :
-                        utilizationSummary.avgUtilization <= 80 ? "text-emerald-600" : "text-blue-600"
-                    )}>
-                      {utilizationSummary.avgUtilization}%
-                    </span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={cn(
-                        "h-full rounded-full",
-                        utilizationSummary.avgUtilization < 40 ? "bg-amber-500" :
-                          utilizationSummary.avgUtilization <= 80 ? "bg-emerald-500" : "bg-blue-500"
-                      )}
-                      style={{ width: `${Math.min(utilizationSummary.avgUtilization, 100)}%` }}
-                    />
-                  </div>
-                  <div className="border-t pt-2 mt-2 space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-red-600">Critical</span>
-                      <span className="font-mono text-red-600">{utilizationSummary.critical}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-amber-600">Low</span>
-                      <span className="font-mono text-amber-600">{utilizationSummary.low}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-emerald-600">Optimal</span>
-                      <span className="font-mono text-emerald-600">{utilizationSummary.optimal}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-blue-600">High</span>
-                      <span className="font-mono text-blue-600">{utilizationSummary.high}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-purple-600">Overworked</span>
-                      <span className="font-mono text-purple-600">{utilizationSummary.overworked}</span>
-                    </div>
-                  </div>
-                  {utilizationSummary.liftCandidates > 0 && (
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-orange-600 flex items-center gap-1">
-                          <Target className="h-3 w-3" />
-                          Lift Candidates
-                        </span>
-                        <span className="font-mono font-bold text-orange-600">{utilizationSummary.liftCandidates}</span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Category Breakdown */}
-            <Card>
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm">By Category</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 px-3 pb-3">
-                {Object.entries(
-                  store.machines.reduce((acc, m) => {
-                    const cat = m.category?.name || "Uncategorized";
-                    acc[cat] = (acc[cat] || 0) + 1;
-                    return acc;
-                  }, {} as Record<string, number>)
-                ).map(([category, count]) => (
-                  <div key={category} className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">{category}</span>
-                    <span className="font-mono">{count}</span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+          <Panel caption="By category">
+            <KeyValueList items={byCategory.map(([category, count]) => ({ label: category, value: count }))} />
+          </Panel>
         </div>
       </div>
-    </AppShell>
+    </Page>
   );
 }

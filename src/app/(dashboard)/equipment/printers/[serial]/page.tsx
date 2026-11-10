@@ -2,23 +2,32 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AppShell } from "@/components/layout/app-shell";
-import { PrinterPageSkeleton } from "@/components/equipment/skeleton";
+import { Check, Save, X } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { EquipmentErrorBoundary } from "@/components/equipment/error-boundary";
-import { ModelSuggest } from "@/components/equipment/model-suggest";
 import { FeedbackPanel } from "@/components/equipment/feedback-panel";
-import { useHotkeys } from "@/lib/use-hotkey";
+import { ModelSuggest } from "@/components/equipment/model-suggest";
+import { Bars } from "@/components/machines/charts";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { DayField } from "@/components/machines/day-field";
+import { Field } from "@/components/machines/field";
+import { Loading } from "@/components/machines/loading";
+import { Page } from "@/components/machines/page";
+import { Panel } from "@/components/machines/panel";
+import { ReadField } from "@/components/machines/read-field";
+import { ConditionBadge } from "@/components/machines/status-badge";
 import { addRecentItem } from "@/lib/recently-viewed";
+import { toast } from "@/lib/toast";
+import { GRID } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
+import { useHotkeys } from "@/lib/use-hotkey";
 import { useRole } from "@/lib/use-role";
-import { toast } from "sonner";
-import {
-  Save, Lock, AlertTriangle, BarChart2, Calendar, ClipboardCheck, Check,
-} from "lucide-react";
-import Link from "next/link";
-import { JlDate } from "@/components/ui/jl-date";
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
-} from "recharts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -83,69 +92,32 @@ const COUNTER_TYPES: { key: CounterKey; label: string }[] = [
   { key: "large", label: "A3 Colour" },
 ];
 
-// Condition choices - neutral segment; selected fills with its semantic colour.
-const CONDITION_OPTIONS: { value: string; color: string }[] = [
-  { value: "Good", color: "var(--green-500)" },
-  { value: "Fair", color: "var(--amber-500)" },
-  { value: "Poor", color: "var(--red-500)" },
+const CONDITION_OPTIONS = ["Good", "Fair", "Poor"].map((c) => ({ value: c, label: c }));
+
+const longDay = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
+
+const count = (key: CounterKey, label: string): Column<MeterReading> => ({
+  key,
+  label,
+  align: "right",
+  cell: (r) => <span className={cn(GRID.num, !r[key] && "text-faint")}>{r[key] != null ? (r[key] as number).toLocaleString("en-ZA") : "0"}</span>,
+});
+
+const READING_COLUMNS: Column<MeterReading>[] = [
+  {
+    key: "date",
+    label: "Date",
+    cell: (r) => <span className="font-medium">{new Date(r.report_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" })}</span>,
+  },
+  count("total", "Total"),
+  count("black", "Black"),
+  count("colour", "Colour"),
+  count("a3", "A3"),
+  count("large", "A3 Colour"),
 ];
 
 function num(v: number | null | undefined): number {
   return typeof v === "number" && isFinite(v) ? v : 0;
-}
-
-function fmtK(v: number): string {
-  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
-  return String(v);
-}
-
-// ─── Read-only identity field ────────────────────────────────────────────────
-
-function ReadField({ label, value, mono }: { label: string; value: string | null | boolean; mono?: boolean }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2)" }}>
-      <span
-        style={{
-          fontSize: "var(--fs-sm)",
-          fontWeight: "var(--fw-semibold)",
-          color: "var(--ink-700)",
-        }}
-      >
-        {label}
-      </span>
-      <span
-        style={{
-          fontSize: "var(--fs-sm)",
-          fontWeight: "var(--fw-semibold)",
-          color: "var(--ink-900)",
-          fontFamily: mono ? "var(--mono)" : "var(--font)",
-        }}
-      >
-        {value === null || value === undefined || value === "" ? (
-          <span className="jl-faint" style={{ fontWeight: "var(--fw-medium)", fontStyle: "italic" }}>Not set</span>
-        ) : value === true ? (
-          <span style={{ color: "var(--green-700)", fontWeight: "var(--fw-bold)" }}>Yes</span>
-        ) : value === false ? (
-          <span className="jl-muted" style={{ fontWeight: "var(--fw-medium)" }}>No</span>
-        ) : (
-          String(value)
-        )}
-      </span>
-    </div>
-  );
-}
-
-// ─── Section header with signature chip ──────────────────────────────────────
-
-function SectionHead({ icon: Icon, title, neutral }: { icon: React.ElementType; title: string; neutral?: boolean }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--s-5)" }}>
-      <span className={`jl-chip jl-chip--sm${neutral ? " jl-chip--neutral" : ""}`}>
-        <Icon />
-      </span>
-      <span className="jl-h3">{title}</span>
-    </div>
-  );
 }
 
 export default function PrinterDetailPage() {
@@ -271,326 +243,143 @@ export default function PrinterDetailPage() {
     }},
   ]);
 
-  if (loading) {
-    return (
-      <AppShell>
-        <PrinterPageSkeleton />
-      </AppShell>
-    );
-  }
+  if (loading) return <Loading />;
 
   const storeName = mapping?.store ?? "";
   const modelName = mapping?.model_name ?? dimensions?.model ?? "Unknown Model";
+  const counterLabel = COUNTER_TYPES.find((c) => c.key === counter)?.label ?? "";
 
   return (
-    <AppShell>
-      <EquipmentErrorBoundary>
-        <div style={{ minHeight: "100vh", background: "var(--canvas)" }}>
-          {/* Sticky Save bar */}
-          <div
-            style={{
-              position: "sticky", top: 0, zIndex: 20,
-              background: "var(--surface)", boxShadow: "var(--sh-sm)",
-              padding: "0 var(--s-7)", height: 64,
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}
-          >
-            <nav className="jl-breadcrumb">
-              <Link href="/equipment">Stores</Link>
-              {storeName && (
-                <>
-                  <span className="sep">/</span>
-                  <Link href={`/equipment/stores/${encodeURIComponent(storeName)}`}>{storeName}</Link>
-                </>
-              )}
-              <span className="sep">/</span>
-              <span className="current jl-mono">{serialStr}</span>
-              {saving && (
-                <span className="jl-badge jl-badge--red" style={{ marginLeft: "var(--s-2)" }}>
-                  <span className="jl-dot jl-dot--red" style={{ boxShadow: "none" }} /> Saving
-                </span>
-              )}
-              {!saving && savedFlash && (
-                <span className="jl-badge jl-badge--green" style={{ marginLeft: "var(--s-2)" }}>
-                  <Check /> Saved
-                </span>
-              )}
-              {!saving && !savedFlash && dirty && (
-                <span className="jl-badge jl-badge--amber" style={{ marginLeft: "var(--s-2)" }}>Unsaved changes</span>
-              )}
-            </nav>
-            <button
-              type="button"
-              className="jl-btn jl-btn--primary"
-              onClick={save}
-              disabled={saving || !dirty}
-              data-loading={saving ? true : undefined}
-            >
-              <Save /> Save
-            </button>
+    <EquipmentErrorBoundary>
+      <Page
+        title={modelName}
+        titleExtra={
+          saving ? (
+            <Badge variant="secondary"><Spinner /> Saving</Badge>
+          ) : savedFlash ? (
+            <Badge status="success"><Check /> Saved</Badge>
+          ) : dirty ? (
+            <Badge status="warning">Unsaved changes</Badge>
+          ) : null
+        }
+        crumbs={[
+          { label: "Stores", href: "/equipment" },
+          ...(storeName ? [{ label: storeName, href: `/equipment/stores/${encodeURIComponent(storeName)}` }] : []),
+          { label: serialStr },
+        ]}
+        actions={
+          <Button onClick={save} disabled={saving || !dirty}>
+            {saving ? <Spinner /> : <Save />} Save
+          </Button>
+        }
+      >
+        <div className="flex w-full max-w-5xl flex-col gap-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{serialStr}</Badge>
+            {mapping?.printer_type && <Badge variant="outline">{mapping.printer_type}</Badge>}
+            {feedback.condition && <ConditionBadge condition={feedback.condition} />}
           </div>
 
-          {/* Content */}
-          <div style={{ maxWidth: 980, margin: "0 auto", padding: "var(--s-7) var(--s-7) var(--s-9)", display: "grid", gap: "var(--s-6)" }}>
-
-            {/* Hero */}
-            <div>
-              <h1 className="jl-h1">{modelName}</h1>
-              <div style={{ display: "flex", gap: "var(--s-2)", marginTop: "var(--s-3)", flexWrap: "wrap", alignItems: "center" }}>
-                <span className="jl-badge jl-badge--dark jl-mono">{serialStr}</span>
-                {mapping?.printer_type && (
-                  <span className="jl-badge">{mapping.printer_type}</span>
-                )}
-                {feedback.condition && (() => {
-                  const c = CONDITION_OPTIONS.find((o) => o.value === feedback.condition);
-                  const dotClass = c?.value === "Good" ? "jl-dot--green" : c?.value === "Fair" ? "jl-dot--amber" : "jl-dot--red";
-                  return (
-                    <span className="jl-badge">
-                      <span className={`jl-dot ${dotClass}`} /> {feedback.condition}
-                    </span>
-                  );
-                })()}
-              </div>
+          {/* Machine identity: read only, it comes from Xerox and BMS. */}
+          <Panel caption="Machine identity">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-4">
+              <ReadField label="Serial" value={dimensions?.serial_number ?? serialStr} />
+              <ReadField label="Model" value={modelName} />
+              <ReadField label="Store" value={storeName} />
+              <ReadField label="Type" value={mapping?.printer_type ?? null} />
+              <ReadField label="Manufacturer" value={dimensions?.manufacturer ?? null} />
+              <ReadField label="Colour" value={dimensions?.color_capable ?? null} />
+              <ReadField label="Duplex" value={dimensions?.duplex_capable ?? null} />
+              <ReadField label="Last Seen" value={dimensions?.last_seen ? longDay(dimensions.last_seen) : null} />
             </div>
+          </Panel>
 
-            {/* Machine identity - READ ONLY, visually locked (sunken card) */}
-            <section className="jl-card jl-card--pad-lg" style={{ background: "var(--surface-sunken)" }}>
-              <SectionHead icon={Lock} title="Machine Identity" neutral />
-              <div style={{ display: "grid", gap: "var(--s-5)" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--s-5)" }}>
-                  <ReadField label="Serial" value={dimensions?.serial_number ?? serialStr} mono />
-                  <ReadField label="Model" value={modelName} />
-                  <ReadField label="Store" value={storeName} />
-                  <ReadField label="Type" value={mapping?.printer_type ?? null} />
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--s-5)" }}>
-                  <ReadField label="Manufacturer" value={dimensions?.manufacturer ?? null} />
-                  <ReadField label="Colour" value={dimensions?.color_capable ?? null} />
-                  <ReadField label="Duplex" value={dimensions?.duplex_capable ?? null} />
-                  <ReadField
-                    label="Last Seen"
-                    value={dimensions?.last_seen
-                      ? new Date(dimensions.last_seen).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })
-                      : null}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Condition - editable, all users */}
-            <section className="jl-card">
-              <SectionHead icon={ClipboardCheck} title="Condition" />
-              <div style={{ display: "grid", gap: "var(--s-5)" }}>
-                <div className="jl-field">
-                  <label>Condition</label>
-                  <div className="jl-segment">
-                    {CONDITION_OPTIONS.map((opt) => {
-                      const active = feedback.condition === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          aria-selected={active}
-                          onClick={() => setF("condition", active ? null : opt.value)}
-                          style={active ? { background: opt.color, color: "#fff", boxShadow: "var(--sh-sm)", flex: 1 } : { flex: 1 }}
-                        >
-                          {opt.value}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="jl-field">
-                  <label>Notes</label>
-                  <textarea
-                    className="jl-textarea"
-                    value={feedback.condition_notes ?? ""}
-                    onChange={(e) => setF("condition_notes", e.target.value || null)}
-                    placeholder="Faults, wear, paper feed issues, print quality"
-                    rows={4}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Contract and Lifecycle - admin only */}
-            {isAdmin && (
-              <section className="jl-card">
-                <SectionHead icon={Calendar} title="Contract and Lifecycle" />
-                <div style={{ display: "grid", gap: "var(--s-5)" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--s-5)" }}>
-                    <div className="jl-field">
-                      <label>Original Install Date</label>
-                      <JlDate value={feedback.original_install_date ?? null} onChange={(v) => setF("original_install_date", v)} placeholder="First ever install" />
-                      <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>When the machine first entered service.</span>
-                    </div>
-                    <div className="jl-field">
-                      <label>Latest Install Date</label>
-                      <JlDate value={feedback.install_date ?? null} onChange={(v) => setF("install_date", v)} placeholder="Install at current store" />
-                      <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>Install at its current store (may be recent).</span>
-                    </div>
-                    <div className="jl-field">
-                      <label>Age</label>
-                      <div className="jl-input" style={{ display: "flex", alignItems: "center", background: "var(--surface-sunken)", color: "var(--ink-700)", fontWeight: 600 }}>
-                        {ageFromDate(feedback.original_install_date)}
-                      </div>
-                      <span className="jl-xs jl-muted" style={{ marginTop: 4 }}>Calculated from the original install date.</span>
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--s-5)" }}>
-                    <div className="jl-field">
-                      <label>Contract End</label>
-                      <JlDate value={feedback.contract_end ?? null} onChange={(v) => setF("contract_end", v)} placeholder="Select date" />
-                    </div>
-                    <div className="jl-field">
-                      <label>Last Visit</label>
-                      <JlDate value={feedback.last_visit ?? null} onChange={(v) => setF("last_visit", v)} placeholder="Select date" />
-                    </div>
-                    <div className="jl-field">
-                      <label>Supplier</label>
-                      <ModelSuggest source="suppliers" value={feedback.supplier ?? ""} onChange={(v) => setF("supplier", v || null)} placeholder="Where it was bought" />
-                    </div>
-                  </div>
-                  {contractExpired && (
-                    <div className="jl-alert jl-alert--amber">
-                      <span className="jl-chip jl-chip--amber"><AlertTriangle /></span>
-                      <div className="jl-alert__body">
-                        <div className="jl-alert__title" style={{ color: "var(--amber-700)" }}>Contract expired</div>
-                        <div className="jl-alert__text">
-                          Ended {new Date(feedback.contract_end as string).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="jl-field">
-                    <label>Technician Notes</label>
-                    <textarea
-                      className="jl-textarea"
-                      value={feedback.technician_notes ?? ""}
-                      onChange={(e) => setF("technician_notes", e.target.value || null)}
-                      placeholder="Work done, parts replaced, recurring issues"
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* Volume History - recharts inside a card */}
-            {history.length > 1 && (
-              <section className="jl-card">
-                <SectionHead icon={BarChart2} title="Volume History" />
-
-                {/* Counter type selector */}
-                <div className="jl-segment" style={{ marginBottom: "var(--s-5)", flexWrap: "wrap" }}>
-                  {COUNTER_TYPES.map((ct) => (
-                    <button
-                      key={ct.key}
-                      type="button"
-                      aria-selected={counter === ct.key}
-                      onClick={() => setCounter(ct.key)}
-                    >
-                      {ct.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Chart */}
-                {hasCounterData ? (
-                  <div style={{ width: "100%", height: 220, marginBottom: "var(--s-6)" }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-100)" vertical={false} />
-                        <XAxis
-                          dataKey="label"
-                          tick={{ fontSize: 11, fill: "var(--ink-400)", fontFamily: "var(--font)" }}
-                          axisLine={{ stroke: "var(--ink-200)" }}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 11, fill: "var(--ink-400)", fontFamily: "var(--font)" }}
-                          axisLine={false}
-                          tickLine={false}
-                          width={48}
-                          tickFormatter={(v) => fmtK(Number(v))}
-                        />
-                        <Tooltip
-                          cursor={{ fill: "var(--red-tint)" }}
-                          formatter={(v) => [Number(v).toLocaleString(), "Prints"] as [string, string]}
-                          contentStyle={{
-                            background: "var(--surface)",
-                            border: "none",
-                            borderRadius: "var(--r-sm)",
-                            boxShadow: "var(--sh-md)",
-                            fontSize: 12,
-                            fontFamily: "var(--font)",
-                          }}
-                          labelStyle={{ color: "var(--ink-500)", fontWeight: 700, fontSize: 11 }}
-                        />
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
-                          {chartData.map((_, i) => (
-                            <Cell
-                              key={i}
-                              fill={i === chartData.length - 1 ? "var(--red-500)" : "var(--ink-300)"}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      height: 160, marginBottom: "var(--s-6)", display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", gap: 8,
-                      borderRadius: "var(--r-lg)", background: "var(--surface-sunken)",
-                      boxShadow: "var(--sh-inset)",
-                    }}
-                  >
-                    <BarChart2 size={22} style={{ color: "var(--ink-300)" }} />
-                    <span className="jl-sm jl-muted" style={{ fontWeight: 600 }}>
-                      No {COUNTER_TYPES.find((c) => c.key === counter)?.label} volume recorded
-                    </span>
-                  </div>
+          {/* Condition: editable by every user. */}
+          <Panel caption="Condition" bodyClassName="flex flex-col gap-4">
+            <Field label="Condition">
+              <div className="flex flex-wrap items-center gap-2">
+                <Segmented label="Condition" value={feedback.condition ?? ""} onValueChange={(v) => setF("condition", v)} options={CONDITION_OPTIONS} />
+                {feedback.condition && (
+                  <Button variant="ghost" size="sm" onClick={() => setF("condition", null)}>
+                    <X /> Clear
+                  </Button>
                 )}
+              </div>
+            </Field>
+            <Field label="Notes" htmlFor="printer-notes">
+              <Textarea
+                id="printer-notes"
+                value={feedback.condition_notes ?? ""}
+                onChange={(e) => setF("condition_notes", e.target.value || null)}
+                placeholder="Faults, wear, paper feed issues, print quality"
+                rows={4}
+              />
+            </Field>
+          </Panel>
 
-                {/* Reading table - last 8 readings, all counter columns */}
-                <div className="jl-table-wrap">
-                  <table className="jl-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th className="num">Total</th>
-                        <th className="num">Black</th>
-                        <th className="num">Colour</th>
-                        <th className="num">A3</th>
-                        <th className="num">A3 Colour</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.slice(0, 8).map((r, i) => (
-                        <tr key={i}>
-                          <td className="cell-strong">
-                            {new Date(r.report_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" })}
-                          </td>
-                          {[r.total, r.black, r.colour, r.a3, r.large].map((v, j) => (
-                            <td key={j} className="num" style={v ? undefined : { color: "var(--ink-300)" }}>
-                              {v != null ? v.toLocaleString() : "0"}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
+          {/* Contract and lifecycle: admin only. */}
+          {isAdmin && (
+            <Panel caption="Contract and lifecycle" bodyClassName="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Original Install Date" htmlFor="printer-original" hint="When the machine first entered service.">
+                  <DayField id="printer-original" value={feedback.original_install_date ?? null} onChange={(v) => setF("original_install_date", v)} placeholder="First ever install" />
+                </Field>
+                <Field label="Latest Install Date" htmlFor="printer-install" hint="Install at its current store (may be recent).">
+                  <DayField id="printer-install" value={feedback.install_date ?? null} onChange={(v) => setF("install_date", v)} placeholder="Install at current store" />
+                </Field>
+                <Field label="Age" htmlFor="printer-age" hint="Calculated from the original install date.">
+                  <Input id="printer-age" value={ageFromDate(feedback.original_install_date)} readOnly disabled />
+                </Field>
+                <Field label="Contract End" htmlFor="printer-contract">
+                  <DayField id="printer-contract" value={feedback.contract_end ?? null} onChange={(v) => setF("contract_end", v)} placeholder="Select date" />
+                </Field>
+                <Field label="Last Visit" htmlFor="printer-visit">
+                  <DayField id="printer-visit" value={feedback.last_visit ?? null} onChange={(v) => setF("last_visit", v)} placeholder="Select date" />
+                </Field>
+                <Field label="Supplier">
+                  <ModelSuggest source="suppliers" value={feedback.supplier ?? ""} onChange={(v) => setF("supplier", v || null)} placeholder="Where it was bought" />
+                </Field>
+              </div>
+              {contractExpired && (
+                <Alert variant="warning">
+                  <AlertTitle>Contract expired</AlertTitle>
+                  <AlertDescription>Ended {longDay(feedback.contract_end as string)}</AlertDescription>
+                </Alert>
+              )}
+              <Field label="Technician Notes" htmlFor="printer-tech">
+                <Textarea
+                  id="printer-tech"
+                  value={feedback.technician_notes ?? ""}
+                  onChange={(e) => setF("technician_notes", e.target.value || null)}
+                  placeholder="Work done, parts replaced, recurring issues"
+                  rows={3}
+                />
+              </Field>
+            </Panel>
+          )}
 
-            {/* Feedback & replacement requests (store + admin) */}
-            <FeedbackPanel type="printer" refId={serialStr} />
-          </div>
+          {history.length > 1 && (
+            <Panel
+              caption="Volume history"
+              right={<Segmented label="Counter" value={counter} onValueChange={(v) => setCounter(v as CounterKey)} options={COUNTER_TYPES.map((ct) => ({ value: ct.key, label: ct.label }))} />}
+              bodyClassName="flex flex-col gap-4"
+            >
+              <Bars
+                labels={chartData.map((d) => d.label)}
+                series={[{ label: "Prints", values: hasCounterData ? chartData.map((d) => d.value) : [] }]}
+                format="count"
+                height="md"
+                empty={`No ${counterLabel} volume recorded`}
+              />
+              {/* The last 8 readings, every counter. */}
+              <DataTable columns={READING_COLUMNS} rows={history.slice(0, 8)} rowKey={(_, i) => i} wide />
+            </Panel>
+          )}
+
+          {/* Feedback and replacement requests (store and admin). */}
+          <FeedbackPanel type="printer" refId={serialStr} />
         </div>
-      </EquipmentErrorBoundary>
-    </AppShell>
+      </Page>
+    </EquipmentErrorBoundary>
   );
 }
