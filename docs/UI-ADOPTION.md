@@ -101,6 +101,14 @@ changed how something is done:
   readings" in the neutral tone, and those machines are left out of the
   bands, the lift candidates and the average (`src/lib/utilization-summary.ts`,
   with a unit test). The route's answer is unchanged.
+- **From the quality loop** (`docs/QA-2026-11.md`): labels are in sentence
+  case; dates read "09 Nov 2026" and counts "2 235 950" everywhere; the
+  account page says who sets a password instead of showing a disabled form;
+  a store's printer list shows a machine once where Xerox holds two records
+  for it; Operations' alert feed judges a machine by its newest reading; the
+  machines needing attention on machine mapping are counted once each; on an
+  item or a printer, Escape closes an open dialog or list before it leaves
+  the page.
 - **Two config panels that no tab reached** (`setup/connections/panel.tsx`,
   `setup/store-groups/panel.tsx`) were removed. Their old addresses still open
   Config.
@@ -192,6 +200,16 @@ Toasts: call `toast.success()`, `toast.error()` or `toast()` from
 
 Run it with `npm run ui:audit`. `npm run gate` runs the audit, the type
 check, the unit tests and the build.
+
+## Tests
+
+| Command | What it checks |
+|---|---|
+| `npm run ui:audit` | The kit rules above |
+| `npm run type-check` | TypeScript |
+| `npm run test:unit` | The pure helpers in `src/lib` (numbers, dates, store scope, reading alerts, machine mapping counts, utilisation summary, the Escape shortcut) |
+| `npm run test:e2e` | A signed-out visitor, and with a sign-in a walk through the main screens; see the top of `playwright.config.ts` for running it against the dev address |
+| `npm run gate` | Audit, type check, unit tests and a production build |
 
 ## Screenshots
 
