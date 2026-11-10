@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { getBrand, splitBrandName } from "@/lib/brand";
+import { isDevCopy } from "@/lib/environment";
 import { CHROME, SURFACE, TYPE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { LoginForm } from "./login-form";
@@ -9,7 +10,7 @@ import { LoginForm } from "./login-form";
 export default function LoginPage() {
   const brand = getBrand();
   const { lead, accent } = splitBrandName(brand.name);
-  const dev = process.env.VERCEL_ENV !== "production";
+  const dev = isDevCopy();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">

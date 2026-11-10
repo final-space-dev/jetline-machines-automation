@@ -5,6 +5,7 @@ import { bmsPool } from "@/lib/bms-pool";
 import { withClient, notFound, badRequest, serverError } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, AuthError, type SessionUser } from "@/lib/auth";
+import { isHostedDevCopy } from "@/lib/environment";
 
 function validId(id: string): boolean {
   return /^\d+$/.test(id) && parseInt(id) > 0;
@@ -20,14 +21,12 @@ const EXT_BY_MIME: Record<string, string> = {
 };
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB per file
 
-// A Vercel deployment that is not Production (the dev environment, any preview)
-// reaches the SAME private photo store as production, and its database is a copy
-// holding the same photo addresses. It may show photos; it must never add or
-// delete one, or a click on the dev copy would change what production shows.
+// The dev copy and any preview hold a copy of production's database, with the
+// same photo addresses. They may show photos; they must never add or delete
+// one, or a click on the dev copy could change what production shows.
 // docs/DEV-ENVIRONMENT.md "What dev may not do".
 function readOnlyPhotos(): NextResponse | null {
-  const env = process.env.VERCEL_ENV;
-  if (!env || env === "production") return null;
+  if (!isHostedDevCopy()) return null;
   return NextResponse.json({ error: "Photos are read-only on the dev copy" }, { status: 403 });
 }
 
