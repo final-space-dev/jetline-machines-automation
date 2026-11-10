@@ -1,62 +1,127 @@
+"use client"
+
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/ui/utils"
+import { RADII } from "@/lib/ui/ui-tokens"
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
+type ButtonVariant =
+  | "default"
+  | "outline"
+  | "secondary"
+  | "ghost"
+  | "destructive"
+  | "link"
+  | "excel"
+
+type ButtonSize =
+  | "default"
+  | "xs"
+  | "sm"
+  | "lg"
+  | "icon"
+  | "icon-xs"
+  | "icon-sm"
+  | "icon-lg"
+
+/** Spec §3.1: weight 500, transition all .2s ease, hover lift, spec focus ring;
+ * disabled = #F7F7F8 / #B4B8BF inside an #ECEDEE inset ring (no layout shift). */
+const baseClasses =
+  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap font-medium transition-all duration-200 ease-standard outline-none select-none focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] disabled:pointer-events-none disabled:bg-[#F7F7F8] disabled:text-[#B4B8BF] disabled:shadow-none disabled:ring-1 disabled:ring-inset disabled:ring-[#ECEDEE] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+
+const variantClasses: Record<ButtonVariant, string> = {
+  // Primary: Signal blue, rest/hover shadows per spec §1.5.
+  default:
+    "bg-[#2A5BD7] text-white shadow-[0_1px_2px_rgba(42,91,215,.3)] hover:bg-[#1E44A8] hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(42,91,215,.24)]",
+  // Secondary (spec "Secondary"): hairline control border on paper.
+  outline:
+    "border border-[#DEE0E3] bg-white text-[#3A3F47] hover:border-[#C8CACD] hover:bg-[#F7F7F8] hover:-translate-y-px",
+  // Subtle (spec "Subtle"): warm tint fill.
+  secondary:
+    "bg-[#F1F2F3] text-[#3A3F47] hover:bg-[#E4E6E8] hover:-translate-y-px",
+  // Ghost: Signal text, wash tint on hover (tints instead of lifting).
+  ghost: "text-[#2A5BD7] hover:bg-[#EEF2FE]",
+  // Destructive outline (spec "Reverse" grammar).
+  destructive:
+    "border border-[#F0D5D2] bg-white text-[#B03E36] hover:border-[#E5B7B2] hover:bg-[#FBEDEB] focus-visible:ring-[#FBEDEB]",
+  // USER HARD RULE: the Excel button stays green - spec geometry only.
+  excel:
+    "bg-[#107C41] text-white shadow-[0_1px_2px_rgba(16,124,65,.3)] hover:bg-[#0E6A37] hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(16,124,65,.22)] focus-visible:ring-[#DCEDE4]",
+  link: "text-[#2A5BD7] underline-offset-4 hover:text-[#1E44A8] hover:underline",
+}
+
+/** Spec sizes: small 12/6x11/r8 · medium 13/10x15/r10 · large 14/13x19/r12;
+ * icon button 36x36 r10. Radius rides the size (spec §1.4). */
+const sizeClasses: Record<ButtonSize, string> = {
+  default: `${RADII.button} px-[15px] py-2.5 text-[13px]`,
+  xs: `${RADII.chip} px-2.5 py-[5px] text-[12px] [&_svg:not([class*='size-'])]:size-3`,
+  sm: `${RADII.chip} px-[11px] py-1.5 text-[12px] [&_svg:not([class*='size-'])]:size-3.5`,
+  lg: "rounded-xl px-[19px] py-[13px] text-[14px]",
+  icon: `${RADII.button} size-9`,
+  "icon-xs": `${RADII.chip} size-6 [&_svg:not([class*='size-'])]:size-3`,
+  "icon-sm": `${RADII.control} size-7 [&_svg:not([class*='size-'])]:size-3.5`,
+  "icon-lg": "rounded-xl size-10",
+}
+
+function buttonVariants({
+  variant = "default",
+  size = "default",
+  className,
+}: {
+  variant?: ButtonVariant | null
+  size?: ButtonSize | null
+  className?: string
+} = {}) {
+  return cn(
+    baseClasses,
+    variantClasses[variant ?? "default"],
+    sizeClasses[size ?? "default"],
+    className
+  )
+}
+
+type ButtonProps = React.ComponentProps<"button"> & {
+  variant?: ButtonVariant
+  size?: ButtonSize
+  /** Render a custom element (e.g. an anchor) carrying the button styles. */
+  render?: React.ReactElement
+  /** Compatibility flag: set false when `render` is not a native button. Accepted and ignored. */
+  nativeButton?: boolean
+}
 
 function Button({
   className,
   variant = "default",
   size = "default",
-  asChild = false,
+  render,
+  nativeButton: _nativeButton,
+  children,
+  type,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot : "button"
+}: ButtonProps) {
+  const classes = cn(buttonVariants({ variant, size }), className)
+
+  if (render) {
+    const el = render as React.ReactElement<Record<string, unknown>>
+    return React.cloneElement(el, {
+      ...props,
+      "data-slot": "button",
+      className: cn(classes, el.props.className as string | undefined),
+      children: children ?? (el.props.children as React.ReactNode),
+    })
+  }
 
   return (
-    <Comp
+    <button
+      type={type ?? "button"}
       data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={classes}
       {...props}
-    />
+    >
+      {children}
+    </button>
   )
 }
 
 export { Button, buttonVariants }
+export type { ButtonProps, ButtonVariant, ButtonSize }

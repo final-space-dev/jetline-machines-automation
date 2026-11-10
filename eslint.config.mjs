@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The Jetline kit is pulled from Archon and never edited here (docs/UI-ADOPTION.md).
+    "src/components/ui/**",
+    "src/lib/ui/**",
   ]),
 ]);
 

@@ -1,0 +1,162 @@
+/* JetlineConsol theme (design-spec-v1), served by the UI API. A project's
+   globals.css keeps its own two imports and adds this one after them:
+     @import "tailwindcss";
+     @import "tw-animate-css";
+     @import "./jetline-theme.css";
+   Source: jetline-survey-automation/src/app/globals.css, less those imports. */
+
+/* Motion tokens: one easing language for the whole product (design-spec-v1 §1.8).
+   ease-bubble is the spec's 380ms travelling-bubble spring; ease-standard is the
+   plain CSS `ease` keyword the spec uses for 180ms hover tints. */
+@theme {
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-bubble: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ease-standard: ease;
+
+  /* Spec keyframe utilities (animate-shimmer, animate-toast-in, ...) with the
+     spec's canonical timings baked in. */
+  --animate-shimmer: shimmer 1.3s linear infinite;
+  --animate-spin-fast: spin 0.7s linear infinite;
+  --animate-toast-in: toastIn 0.28s cubic-bezier(0.2, 0.9, 0.2, 1);
+  --animate-fade-in: fadeIn 0.18s ease;
+  --animate-sheet-in: sheetIn 0.24s cubic-bezier(0.2, 0.9, 0.2, 1);
+  --animate-pop-in: popIn 0.22s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+/* Keyframes exactly as designed (design-spec-v1 §1.8). */
+@keyframes shimmer{0%{background-position:-320px 0}100%{background-position:320px 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes sheetIn{from{transform:translateX(30px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes popIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+
+/* Design tokens: warm paper neutrals, ink text, Signal blue accent
+   (design-spec-v1 §1.3). Kept as CSS variables so token-based utility
+   classes (bg-background, text-muted-foreground, ...) keep resolving. */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", Helvetica, Arial, sans-serif;
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+}
+
+:root {
+  --background: #F7F7F8; /* Canvas */
+  --foreground: #1b1d21; /* Ink */
+  --card: #ffffff; /* Paper */
+  --card-foreground: #1b1d21;
+  --popover: #ffffff;
+  --popover-foreground: #1b1d21;
+  --primary: #2a5bd7; /* Signal */
+  --primary-foreground: #ffffff;
+  --secondary: #F1F2F3; /* subtle button bg */
+  --secondary-foreground: #3a3f47; /* Slate */
+  --muted: #F4F4F5; /* neutral chip bg */
+  --muted-foreground: #6e747e; /* Muted */
+  --accent: #eef2fe; /* Signal wash */
+  --accent-foreground: #2148ae; /* Signal chip fg */
+  --destructive: #c0453c; /* Deficit */
+  --border: #E8E9EB; /* Hairline */
+  --input: #DEE0E3; /* control borders */
+  --ring: #2a5bd7;
+}
+
+/* Face chrome (UI/UX rule R39, project kill-qlik). Consol is the default;
+   the Reporting face overrides under [data-face="reporting"]. Read only by
+   the sidebar, the face switch and the sign-in chip through the CHROME and
+   SHELL tokens (src/lib/ui-tokens.ts); nothing inside the canvas uses them. */
+:root {
+  --face-sidebar-bg: #131B2C;
+  --face-sidebar-card: #0E1626;
+  --face-accent: #0EA5E9;
+  --face-accent-hover: #38BDF8;
+  --face-accent-glow: 0 6px 18px rgba(14,165,233,.32);
+  --face-nav-label: #5C6B84;
+  --face-nav-idle: #A9B6C8;
+  --face-nav-dim: #64748B;
+  --face-nav-mid: #7C8CA3;
+  --face-nav-text: #C7D2DE;
+}
+[data-face="reporting"] {
+  --face-sidebar-bg: #1C1114;
+  --face-sidebar-card: #150C0F;
+  --face-accent: #A4213D;
+  --face-accent-hover: #BF2E4C;
+  --face-accent-glow: 0 6px 18px rgba(164,33,61,.4);
+  --face-nav-label: #8A6E75;
+  --face-nav-idle: #CDB7BC;
+  --face-nav-dim: #7A666B;
+  --face-nav-mid: #9B8288;
+  --face-nav-text: #DECBCF;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: #F7F7F8;
+  color: #1b1d21;
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+  font-variant-numeric: tabular-nums; /* tabular numerals are global (§1.1) */
+}
+
+/* Consistent rendering everywhere: controls and cells inherit the app face. */
+input, select, textarea, button, td, th {
+  font-family: inherit;
+}
+
+::placeholder {
+  color: #a8adb5;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbars (design-spec-v1 §1.7). */
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:#D4D6D9;border-radius:8px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#B7B9BD;background-clip:content-box}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Data-grid font (user rule 2026-08-27): numbers read in Geist, chrome stays Jakarta */
+.font-grid{font-family:var(--font-geist),-apple-system,'Segoe UI',sans-serif}

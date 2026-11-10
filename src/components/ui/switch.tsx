@@ -1,34 +1,43 @@
 "use client"
 
 import * as React from "react"
-import * as SwitchPrimitive from "@radix-ui/react-switch"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/ui/utils"
 
+/** The one switch. Replaces the hand-rolled role="switch" copies. */
 function Switch({
+  checked,
+  onCheckedChange,
+  disabled,
   className,
-  size = "default",
   ...props
-}: React.ComponentProps<typeof SwitchPrimitive.Root> & {
-  size?: "sm" | "default"
+}: Omit<React.ComponentProps<"button">, "onChange"> & {
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
 }) {
   return (
-    <SwitchPrimitive.Root
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
       data-slot="switch"
-      data-size={size}
+      onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/50 dark:data-[state=unchecked]:bg-input/80 group/switch inline-flex shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-[1.15rem] data-[size=default]:w-8 data-[size=sm]:h-3.5 data-[size=sm]:w-6",
+        "relative inline-flex h-[21px] w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-[240ms] ease-standard focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        checked ? "bg-[#2A5BD7]" : "bg-[#D8DADE]",
         className
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb
-        data-slot="switch-thumb"
+      <span
+        aria-hidden
         className={cn(
-          "bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block rounded-full ring-0 transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0"
+          "inline-block size-[17px] rounded-full bg-white shadow-[0_1px_3px_rgba(28,25,23,.3)] transition-transform duration-[280ms] ease-bubble",
+          checked ? "translate-x-[17px]" : "translate-x-[2px]"
         )}
       />
-    </SwitchPrimitive.Root>
+    </button>
   )
 }
 

@@ -1,57 +1,74 @@
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/ui/utils"
+import { RADII, STATUS } from "@/lib/ui/ui-tokens"
 
-const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
-  {
-    variants: {
-      variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
-        destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
+type BadgeVariant =
+  | "default"
+  | "secondary"
+  | "destructive"
+  | "outline"
+  | "ghost"
+  | "link"
+
+/** Spec §3.4 status chip: 12/500, 6x10 padding, chip radius (r8). */
+const badgeBase = cn(
+  "inline-flex w-fit shrink-0 items-center justify-center gap-1.5 overflow-hidden border border-transparent px-2.5 py-1.5 text-[12px] font-medium leading-none whitespace-nowrap transition-colors duration-[180ms] ease-standard [&>svg]:pointer-events-none [&>svg]:size-3",
+  RADII.chip
 )
+
+const badgeVariantClasses: Record<BadgeVariant, string> = {
+  /** Signal solid */
+  default: "bg-[#2A5BD7] text-white",
+  /** Neutral wash */
+  secondary: STATUS.neutral,
+  destructive: STATUS.danger,
+  /** Spec outline tag: hairline border, muted text, no fill */
+  outline: "border-[#DEE0E3] bg-transparent text-[#6E747E]",
+  ghost: "text-[#6E747E]",
+  link: "text-[#2A5BD7] underline-offset-4 hover:underline",
+}
+
+function badgeVariants({
+  variant = "default",
+  className,
+}: {
+  variant?: BadgeVariant | null
+  className?: string
+} = {}) {
+  return cn(badgeBase, badgeVariantClasses[variant ?? "default"], className)
+}
+
+/** The one blessed color pair per status meaning (STATUS token, spec §3.4).
+ * Custom color classNames on Badge are a convention violation - use status. */
+type BadgeStatus = "success" | "warning" | "danger" | "info" | "elim" | "neutral"
+
+const badgeStatusClasses: Record<BadgeStatus, string> = {
+  success: STATUS.success,
+  warning: STATUS.warning,
+  danger: STATUS.danger,
+  info: STATUS.info,
+  elim: STATUS.elim,
+  neutral: STATUS.neutral,
+}
 
 function Badge({
   className,
-  variant,
-  asChild = false,
+  variant = "default",
+  status,
   ...props
-}: React.ComponentProps<"span"> &
-  VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "span"
-
+}: React.ComponentProps<"span"> & { variant?: BadgeVariant; status?: BadgeStatus }) {
   return (
-    <Comp
+    <span
       data-slot="badge"
-      className={cn(badgeVariants({ variant }), className)}
+      className={cn(
+        status ? cn(badgeBase, badgeStatusClasses[status]) : badgeVariants({ variant }),
+        className
+      )}
       {...props}
     />
   )
 }
 
-// Legacy StatusBadge component for backwards compatibility
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    ACTIVE: "default",
-    INACTIVE: "secondary",
-    MAINTENANCE: "outline",
-    DECOMMISSIONED: "destructive",
-  };
-  return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
-}
-
-export { Badge, badgeVariants, StatusBadge }
+export { Badge, badgeVariants }
+export type { BadgeVariant, BadgeStatus }
