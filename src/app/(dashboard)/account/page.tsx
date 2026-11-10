@@ -1,14 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { ArrowLeft } from "lucide-react";
-import { AppShell } from "@/components/layout/app-shell";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
+import { Field } from "@/components/machines/field";
+import { Page } from "@/components/machines/page";
+import { Muted, Panel, SectionHeading } from "@/components/machines/panel";
 
-// Account page. Shows the signed-in user and a change-password form shell
-// built from the Jetline UI kit. The submit is wired in a later phase together
-// with the backend endpoint, so the button stays disabled here rather than
-// pretending to change a password.
+// Account page. Shows the signed-in user and the change-password form. The
+// submit is wired together with its backend endpoint in a later phase, so the
+// fields stay disabled here rather than pretending to change a password.
 export default function AccountPage() {
   // useSession() can return undefined during static prerender (no SessionProvider
   // in the tree at build time), so guard the same way lib/use-role.ts does.
@@ -16,64 +18,38 @@ export default function AccountPage() {
   const user = session?.data?.user;
   const name = user?.name || "";
   const email = user?.email || "";
-  const initial = (name || email || "?").trim().charAt(0).toUpperCase();
 
   return (
-    <AppShell>
-      <div style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: "var(--s-6)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--s-3)" }}>
-          <Link
-            href="/stores"
-            className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-            aria-label="Back to stores"
-          >
-            <ArrowLeft />
-          </Link>
-          <h1 className="jl-h1">Account</h1>
-        </div>
-
-        <div className="jl-card">
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)" }}>
-            <span className="jl-avatar jl-avatar--lg" aria-hidden="true">
-              {initial}
-            </span>
-            <div>
-              <div className="jl-h3">{name || "Signed-in user"}</div>
-              {email && <div className="jl-sm jl-muted">{email}</div>}
+    <Page title="Account">
+      <div className="flex w-full max-w-xl flex-col gap-5">
+        <Panel>
+          <div className="flex items-center gap-4 pt-1">
+            <Avatar name={name || email || "?"} size="lg" />
+            <div className="flex min-w-0 flex-col">
+              <SectionHeading>{name || "Signed-in user"}</SectionHeading>
+              {email && <Muted>{email}</Muted>}
             </div>
           </div>
-        </div>
-
-        <div className="jl-card">
-          <div className="jl-card__head">
-            <div className="jl-card__title">Change password</div>
-          </div>
-
-          <form
-            style={{ display: "flex", flexDirection: "column", gap: "var(--s-4)" }}
-            onSubmit={(e) => e.preventDefault()}
-          >
-            <div className="jl-field">
-              <label htmlFor="acc-current">Current password</label>
-              <input id="acc-current" className="jl-input" type="password" autoComplete="current-password" disabled />
-            </div>
-            <div className="jl-field">
-              <label htmlFor="acc-new">New password</label>
-              <input id="acc-new" className="jl-input" type="password" autoComplete="new-password" disabled />
-            </div>
-            <div className="jl-field">
-              <label htmlFor="acc-confirm">Confirm new password</label>
-              <input id="acc-confirm" className="jl-input" type="password" autoComplete="new-password" disabled />
-              <span className="hint">Password changes will be enabled in an upcoming release.</span>
-            </div>
+        </Panel>
+        <Panel caption="Change password">
+          <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+            <Field label="Current password" htmlFor="acc-current">
+              <PasswordInput id="acc-current" autoComplete="current-password" disabled />
+            </Field>
+            <Field label="New password" htmlFor="acc-new">
+              <PasswordInput id="acc-new" autoComplete="new-password" disabled />
+            </Field>
+            <Field label="Confirm new password" htmlFor="acc-confirm" hint="Password changes will be enabled in an upcoming release.">
+              <PasswordInput id="acc-confirm" autoComplete="new-password" disabled />
+            </Field>
             <div>
-              <button type="submit" className="jl-btn jl-btn--primary" disabled aria-disabled="true">
+              <Button type="submit" disabled>
                 Update password
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
+        </Panel>
       </div>
-    </AppShell>
+    </Page>
   );
 }
