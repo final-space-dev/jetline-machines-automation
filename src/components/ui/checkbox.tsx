@@ -27,7 +27,7 @@ function Checkbox({
       aria-checked={indeterminate ? "mixed" : checked}
       onClick={onCheckedChange ? () => onCheckedChange(!checked) : undefined}
       className={cn(
-        "inline-flex size-4 shrink-0 items-center justify-center rounded border transition-colors duration-150 focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex size-4 shrink-0 items-center justify-center rounded border pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5 pointer-coarse:after:content-[''] transition-colors duration-150 focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
         checked || indeterminate ? "border-[#2A5BD7] bg-[#2A5BD7] text-white" : "border-[#DEE0E3] bg-white",
         className
       )}

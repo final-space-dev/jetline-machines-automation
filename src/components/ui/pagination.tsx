@@ -27,7 +27,7 @@ function pageWindow(page: number, pageCount: number): (number | "ellipsis-l" | "
 }
 
 const itemBase =
-  "min-w-[30px] rounded-lg px-[9px] py-[7px] text-center text-[12.5px] leading-none"
+  "min-w-[30px] rounded-lg px-[9px] py-[7px] text-center text-[12.5px] leading-none pointer-coarse:min-h-11 pointer-coarse:min-w-11"
 
 function Pagination({
   page,
@@ -46,7 +46,8 @@ function Pagination({
       aria-label="Pagination"
       data-slot="pagination"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-[11px] border border-[#DEE0E3] bg-white p-[3px]",
+        // Wraps on a narrow screen: with finger-sized pages a long run is wider than a phone.
+        "inline-flex max-w-full flex-wrap items-center gap-0.5 rounded-[11px] border border-[#DEE0E3] bg-white p-[3px]",
         className
       )}
       {...props}
@@ -62,7 +63,7 @@ function Pagination({
           "font-medium",
           page <= 1
             ? "cursor-not-allowed text-[#B4B8BF]"
-            : "text-[#7A8087] hover:bg-[#F1F2F3] hover:text-[#1B1D21]"
+            : "text-[#696F79] hover:bg-[#F1F2F3] hover:text-[#1B1D21]"
         )}
       >
         &#8249;
@@ -81,7 +82,7 @@ function Pagination({
               "tabular-nums",
               p === page
                 ? "bg-[#F1F2F3] font-semibold text-[#1B1D21]"
-                : "font-medium text-[#7A8087] hover:bg-[#F1F2F3] hover:text-[#1B1D21]"
+                : "font-medium text-[#696F79] hover:bg-[#F1F2F3] hover:text-[#1B1D21]"
             )}
           >
             {p}
@@ -90,7 +91,7 @@ function Pagination({
           <span
             key={p}
             aria-hidden
-            className={cn(itemBase, "font-medium text-[#7A8087]")}
+            className={cn(itemBase, "font-medium text-[#696F79]")}
           >
             &#8230;
           </span>
@@ -107,7 +108,7 @@ function Pagination({
           "font-medium",
           page >= pageCount
             ? "cursor-not-allowed text-[#B4B8BF]"
-            : "text-[#7A8087] hover:bg-[#F1F2F3] hover:text-[#1B1D21]"
+            : "text-[#696F79] hover:bg-[#F1F2F3] hover:text-[#1B1D21]"
         )}
       >
         &#8250;

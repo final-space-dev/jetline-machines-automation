@@ -142,7 +142,7 @@ export function SearchSelect({
           "flex h-8 select-none items-center justify-between gap-2 rounded-[10px] border border-[#DEE0E3] bg-white px-2.5 text-[12.5px] whitespace-nowrap text-[#1B1D21] transition-[color,background-color,border-color,box-shadow,opacity] duration-[180ms] ease-standard outline-none",
           "hover:border-[#C8CACD] focus-visible:border-[#2A5BD7] focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] disabled:cursor-not-allowed disabled:border-[#ECEDEE] disabled:bg-[#F7F7F8] disabled:text-[#B4B8BF]",
           open && "border-[#2A5BD7] ring-[3px] ring-[#E4EAFB] hover:border-[#2A5BD7]",
-          !selected && "text-[#8B9098]",
+          !selected && "text-[#696F79]",
           className
         )}
       >
@@ -186,7 +186,7 @@ export function SearchSelect({
                 {grouped.map(({ group, items }, gi) => (
                   <div key={gi}>
                     {group && (
-                      <p className="px-2.5 pt-1.5 pb-0.5 text-[10.5px] font-semibold tracking-[0.1em] text-[#9AA0A9] uppercase">
+                      <p className="px-2.5 pt-1.5 pb-0.5 text-[10.5px] font-semibold tracking-[0.1em] text-[#696F79] uppercase">
                         {group}
                       </p>
                     )}
@@ -218,7 +218,7 @@ export function SearchSelect({
                   </button>
                 )}
                 {!filtered.length && (
-                  <p className="px-3 py-4 text-center text-[12.5px] text-[#9AA0A9]">
+                  <p className="px-3 py-4 text-center text-[12.5px] text-[#696F79]">
                     Nothing matches.
                   </p>
                 )}

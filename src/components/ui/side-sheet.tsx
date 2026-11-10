@@ -66,7 +66,7 @@ function SideSheet({
               type="button"
               data-slot="side-sheet-close"
               onClick={() => onOpenChange(false)}
-              className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#F1F2F3] text-[#696F79] transition-colors duration-[180ms] ease-standard hover:bg-[#E4E6E8]"
+              className="relative flex size-[30px] shrink-0 items-center justify-center rounded-[9px] pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-[''] bg-[#F1F2F3] text-[#696F79] transition-colors duration-[180ms] ease-standard hover:bg-[#E4E6E8]"
             >
               <XIcon className="size-3.5" />
               <span className="sr-only">Close</span>

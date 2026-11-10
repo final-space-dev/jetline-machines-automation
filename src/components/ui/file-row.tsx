@@ -48,7 +48,7 @@ function FileRow({
       <span
         aria-hidden
         data-slot="file-row-ext"
-        className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#F4F4F5] text-[9.5px] font-bold tracking-wide text-[#8B9098]"
+        className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#F4F4F5] text-[9.5px] font-bold tracking-wide text-[#696F79]"
       >
         {ext}
       </span>
@@ -57,7 +57,7 @@ function FileRow({
           {name}
         </span>
         {meta != null && (
-          <span className="mt-px block truncate text-[11px] text-[#9AA0A9]">{meta}</span>
+          <span className="mt-px block truncate text-[11px] text-[#696F79]">{meta}</span>
         )}
       </span>
       {chip}

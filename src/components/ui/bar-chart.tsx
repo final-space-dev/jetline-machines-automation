@@ -154,7 +154,7 @@ export function BarChart({
                   stroke={Math.abs(t) < scale.step * 0.001 ? "#DEE0E3" : "#F1F1F2"}
                   strokeWidth={1}
                 />
-                <text x={padL - 7} y={clampY(yAt(t)) + 3} textAnchor="end" className="fill-[#9AA0A9] text-[10px]">
+                <text x={padL - 7} y={clampY(yAt(t)) + 3} textAnchor="end" className="fill-[#696F79] text-[10px]">
                   {axisFormat(t)}
                 </text>
               </g>
@@ -199,7 +199,7 @@ export function BarChart({
                   y={y}
                   textAnchor={tilt ? "end" : "middle"}
                   transform={tilt ? `rotate(-30 ${x} ${y})` : undefined}
-                  className="fill-[#9AA0A9] text-[10px]"
+                  className="fill-[#696F79] text-[10px]"
                 >
                   {l}
                 </text>

@@ -74,7 +74,7 @@
   --muted-foreground: #696f79; /* Muted */
   --accent: #eef2fe; /* Signal wash */
   --accent-foreground: #2148ae; /* Signal chip fg */
-  --destructive: #c0453c; /* Deficit */
+  --destructive: #ba433a; /* Deficit */
   --border: #E8E9EB; /* Hairline */
   --input: #DEE0E3; /* control borders */
   --ring: #2a5bd7;
@@ -87,12 +87,12 @@
 :root {
   --face-sidebar-bg: #131B2C;
   --face-sidebar-card: #0E1626;
-  --face-accent: #0EA5E9;
-  --face-accent-hover: #38BDF8;
-  --face-accent-glow: 0 6px 18px rgba(14,165,233,.32);
-  --face-nav-label: #5C6B84;
+  --face-accent: #0277B6;
+  --face-accent-hover: #0369A1;
+  --face-accent-glow: 0 6px 18px rgba(2,119,182,.32);
+  --face-nav-label: #7C8BA4;
   --face-nav-idle: #A9B6C8;
-  --face-nav-dim: #64748B;
+  --face-nav-dim: #7D8CA1;
   --face-nav-mid: #7C8CA3;
   --face-nav-text: #C7D2DE;
 }
@@ -102,9 +102,9 @@
   --face-accent: #A4213D;
   --face-accent-hover: #BF2E4C;
   --face-accent-glow: 0 6px 18px rgba(164,33,61,.4);
-  --face-nav-label: #8A6E75;
+  --face-nav-label: #94797F;
   --face-nav-idle: #CDB7BC;
-  --face-nav-dim: #7A666B;
+  --face-nav-dim: #907A80;
   --face-nav-mid: #9B8288;
   --face-nav-text: #DECBCF;
 }

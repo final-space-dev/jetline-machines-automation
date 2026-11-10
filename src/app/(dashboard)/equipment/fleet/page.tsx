@@ -168,9 +168,9 @@ const STORE_COLUMNS: Column<StoreHealthRow>[] = [
   { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/equipment/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
   { key: "group", label: "Group", hideBelow: "md", sortValue: (r) => r.group ?? "", cell: (r) => <Muted>{r.group ?? ""}</Muted> },
   { key: "equipment", label: "Equipment", align: "right", hideBelow: "sm", sortValue: (r) => r.equipment, cell: (r) => <span className={cn(GRID.num, "font-medium")}>{r.equipment}</span> },
-  { key: "poor", label: "Poor", align: "right", sortValue: (r) => r.poor, cell: (r) => <span className={cn(GRID.num, r.poor > 0 ? "font-semibold text-deficit" : "text-faint")}>{r.poor}</span> },
+  { key: "poor", label: "Poor", align: "right", sortValue: (r) => r.poor, cell: (r) => <span className={cn(GRID.num, r.poor > 0 ? "font-semibold text-deficit" : "text-muted-foreground")}>{r.poor}</span> },
   { key: "printers", label: "Printers", align: "right", hideBelow: "sm", sortValue: (r) => r.printers, cell: (r) => <span className={GRID.num}>{r.printers}</span> },
-  { key: "replace", label: "Replace", align: "right", hideBelow: "sm", sortValue: (r) => r.replace, cell: (r) => <span className={cn(GRID.num, r.replace > 0 ? "font-semibold" : "text-faint")}>{r.replace}</span> },
+  { key: "replace", label: "Replace", align: "right", hideBelow: "sm", sortValue: (r) => r.replace, cell: (r) => <span className={cn(GRID.num, r.replace > 0 ? "font-semibold" : "text-muted-foreground")}>{r.replace}</span> },
   { key: "score", label: "Score", align: "right", sortValue: (r) => r.score, cell: (r) => <Badge status={scoreStatus(r.score)}>{Math.round(r.score * 100)}%</Badge> },
   { key: "lastActivity", label: "Last activity", align: "right", hideBelow: "lg", sortValue: (r) => time(r.lastActivity), cell: (r) => <Muted>{fmtDate(r.lastActivity)}</Muted> },
 ];
@@ -184,7 +184,7 @@ function LeaderRow({ rank, row }: { rank: number; row: DataQualityRow }) {
     <Link
       // The store's own page is the one that shows its completeness.
       href={`/equipment/stores/${encodeURIComponent(row.store)}`}
-      className="flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none hover:bg-muted focus-visible:bg-muted"
+      className="flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none hover:bg-muted focus-visible:bg-muted pointer-coarse:min-h-11"
     >
       <span className={cn(TYPE.micro, "w-4 shrink-0 text-right font-semibold text-muted-foreground tabular-nums")}>{rank}</span>
       <span className={cn(TYPE.data, "min-w-0 flex-1 truncate font-medium")}>{row.store}</span>

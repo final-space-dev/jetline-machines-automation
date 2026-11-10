@@ -9,7 +9,9 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      // A wide table scrolls sideways inside this box; it takes focus so the arrow keys can scroll it.
+      tabIndex={0}
+      className="relative w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <table
         data-slot="table"
@@ -71,7 +73,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       data-slot="table-head"
-      // R31 / spec 3.6: the one table header - 11.5/600 #8B9098, sentence
+      // R31 / spec 3.6: the one table header - 11.5/600 #696F79, sentence
       // case (never uppercase), 13px/14px padding.
       className={cn(GRID.th, className)}
       {...props}

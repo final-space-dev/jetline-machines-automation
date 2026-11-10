@@ -67,7 +67,7 @@ function SelectTrigger({
       data-size={size}
       className={cn(
         "flex w-fit items-center justify-between gap-1.5 rounded-[10px] border border-[#DEE0E3] bg-white px-2.5 text-[13px] whitespace-nowrap text-[#1B1D21] transition-[color,background-color,border-color,box-shadow,opacity] duration-[180ms] ease-standard outline-none select-none hover:border-[#C8CACD] focus-visible:border-[#2A5BD7] focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] data-open:border-[#2A5BD7] data-open:ring-[3px] data-open:ring-[#E4EAFB] disabled:cursor-not-allowed disabled:border-[#ECEDEE] disabled:bg-[#F7F7F8] disabled:text-[#B4B8BF]",
-        size === "sm" ? "h-7 text-[12.5px]" : "h-8",
+        size === "sm" ? "h-7 text-[12.5px] pointer-coarse:h-11" : "h-8 pointer-coarse:h-11",
         className
       )}
       {...props}
@@ -108,7 +108,7 @@ function SelectLabel({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="select-label"
-      className={cn("px-2.5 py-1 text-[11px] font-medium text-[#9AA0A9]", className)}
+      className={cn("px-2.5 py-1 text-[11px] font-medium text-[#696F79]", className)}
       {...props}
     />
   )
@@ -131,7 +131,7 @@ function SelectItem({
       disabled={disabled}
       data-slot="select-item"
       className={cn(
-        "flex w-full cursor-default items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[13px] text-[#3A3F47] select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-focus:bg-[#F4F4F5] data-focus:text-[#1B1D21]",
+        "flex w-full cursor-default items-center gap-2 rounded-[9px] px-2.5 py-1.5 pointer-coarse:min-h-11 text-[13px] text-[#3A3F47] select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-focus:bg-[#F4F4F5] data-focus:text-[#1B1D21]",
         className
       )}
     >

@@ -182,7 +182,7 @@ function StoreRow({ store, score }: { store: ResolvedStore; score?: number }) {
     <Link
       href={`/equipment/stores/${encodeURIComponent(store.name)}`}
       title={typeof score === "number" ? `Open ${store.name} · ${Math.round(score)}% complete` : `Open ${store.name}`}
-      className="flex items-center gap-2.5 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:bg-muted"
+      className="flex items-center gap-2.5 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:bg-muted pointer-coarse:min-h-11"
     >
       <span className={cn(TYPE.data, "max-w-1/2 shrink-0 truncate font-semibold")}>{store.name}</span>
       <span className="min-w-0 flex-1">

@@ -169,7 +169,9 @@ function SidebarNav({
     setActiveRect(el ? { top: el.offsetTop, h: el.offsetHeight } : null);
     const raf = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(raf);
-  }, [activeHref, bubbleKey]);
+  // `nav` too: rows that arrive after first paint (a menu filtered by a session that loads late)
+  // move the active row, and the bubble must be measured where the row now is.
+  }, [activeHref, bubbleKey, nav]);
 
   return (
     <nav
@@ -312,7 +314,8 @@ function Sidebar({ search, ...p }: SidebarProps & { search: string }) {
     >
       {/* Logo row */}
       <div className="flex items-center gap-[9px] border-b border-white/[.06] px-[18px] pb-[18px] pt-[19px]">
-        <h1 className="text-base font-bold tracking-[-0.02em] text-white">{p.brand}</h1>
+        {/* Not a heading: the page's title is the one h1 (PageShell). */}
+        <span className="text-base font-bold tracking-[-0.02em] text-white">{p.brand}</span>
         {p.chip && (
           <span className={`rounded-[7px] ${CHROME.accent} px-[9px] py-[3px] text-xs font-semibold tracking-[-0.01em] text-white`}>
             {p.chip}

@@ -145,7 +145,7 @@ export function MachinesShell({ dev, children }: { dev: boolean; children: React
       >
         <ToastBridge />
         <div className="flex flex-none items-center justify-between gap-3 border-b border-border bg-card px-4 py-2.5 lg:hidden print:hidden">
-          <Link href="/" className={cn(TYPE.section, "flex items-center gap-2 font-bold tracking-tight")}>
+          <Link href="/" className={cn(TYPE.section, "flex items-center gap-2 font-bold tracking-tight pointer-coarse:min-h-11")}>
             {getBrand().name}
             {dev && <Badge status="warning">DEV</Badge>}
           </Link>
@@ -193,7 +193,7 @@ export function MachinesShell({ dev, children }: { dev: boolean; children: React
                       href={item.href}
                       onClick={() => setMenuOpen(false)}
                       aria-current={active ? "page" : undefined}
-                      className={cn(TYPE.body, "flex items-center gap-3 rounded-lg px-2 py-2.5", active ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted")}
+                      className={cn(TYPE.body, "flex items-center gap-3 rounded-lg px-2 py-2.5 pointer-coarse:min-h-11", active ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted")}
                     >
                       <Icon className="size-4 shrink-0" />
                       {item.label}
@@ -204,7 +204,13 @@ export function MachinesShell({ dev, children }: { dev: boolean; children: React
             ))}
           </nav>
         </SideSheet>
-        {children}
+        {/* Pages fill this frame; on a wide screen the bell sits at the header's right edge. */}
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="absolute top-4 right-7 z-10 max-lg:hidden print:hidden">
+            <NotificationBell size="default" />
+          </div>
+          {children}
+        </div>
         <SearchPalette />
         <SyncPanel />
       </Shell>

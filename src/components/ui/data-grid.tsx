@@ -109,7 +109,7 @@ export function DataGrid<Row>({
             >
               {c.label}
               {sort?.key === c.key && (
-                <span className="ml-1 text-[9px] leading-none text-[#9AA0A9]">
+                <span className="ml-1 text-[9px] leading-none text-[#696F79]">
                   {sort.dir === -1 ? "\u25BC" : "\u25B2"}
                 </span>
               )}
@@ -121,7 +121,7 @@ export function DataGrid<Row>({
       <tbody className="divide-y divide-[#F4F4F5]">
         {sorted.length === 0 && empty !== undefined ? (
           <tr>
-            <td colSpan={columns.length + (chevron ? 1 : 0)} className="px-4 py-10 text-center text-[12.5px] text-[#8B9098]">
+            <td colSpan={columns.length + (chevron ? 1 : 0)} className="px-4 py-10 text-center text-[12.5px] text-[#696F79]">
               {empty}
             </td>
           </tr>
@@ -157,7 +157,8 @@ export function DataGrid<Row>({
   )
 
   const body = <GlideRows>{table}</GlideRows>
-  return card ? <div className={GRID.card}>{body}</div> : body
+  // A wide grid scrolls sideways inside its card; the card takes focus so the arrow keys can scroll it.
+  return card ? <div tabIndex={0} className={cn(GRID.card, "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2A5BD7]")}>{body}</div> : body
 }
 
 /** Right-aligned whole-rand amount with red brackets (the one money cell).
@@ -177,7 +178,7 @@ export function Identity({ primary, secondary }: { primary: React.ReactNode; sec
   return (
     <div className="min-w-0">
       <div className="truncate font-medium text-[#1B1D21]">{primary}</div>
-      {secondary && <div className="truncate text-[11px] text-[#9AA0A9]">{secondary}</div>}
+      {secondary && <div className="truncate text-[11px] text-[#696F79]">{secondary}</div>}
     </div>
   )
 }

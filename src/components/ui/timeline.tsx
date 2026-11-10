@@ -17,7 +17,7 @@ const toneDotClasses: Record<TimelineTone, string> = {
   /** System events */
   system: "bg-[#C2C4C8]",
   /** Flags and failures */
-  flag: "bg-[#C0453C]",
+  flag: "bg-[#BA433A]",
 }
 
 function Timeline({
@@ -65,7 +65,7 @@ function TimelineItem({
       <div className="min-w-0 flex-1 pb-4 pl-2.5">
         <div className="text-[12.5px] leading-relaxed text-[#3A3F47]">{children}</div>
         {date != null && (
-          <div className="mt-[3px] text-[11px] text-[#9AA0A9]">{date}</div>
+          <div className="mt-[3px] text-[11px] text-[#696F79]">{date}</div>
         )}
       </div>
     </div>

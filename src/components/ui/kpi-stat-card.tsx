@@ -53,7 +53,7 @@ function KpiStatCard({
       {...props}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-xs font-medium text-[#8B9098]">
+        <span className="min-w-0 truncate text-xs font-medium text-[#696F79]">
           {label}
         </span>
         {delta}
@@ -61,7 +61,7 @@ function KpiStatCard({
       <div
         className={cn(
           "mt-2.5 text-[26px] leading-[1.05] font-bold tracking-[-0.025em] tabular-nums",
-          tone === "danger" ? "text-[#C0453C]" : "text-[#1B1D21]"
+          tone === "danger" ? "text-[#BA433A]" : "text-[#1B1D21]"
         )}
       >
         {value}
@@ -69,7 +69,7 @@ function KpiStatCard({
       {prior != null && prior !== "" && (
         <div
           data-slot="kpi-prior"
-          className="mt-1.5 text-[11px] leading-4 text-[#8B9098] tabular-nums"
+          className="mt-1.5 text-[11px] leading-4 text-[#696F79] tabular-nums"
         >
           {priorParts(prior)}
         </div>

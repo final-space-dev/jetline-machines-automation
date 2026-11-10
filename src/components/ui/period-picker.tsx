@@ -142,7 +142,7 @@ function MonthGrid({ selectedMonth, onSelect, ytdMode }: MonthGridProps) {
             className={[
               "rounded px-1 py-1.5 text-xs font-medium transition-all duration-150 cursor-pointer",
               active
-                ? "bg-sky-500 text-white shadow-sm shadow-sky-900/50"
+                ? "bg-[#0277B6] text-white shadow-sm shadow-sky-900/50"
                 : isInRange
                   ? "bg-sky-950 text-sky-300 hover:bg-sky-900"
                   : "text-gray-400 hover:bg-gray-700 hover:text-gray-200",
@@ -173,7 +173,7 @@ function QuarterGrid({ selectedMonth, onSelect }: QuarterGridProps) {
             className={[
               "rounded-md px-2 py-2.5 text-left transition-all duration-150 cursor-pointer",
               active
-                ? "bg-sky-500 text-white shadow-sm shadow-sky-900/50"
+                ? "bg-[#0277B6] text-white shadow-sm shadow-sky-900/50"
                 : "text-gray-300 hover:bg-gray-700",
             ].join(" ")}
           >

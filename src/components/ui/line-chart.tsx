@@ -39,7 +39,7 @@ export interface LineSeriesDef {
 export const SERIES_COLORS = [
   "#2A5BD7", // blue
   "#17795B", // green
-  "#C0453C", // red
+  "#BA433A", // red
   "#7A4CC9", // purple
   "#0891B2", // teal
   "#D9730D", // orange
@@ -454,7 +454,7 @@ export function LineChart({
                   x={padL - 7}
                   y={clampY(yAt(t)) + 3}
                   textAnchor="end"
-                  className="fill-[#9AA0A9] text-[10px]"
+                  className="fill-[#696F79] text-[10px]"
                 >
                   {axisFormat(t)}
                 </text>
@@ -474,7 +474,7 @@ export function LineChart({
                   y={y}
                   textAnchor={tilt ? "end" : "middle"}
                   transform={tilt ? `rotate(-30 ${x} ${y})` : undefined}
-                  className="fill-[#9AA0A9] text-[10px]"
+                  className="fill-[#696F79] text-[10px]"
                 >
                   {l}
                 </text>

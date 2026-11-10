@@ -9,7 +9,7 @@ import { FilterGroup } from "@/components/ui/filter-group"
  * Segmented control (design-spec-v1 §3.3): the travelling-bubble select.
  * Warm #F1F2F3 track (r11, 3px pad), items 12.5/500 - active ink riding a
  * white bubble (r9, segmentedBubble shadow) that glides on the 380ms spring;
- * inactive #7A8087. Tabs now means tabs (underline); this is the filter idiom.
+ * inactive #696F79. Tabs now means tabs (underline); this is the filter idiom.
  */
 function Segmented({
   label,
@@ -108,8 +108,8 @@ function Segmented({
             disabled={disabled}
             onClick={() => onValueChange(o.value)}
             className={cn(
-              "relative z-10 inline-flex items-center justify-center gap-1.5 rounded-[9px] px-3 py-[5px] text-[12.5px] font-medium whitespace-nowrap transition-colors duration-[220ms] ease-standard outline-none select-none focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB]",
-              active ? "text-[#1B1D21]" : "text-[#7A8087] hover:text-[#1B1D21]"
+              "relative z-10 inline-flex items-center justify-center gap-1.5 rounded-[9px] px-3 py-[5px] pointer-coarse:min-h-11 text-[12.5px] font-medium whitespace-nowrap transition-colors duration-[220ms] ease-standard outline-none select-none focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB]",
+              active ? "text-[#1B1D21]" : "text-[#696F79] hover:text-[#1B1D21]"
             )}
           >
             {o.label}

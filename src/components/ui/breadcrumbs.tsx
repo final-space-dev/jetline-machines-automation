@@ -52,14 +52,14 @@ function Breadcrumbs({
               <Link
                 href={item.href}
                 className={cn(
-                  "text-[#9AA0A9] hover:text-[#2A5BD7]",
+                  "text-[#696F79] hover:text-[#2A5BD7]",
                   MOTION.settle
                 )}
               >
                 {item.label}
               </Link>
             ) : (
-              <span className="text-[#9AA0A9]">{item.label}</span>
+              <span className="text-[#696F79]">{item.label}</span>
             )}
           </React.Fragment>
         )

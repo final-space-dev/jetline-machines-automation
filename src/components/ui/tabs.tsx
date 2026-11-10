@@ -98,7 +98,7 @@ function TabsList({
       data-slot="tabs-list"
       onKeyDown={handleKeyDown}
       className={cn(
-        "relative inline-flex w-fit items-stretch gap-0.5 border-b border-[#E8E9EB] text-[#7A8087]",
+        "relative inline-flex w-fit items-stretch gap-0.5 border-b border-[#E8E9EB] text-[#696F79]",
         className
       )}
       {...props}
@@ -140,8 +140,8 @@ function TabsTrigger({
       }}
       className={cn(
         // Spec §3.3 Tabs: 13.5px, 11/15/13px padding, active 600 ink on the
-        // 2px Signal underline, inactive 500 #7A8087.
-        "relative inline-flex items-center justify-center gap-1.5 rounded-t-[6px] px-[15px] pt-[11px] pb-[13px] text-[13.5px] font-medium whitespace-nowrap text-[#7A8087] transition-colors duration-[180ms] ease-standard outline-none select-none hover:text-[#1B1D21] focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] disabled:pointer-events-none disabled:opacity-50 data-active:font-semibold data-active:text-[#1B1D21] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        // 2px Signal underline, inactive 500 #696F79.
+        "relative inline-flex items-center justify-center gap-1.5 rounded-t-[6px] px-[15px] pt-[11px] pb-[13px] text-[13.5px] font-medium whitespace-nowrap text-[#696F79] transition-colors duration-[180ms] ease-standard outline-none select-none hover:text-[#1B1D21] focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] disabled:pointer-events-none disabled:opacity-50 data-active:font-semibold data-active:text-[#1B1D21] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}

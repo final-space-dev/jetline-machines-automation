@@ -24,7 +24,7 @@ function Switch({
       data-slot="switch"
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative inline-flex h-[21px] w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-[240ms] ease-standard focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex h-[21px] w-9 shrink-0 cursor-pointer items-center rounded-full pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-3 pointer-coarse:after:content-[''] transition-colors duration-[240ms] ease-standard focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
         checked ? "bg-[#2A5BD7]" : "bg-[#D8DADE]",
         className
       )}

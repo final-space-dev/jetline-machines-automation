@@ -3,7 +3,6 @@
 import * as React from "react";
 import { DataGrid, type DataGridColumn } from "@/components/ui/data-grid";
 import { Pagination } from "@/components/ui/pagination";
-import { SURFACE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { Empty } from "./empty";
 
@@ -89,8 +88,7 @@ export function DataTable<Row>({
       onRowClick={onRowClick}
       rowClassName={rowClassName}
       chevron={!!onRowClick}
-      // A wide table brings its own card (below), so the part that scrolls is ours and can take the keyboard.
-      card={wide ? false : card}
+      card={card}
       defaultSort={defaultSort}
       onSortChange={(key, dir) => {
         setSort({ key, dir: dir === "desc" ? -1 : 1 });
@@ -104,12 +102,11 @@ export function DataTable<Row>({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      {wide ? (
-        <div tabIndex={0} role="region" aria-label="Table, scrolls sideways" className={cn(card && SURFACE.shell, "min-w-0 overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-ring/30")}>
-          {grid}
-        </div>
+      {/* The kit's card scrolls a wide grid and takes the keyboard. Without the card (a table inside a panel), this box does. */}
+      {card ? (
+        <div className={wide ? "min-w-0" : "@container min-w-0"}>{grid}</div>
       ) : (
-        <div className="@container min-w-0 overflow-x-auto">{grid}</div>
+        <div tabIndex={wide ? 0 : undefined} className={cn("min-w-0 overflow-x-auto outline-none", !wide && "@container")}>{grid}</div>
       )}
       {pageCount > 1 && <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />}
     </div>

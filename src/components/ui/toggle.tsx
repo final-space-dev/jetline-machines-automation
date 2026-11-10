@@ -23,7 +23,7 @@ function Toggle({
       data-slot="toggle"
       onClick={() => onPressedChange(!pressed)}
       className={cn(
-        "rounded-[9px] border px-3 py-2 text-[12.5px] font-medium transition-all duration-200 ease-standard focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] focus-visible:outline-none",
+        "rounded-[9px] border px-3 py-2 pointer-coarse:min-h-11 text-[12.5px] font-medium transition-all duration-200 ease-standard focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB] focus-visible:outline-none",
         pressed
           ? "border-[#2A5BD7] bg-[#EEF2FE] text-[#2148AE]"
           : "border-[#DEE0E3] bg-transparent text-[#4A5058] hover:bg-[#F1F2F3]",

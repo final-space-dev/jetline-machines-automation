@@ -194,9 +194,9 @@ export function FlowCanvas({
 export type FlowAccent = "driver" | "cost" | "intermediate" | "outcome" | "neutral";
 
 const ACCENT_STYLES: Record<FlowAccent, { border: string; label: string }> = {
-  driver: { border: "border-green-400", label: "text-green-600" },
-  cost: { border: "border-red-400", label: "text-red-500" },
-  intermediate: { border: "border-blue-400", label: "text-blue-500" },
+  driver: { border: "border-green-400", label: "text-[#17795B]" },
+  cost: { border: "border-red-400", label: "text-[#BA433A]" },
+  intermediate: { border: "border-blue-400", label: "text-[#2A5BD7]" },
   outcome: { border: "border-[var(--color-navy-800,#173050)]", label: "text-[var(--color-text-muted,#676c76)]" },
   neutral: { border: "border-[var(--color-grey-300,#c4c6cb)]", label: "text-[var(--color-text-muted,#676c76)]" },
 };
@@ -252,9 +252,9 @@ export function FlowCard({
               <span
                 className={`tabular-nums font-medium whitespace-nowrap ${
                   r.tone === "danger"
-                    ? "text-red-500"
+                    ? "text-[#BA433A]"
                     : r.tone === "success"
-                    ? "text-green-600"
+                    ? "text-[#17795B]"
                     : "text-[var(--color-text-secondary,#49505b)]"
                 }`}
               >

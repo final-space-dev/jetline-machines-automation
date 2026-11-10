@@ -33,14 +33,14 @@ function KeyValueList({
           data-slot="key-value-row"
           className="flex items-baseline justify-between gap-3 border-b border-[#F4F4F5] py-2.5 last:border-b-0"
         >
-          <dt className="shrink-0 text-[12.5px] text-[#8B9098]">{item.label}</dt>
+          <dt className="shrink-0 text-[12.5px] text-[#696F79]">{item.label}</dt>
           <dd
             className={cn(
               "min-w-0 text-right text-[12.5px] font-medium tabular-nums",
               item.tone === "good"
                 ? "text-[#17795B]"
                 : item.tone === "bad"
-                  ? "text-[#C0453C]"
+                  ? "text-[#BA433A]"
                   : "text-[#1B1D21]"
             )}
           >

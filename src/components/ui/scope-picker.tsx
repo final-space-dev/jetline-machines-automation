@@ -234,7 +234,7 @@ export function ScopePicker({
                 {grouped.map(({ group, items }, gi) => (
                   <div key={gi}>
                     {group && (
-                      <p className="px-2.5 pt-1.5 pb-0.5 text-[10.5px] font-semibold tracking-[0.1em] text-[#9AA0A9] uppercase">{group}</p>
+                      <p className="px-2.5 pt-1.5 pb-0.5 text-[10.5px] font-semibold tracking-[0.1em] text-[#696F79] uppercase">{group}</p>
                     )}
                     {items.map((opt) => {
                       const on = tokens.includes(opt.value);
@@ -253,7 +253,7 @@ export function ScopePicker({
                     })}
                   </div>
                 ))}
-                {!filtered.length && <p className="px-3 py-4 text-center text-[12.5px] text-[#9AA0A9]">Nothing matches.</p>}
+                {!filtered.length && <p className="px-3 py-4 text-center text-[12.5px] text-[#696F79]">Nothing matches.</p>}
               </ComboboxOptions>
             </Combobox>
             <div className="flex items-center justify-between gap-2 border-t border-[#F1F1F2] px-2 py-1.5">

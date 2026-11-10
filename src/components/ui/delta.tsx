@@ -48,7 +48,7 @@ function Delta({
       data-slot="delta"
       className={cn(
         chipBase,
-        good ? "bg-[#E9F4EF] text-[#17795B]" : "bg-[#FBEDEB] text-[#C0453C]",
+        good ? "bg-[#E9F4EF] text-[#17795B]" : "bg-[#FBEDEB] text-[#BA433A]",
         className
       )}
     >

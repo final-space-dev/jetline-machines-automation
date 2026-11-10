@@ -144,7 +144,7 @@ export function BookmarkMenu({
       <button type="button" onClick={() => recall(b)} className="min-w-0 flex-1 text-left">
         <div className="flex items-center gap-1.5">
           <span className="truncate text-xs font-medium text-gray-800">{b.name}</span>
-          {b.shared && <Users className="size-3 shrink-0 text-gray-400" aria-label="Shared with everyone" />}
+          {b.shared && <Users className="size-3 shrink-0 text-[#696F79]" aria-label="Shared with everyone" />}
         </div>
         {(b.tags.length > 0 || (!b.mine && b.owner_name)) && (
           <div className="mt-1 flex flex-wrap gap-1">
@@ -188,9 +188,9 @@ export function BookmarkMenu({
           className
         )}
       >
-        <Bookmark className="size-3.5 text-gray-400" />
+        <Bookmark className="size-3.5 text-[#696F79]" />
         Bookmarks
-        <ChevronDown className="size-3.5 text-gray-400" />
+        <ChevronDown className="size-3.5 text-[#696F79]" />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0">
         <div className="border-b border-gray-100 p-2.5">
@@ -213,16 +213,16 @@ export function BookmarkMenu({
         </div>
         <div className="max-h-80 overflow-y-auto">
           {list === null ? (
-            <div className="flex items-center justify-center gap-2 p-4 text-xs text-gray-400"><Spinner className="size-3.5" /> Loading</div>
+            <div className="flex items-center justify-center gap-2 p-4 text-xs text-[#696F79]"><Spinner className="size-3.5" /> Loading</div>
           ) : list.length === 0 ? (
-            <div className="p-4 text-xs text-gray-400">
+            <div className="p-4 text-xs text-[#696F79]">
               No saved views yet. Set up the report the way you want it, name it above and save - it comes back exactly as it is now.
             </div>
           ) : (
             <>
-              {mine.length > 0 && <p className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400">My views</p>}
+              {mine.length > 0 && <p className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[#696F79]">My views</p>}
               {mine.map(row)}
-              {shared.length > 0 && <p className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400">Shared views</p>}
+              {shared.length > 0 && <p className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[#696F79]">Shared views</p>}
               {shared.map(row)}
             </>
           )}

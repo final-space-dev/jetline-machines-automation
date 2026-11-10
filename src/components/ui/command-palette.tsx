@@ -136,7 +136,7 @@ export function CommandPalette({
           <Kbd>esc</Kbd>
         </div>
         <div className="max-h-[340px] overflow-y-auto p-2">
-          {items.length === 0 && <p className="px-4 py-6 text-center text-xs text-[#9AA0A9]">Nothing matches.</p>}
+          {items.length === 0 && <p className="px-4 py-6 text-center text-xs text-[#696F79]">Nothing matches.</p>}
           {items.map((item, i) => (
             <button
               key={item.key}
@@ -154,7 +154,7 @@ export function CommandPalette({
                 {kindCode(item)}
               </span>
               <span className="flex-1 truncate text-[12.5px] text-[#1B1D21]">{item.label}</span>
-              <span className="text-[11.5px] text-[#A8ADB5]">{item.hint ?? item.group}</span>
+              <span className="text-[11.5px] text-[#696F79]">{item.hint ?? item.group}</span>
             </button>
           ))}
         </div>

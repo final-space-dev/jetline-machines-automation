@@ -36,7 +36,7 @@ export const COLORS = {
   pendingHover: "#5B616B",
   pendingWash: "#F1F2F3",
   pendingChipFg: "#5B616B",
-  deficit: "#C0453C",
+  deficit: "#BA433A",
   deficitHover: "#A3352D",
   deficitWash: "#FBEDEB",
   deficitChipFg: "#A83C34",
@@ -58,7 +58,7 @@ export const COLORS = {
   nil: "#C3C7CD",
   disabledText: "#B4B8BF",
   placeholder: "#A8ADB5",
-  headerFg: "#8B9098",
+  headerFg: "#696F79",
   // Sidebar (dark) family: the Consol face's values, documented in the spec.
   // The live chrome reads CHROME (the face's CSS variables); sky stays a
   // literal because it is also a chart series colour (R37).
@@ -151,13 +151,13 @@ export const TYPE = {
   /** Hints, timeline dates, metadata */
   micro: "text-[11px]",
   /** Uppercase micro label (labelled dividers, filter captions) */
-  microLabel: "text-[11px] font-semibold tracking-[0.1em] text-[#9AA0A9] uppercase",
+  microLabel: "text-[11px] font-semibold tracking-[0.1em] text-[#696F79] uppercase",
 } as const;
 
 // ── Grid metrics (R31, spec §3.6) ────────────────────────────────────────────
 export const GRID = {
-  /** The one table header style: 11.5/600 #8B9098 on #FAFAFB, 13px/14px pads */
-  th: "font-grid px-3.5 py-[13px] text-left align-middle text-[11.5px] font-semibold whitespace-nowrap text-[#8B9098]",
+  /** The one table header style: 11.5/600 #696F79 on #FAFAFB, 13px/14px pads */
+  th: "font-grid px-3.5 py-[13px] text-left align-middle text-[11.5px] font-semibold whitespace-nowrap text-[#696F79]",
   thRight: "text-right",
   /** Data row cell (compact density: 8px vertical, 14px horizontal) */
   td: "font-grid px-3.5 py-2 text-[13px]",
@@ -166,7 +166,7 @@ export const GRID = {
   /** Right-aligned tabular numerals */
   num: "text-right tabular-nums whitespace-nowrap",
   /** Negative amounts (Deficit) */
-  neg: "text-[#C0453C]",
+  neg: "text-[#BA433A]",
   /** Emphasis / banded column background */
   band: "bg-[#FAFAFB]",
   bandHeader: "bg-[#F4F4F5] text-[#1B1D21]",

@@ -102,7 +102,7 @@ const readingColumn = (key: CounterKey, label: string): Column<MeterReading> => 
   label,
   align: "right",
   // Readings arrive as strings (bigint); count() groups them.
-  cell: (r) => <span className={cn(GRID.num, !num(r[key]) && "text-faint")}>{count(num(r[key]))}</span>,
+  cell: (r) => <span className={cn(GRID.num, !num(r[key]) && "text-muted-foreground")}>{count(num(r[key]))}</span>,
 });
 
 const READING_COLUMNS: Column<MeterReading>[] = [

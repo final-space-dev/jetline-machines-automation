@@ -7,7 +7,7 @@ export function TextLink({ href, quiet = false, className, children }: { href: s
     <Link
       href={href}
       onClick={(e) => e.stopPropagation()}
-      className={cn("rounded-sm font-medium outline-none hover:underline focus-visible:underline", quiet ? "text-foreground" : "text-primary", className)}
+      className={cn("rounded-sm font-medium outline-none hover:underline focus-visible:underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center", quiet ? "text-foreground" : "text-primary", className)}
     >
       {children}
     </Link>

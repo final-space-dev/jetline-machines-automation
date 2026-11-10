@@ -32,10 +32,10 @@ function ViewMenu({
           className
         )}
       >
-        <SlidersHorizontal className="size-3.5 text-gray-400" />
+        <SlidersHorizontal className="size-3.5 text-[#696F79]" />
         View
-        <span className="max-w-64 truncate font-normal text-gray-400">{summary}</span>
-        <ChevronDown className="size-3.5 text-gray-400" />
+        <span className="max-w-64 truncate font-normal text-[#696F79]">{summary}</span>
+        <ChevronDown className="size-3.5 text-[#696F79]" />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-3">
         <div className="flex flex-col gap-3">{children}</div>
@@ -53,7 +53,7 @@ function ViewMenuSection({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="text-[11px] font-medium tracking-wide text-gray-400 uppercase">{label}</p>
+      <p className="text-[11px] font-medium tracking-wide text-[#696F79] uppercase">{label}</p>
       {children}
     </div>
   )

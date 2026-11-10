@@ -94,7 +94,7 @@ export function DonutChart({
               </div>
             )}
             {centerLabel !== undefined && (
-              <div className="text-[10px] text-[#8B9098]">{centerLabel}</div>
+              <div className="text-[10px] text-[#696F79]">{centerLabel}</div>
             )}
           </div>
         )}

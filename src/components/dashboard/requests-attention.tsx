@@ -62,7 +62,7 @@ export function RequestsAttention() {
       <span className="flex flex-1 flex-wrap gap-x-6 gap-y-1">
         {figures.map((f) => (
           <span key={f.label} className="inline-flex items-baseline gap-1.5">
-            <span className={cn(TYPE.section, "tabular-nums", f.value === 0 ? "text-faint" : f.alarm && "text-deficit")}>{f.value}</span>
+            <span className={cn(TYPE.section, "tabular-nums", f.value === 0 ? "text-muted-foreground" : f.alarm && "text-deficit")}>{f.value}</span>
             <Muted>{f.label}</Muted>
           </span>
         ))}

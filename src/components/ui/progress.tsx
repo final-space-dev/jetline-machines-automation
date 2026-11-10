@@ -29,6 +29,7 @@ function Progress({
   tone = "accent",
   valueLabel,
   className,
+  "aria-label": ariaLabel,
   ...props
 }: React.ComponentProps<"div"> & {
   label?: React.ReactNode
@@ -51,6 +52,8 @@ function Progress({
       )}
       <div
         role="progressbar"
+        // The bar is what a screen reader meets: it takes the name, from aria-label or the drawn label.
+        aria-label={ariaLabel ?? (typeof label === "string" && label ? label : "Progress")}
         aria-valuemin={0}
         aria-valuemax={max}
         aria-valuenow={value}
@@ -90,6 +93,8 @@ function ProgressRing({
     <div
       data-slot="progress-ring"
       role="progressbar"
+      // {...props} below carries a caller's own aria-label over this one.
+      aria-label={typeof label === "string" && label ? label : "Progress"}
       aria-valuemin={0}
       aria-valuemax={max}
       aria-valuenow={value}
@@ -109,7 +114,7 @@ function ProgressRing({
           {centerLabel ?? `${Math.round(fraction * 100)}%`}
         </span>
         {label != null && (
-          <span className="mt-px text-[10px] text-[#8B9098]">{label}</span>
+          <span className="mt-px text-[10px] text-[#696F79]">{label}</span>
         )}
       </div>
     </div>

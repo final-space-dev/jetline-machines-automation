@@ -53,14 +53,15 @@ const variantClasses: Record<ButtonVariant, string> = {
 /** Spec sizes: small 12/6x11/r8 · medium 13/10x15/r10 · large 14/13x19/r12;
  * icon button 36x36 r10. Radius rides the size (spec §1.4). */
 const sizeClasses: Record<ButtonSize, string> = {
-  default: `${RADII.button} px-[15px] py-2.5 text-[13px]`,
-  xs: `${RADII.chip} px-2.5 py-[5px] text-[12px] [&_svg:not([class*='size-'])]:size-3`,
-  sm: `${RADII.chip} px-[11px] py-1.5 text-[12px] [&_svg:not([class*='size-'])]:size-3.5`,
-  lg: "rounded-xl px-[19px] py-[13px] text-[14px]",
-  icon: `${RADII.button} size-9`,
-  "icon-xs": `${RADII.chip} size-6 [&_svg:not([class*='size-'])]:size-3`,
-  "icon-sm": `${RADII.control} size-7 [&_svg:not([class*='size-'])]:size-3.5`,
-  "icon-lg": "rounded-xl size-10",
+  // `pointer-coarse` is a finger: 44 px there, the spec's sizes under a mouse.
+  default: `${RADII.button} px-[15px] py-2.5 text-[13px] pointer-coarse:min-h-11`,
+  xs: `${RADII.chip} px-2.5 py-[5px] text-[12px] pointer-coarse:min-h-11 [&_svg:not([class*='size-'])]:size-3`,
+  sm: `${RADII.chip} px-[11px] py-1.5 text-[12px] pointer-coarse:min-h-11 [&_svg:not([class*='size-'])]:size-3.5`,
+  lg: "rounded-xl px-[19px] py-[13px] text-[14px] pointer-coarse:min-h-11",
+  icon: `${RADII.button} size-9 pointer-coarse:size-11`,
+  "icon-xs": `${RADII.chip} size-6 pointer-coarse:size-11 [&_svg:not([class*='size-'])]:size-3`,
+  "icon-sm": `${RADII.control} size-7 pointer-coarse:size-11 [&_svg:not([class*='size-'])]:size-3.5`,
+  "icon-lg": "rounded-xl size-10 pointer-coarse:size-11",
 }
 
 function buttonVariants({
