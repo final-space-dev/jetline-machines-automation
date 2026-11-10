@@ -109,7 +109,9 @@ neonctl branches reset dev --parent --project-id <the project id>
 ```
 
 The branch keeps its address, so `DATABASE_URL` stays right. The dev-only
-accounts disappear with the reset; make them again.
+accounts disappear with the reset; make them again. Until production has the
+`meter_readings` table (see "Known gaps"), run `prisma/sql/meter_readings.sql`
+on the dev branch again after a reset.
 
 Schema changes: run them against dev first (`DATABASE_URL` of the dev branch
 in the shell, then `npx prisma db push`). Never run a migration, a seed or a
@@ -185,15 +187,31 @@ An agent does step 1 only.
   the CLI), and git deployments are switched on. A push to `main` would try to
   deploy old code to production. Decide which branch is production and make
   the setting agree.
-- `src/lib/bms/connection.ts` has a default database user and password
-  written in the code. They should come from variables only.
-- Archon's register lists Machines' database as `postgres17` on the box. It
-  is Neon. The box still has a `jetline_machines` database and the repository
-  still has `deploy.sh` and `ecosystem.config.cjs` from the time Machines ran
-  there; nothing runs from them.
-- The completeness badge on a store and the rows of the completeness
-  leaderboard link to `/stores/<store>/completeness`, a page that does not
-  exist. It did not exist before the UI work either.
-- The store analysis page (`/stores/[id]`) gets a 500 from
-  `/api/machines/utilization` on the dev database and shows the store without
-  utilisation figures. Not caused by the UI work.
+- **BMS credentials in the code (Archon Work W-85).**
+  `src/lib/bms/connection.ts` falls back to a database user and password
+  written in the code when `BMS_DB_USER` and `BMS_DB_PASSWORD` are not set.
+  They were left in place on 10 November 2026 because production's project
+  has neither variable (checked by name only), so removing the fallback would
+  change what production does. To remove them: add both variables to
+  production's project first, or decide the BMS sync is retired (it cannot
+  reach the stores' network from Vercel) and delete the module; then change
+  the password itself, since it has been in git.
+- The box still has a `jetline_machines` database and the repository still
+  has `deploy.sh` and `ecosystem.config.cjs` from the time Machines ran
+  there; nothing runs from them. (Archon's register now says Neon.)
+- **The Prisma table `meter_readings` is missing from the database (W-86).**
+  `/api/machines/utilization` answered 500 because `public.meter_readings`,
+  the table behind the Prisma model `MeterReading`, does not exist. The dev
+  branch is a copy of production's database, so production lacks it too, and
+  there the same routes fail: `/api/machines/utilization` (the store analysis
+  page, `/stores/[id]`), the reading count in `/api/health/detailed` and in
+  `/api/sync`, and the BMS sync. Print volumes are not affected; they come
+  from `xerox.meter_readings_normalised`. `prisma/sql/meter_readings.sql`
+  creates the table exactly as the schema describes it and was run on the dev
+  branch. **Production needs the same file run once**, by Alwyn's say-so; it
+  only adds an empty table. The table stays empty until a BMS sync fills it,
+  so store analysis shows machines without utilisation figures either way.
+- The links to `/stores/<store>/completeness` (a page that never existed) and
+  fleet health's links to `/stores/<store name>` (the store analysis page
+  wants a company id, so they showed "Store not found") now open the store's
+  own page. `docs/UI-ADOPTION.md` "What changed in behaviour".

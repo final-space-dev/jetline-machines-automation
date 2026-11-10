@@ -478,9 +478,11 @@ export default function StoreDetailPage() {
       title={storeName}
       titleExtra={
         completeness && (
-          <Link href={`/stores/${encodeURIComponent(storeName)}/completeness`} prefetch={false} title="View data completeness breakdown">
-            <CompletenessBadge score={completeness.overallScore} />
-          </Link>
+          // The store's own page is where its completeness shows; the parts of the score are on hover.
+          <CompletenessBadge
+            score={completeness.overallScore}
+            title={`${Math.round(completeness.overallScore)}% complete · equipment ${Math.round(completeness.equipmentScore)}% · printers ${Math.round(completeness.printerScore)}%`}
+          />
         )
       }
       crumbs={isAdmin ? [{ label: "Stores", href: "/equipment" }, { label: storeName }] : undefined}

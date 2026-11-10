@@ -111,7 +111,7 @@ function scoreStatus(score: number): "danger" | "warning" | "success" {
 // ─── Attention columns ───────────────────────────────────────────────────────
 
 const equipmentColumns = (last: Column<EquipmentAttention>): Column<EquipmentAttention>[] => [
-  { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
+  { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/equipment/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
   { key: "machine_type", label: "Type", sortValue: (r) => r.machine_type ?? "", cell: (r) => <TextLink quiet href={`/equipment/items/${r.id}`}>{r.machine_type ?? "Equipment"}</TextLink> },
   { key: "make_model", label: "Model", hideBelow: "md", sortValue: (r) => r.make_model ?? "", cell: (r) => r.make_model ?? "" },
   { key: "condition", label: "Condition", hideBelow: "sm", sortValue: (r) => r.condition ?? "", cell: (r) => r.condition ?? "" },
@@ -143,14 +143,14 @@ const REPLACE_COLUMNS: Column<ReplaceRow>[] = [
   {
     key: "store", label: "Store",
     sortValue: (r) => r.store ?? "",
-    cell: (r) => (r.store ? <TextLink quiet href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> : ""),
+    cell: (r) => (r.store ? <TextLink quiet href={`/equipment/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> : ""),
   },
   { key: "detail", label: "Detail", hideBelow: "md", cell: (r) => (r.kind === "printer" ? r.model ?? "" : r.make_model ?? "") },
 ];
 
 const CONTRACT_COLUMNS: Column<PrinterAttention>[] = [
   { key: "serial", label: "Serial", sortValue: (r) => r.serial, cell: (r) => <TextLink href={`/equipment/printers/${encodeURIComponent(r.serial)}`}>{r.serial}</TextLink> },
-  { key: "store", label: "Store", sortValue: (r) => r.store ?? "", cell: (r) => (r.store ? <TextLink quiet href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> : "") },
+  { key: "store", label: "Store", sortValue: (r) => r.store ?? "", cell: (r) => (r.store ? <TextLink quiet href={`/equipment/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> : "") },
   { key: "model", label: "Model", hideBelow: "md", sortValue: (r) => r.model ?? "", cell: (r) => r.model ?? "" },
   { key: "contract_end", label: "Contract End", hideBelow: "sm", sortValue: (r) => time(r.contract_end), cell: (r) => fmtDate(r.contract_end) },
   {
@@ -164,7 +164,7 @@ const CONTRACT_COLUMNS: Column<PrinterAttention>[] = [
 ];
 
 const STORE_COLUMNS: Column<StoreHealthRow>[] = [
-  { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
+  { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <TextLink href={`/equipment/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> },
   { key: "group", label: "Group", hideBelow: "md", sortValue: (r) => r.group ?? "", cell: (r) => <Muted>{r.group ?? ""}</Muted> },
   { key: "equipment", label: "Equipment", align: "right", sortValue: (r) => r.equipment, cell: (r) => <span className={cn(GRID.num, "font-medium")}>{r.equipment}</span> },
   { key: "poor", label: "Poor", align: "right", sortValue: (r) => r.poor, cell: (r) => <span className={cn(GRID.num, r.poor > 0 ? "font-semibold text-deficit" : "text-faint")}>{r.poor}</span> },
@@ -181,8 +181,8 @@ const NOTHING = "Nothing needs attention here right now";
 function LeaderRow({ rank, row }: { rank: number; row: DataQualityRow }) {
   return (
     <Link
-      href={`/stores/${encodeURIComponent(row.store)}/completeness`}
-      prefetch={false}
+      // The store's own page is the one that shows its completeness.
+      href={`/equipment/stores/${encodeURIComponent(row.store)}`}
       className="flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none hover:bg-muted focus-visible:bg-muted"
     >
       <span className={cn(TYPE.micro, "w-4 shrink-0 text-right font-semibold text-muted-foreground tabular-nums")}>{rank}</span>

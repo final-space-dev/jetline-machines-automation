@@ -85,6 +85,16 @@ changed how something is done:
 - **Tables** hide their secondary columns on a narrow screen and scroll inside
   their card; the old separate phone card list for a store's equipment is
   gone. Reports keep every column and scroll sideways.
+- **Completeness links.** The completeness badge on a store and the rows of
+  the fleet's completeness leaderboard linked to `/stores/<store>/completeness`,
+  a page that has never existed. The badge on a store is now plain, with the
+  equipment and printer parts of the score on hover (the store's own page is
+  where its completeness shows). A leaderboard row opens that store's page,
+  `/equipment/stores/<store>`.
+- **Store names in fleet health** linked to `/stores/<store name>`, the store
+  analysis page, which looks a store up by its company id and so showed
+  "Store not found" for every one. They now open the store's own page,
+  `/equipment/stores/<store>`.
 - **Two config panels that no tab reached** (`setup/connections/panel.tsx`,
   `setup/store-groups/panel.tsx`) were removed. Their old addresses still open
   Config.
