@@ -1,8 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Edit, Trash2, Upload, X } from "lucide-react";
-import { JlSelect } from "@/components/ui/jl-select";
+import { useCallback, useEffect, useState } from "react";
+import { Plus, Upload, X } from "lucide-react";
+import { Alert, AlertAction, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Confirm } from "@/components/machines/confirm";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Field } from "@/components/machines/field";
+import { FilePicker } from "@/components/machines/file-picker";
+import { Loading } from "@/components/machines/loading";
+import { Muted } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
+import { RowActions } from "@/components/machines/row-actions";
+import { GRID } from "@/lib/ui/ui-tokens";
 import { useRole } from "@/lib/use-role";
 
 interface ModelRow {
@@ -52,7 +65,8 @@ export function ModelsPanel() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 
-  const fileRef = useRef<HTMLInputElement>(null);
+  // The model whose deletion is being confirmed.
+  const [deleting, setDeleting] = useState<ModelRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,8 +143,7 @@ export function ModelsPanel() {
     }
   }
 
-  async function removeModel(id: number, name: string) {
-    if (!window.confirm(`Delete model "${name}"? Items using it keep their make/model text.`)) return;
+  async function removeModel(id: number) {
     setBusy(true);
     setError(null);
     try {
@@ -144,6 +157,7 @@ export function ModelsPanel() {
       await load();
     } finally {
       setBusy(false);
+      setDeleting(null);
     }
   }
 
@@ -181,207 +195,113 @@ export function ModelsPanel() {
     }
   }
 
-  if (roleLoading) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm p-6 text-sm text-gray-500">Loading</div>
-    );
-  }
+  if (roleLoading) return <Loading />;
+
+  const columns: Column<ModelRow>[] = [
+    { key: "name", label: "Model Name", sortValue: (r) => r.name, cell: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "manufacturer", label: "Manufacturer", hideBelow: "sm", sortValue: (r) => r.manufacturer ?? "", cell: (r) => r.manufacturer || <Muted>Not set</Muted> },
+    { key: "type", label: "Type", sortValue: (r) => r.equipment_type, cell: (r) => <Badge status="info">{r.equipment_type}</Badge> },
+    { key: "year", label: "Year", align: "right", hideBelow: "md", sortValue: (r) => r.year_introduced ?? 0, cell: (r) => <span className={GRID.num}>{r.year_introduced ?? <Muted>Not set</Muted>}</span> },
+    { key: "items", label: "Items", align: "right", hideBelow: "sm", sortValue: (r) => r.item_count, cell: (r) => <span className={GRID.num}>{r.item_count}</span> },
+    ...(isAdmin
+      ? [{ key: "actions", label: "", align: "right", cell: (r: ModelRow) => <RowActions onEdit={() => openEdit(r)} onDelete={() => setDeleting(r)} disabled={busy} /> } satisfies Column<ModelRow>]
+      : []),
+  ];
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <span className="jl-badge">{rows.length} models</span>
-          {!isAdmin && <span className="jl-badge jl-badge--amber">Read only</span>}
+    <div className="flex w-full max-w-5xl flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{rows.length} models</Badge>
+          {!isAdmin && <Badge status="warning">Read only</Badge>}
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void importCsv(f);
-                e.target.value = "";
-              }}
-            />
-            <button
-              type="button"
-              className="jl-btn jl-btn--secondary"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
+            <FilePicker accept=".csv,text/csv" disabled={busy} onFiles={(files) => void importCsv(files[0])}>
               <Upload /> Import CSV
-            </button>
-            <button
-              type="button"
-              className="jl-btn jl-btn--primary"
-              disabled={busy}
-              onClick={openCreate}
-            >
+            </FilePicker>
+            <Button size="sm" disabled={busy} onClick={openCreate}>
               <Plus /> Add Model
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
-      {/* Notice / error banners */}
-      {error && (
-        <div className="bg-red-50 rounded-lg p-3 text-sm text-red-700 flex items-start justify-between gap-3">
-          <span>{error}</span>
-          <button type="button" className="p-0.5 hover:bg-red-100 rounded" onClick={() => setError(null)} aria-label="Dismiss">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      {error && !showForm && (
+        <Alert variant="destructive">
+          <AlertTitle>{error}</AlertTitle>
+          <AlertAction>
+            <Button variant="ghost" size="icon-sm" onClick={() => setError(null)} aria-label="Dismiss">
+              <X />
+            </Button>
+          </AlertAction>
+        </Alert>
       )}
       {notice && (
-        <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 flex items-start justify-between gap-3">
-          <span>{notice}</span>
-          <button type="button" className="p-0.5 hover:bg-gray-100 rounded" onClick={() => setNotice(null)} aria-label="Dismiss">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <Alert variant="info">
+          <AlertTitle>{notice}</AlertTitle>
+          <AlertAction>
+            <Button variant="ghost" size="icon-sm" onClick={() => setNotice(null)} aria-label="Dismiss">
+              <X />
+            </Button>
+          </AlertAction>
+        </Alert>
       )}
 
-      {/* Create / Edit form card: real form, no inline table editing */}
-      {showForm && isAdmin && (
-        <form onSubmit={handleSubmit} className="space-y-3 bg-white rounded-xl shadow-sm p-4">
-          <h2 className="text-sm font-bold text-gray-900">
-            {editingId == null ? "Add Model" : "Edit Model"}
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Model Name *</label>
-              <input
-                autoFocus
-                className="jl-input"
-                placeholder="Polar Mohr 76 EM"
-                value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Manufacturer</label>
-              <input
-                className="jl-input"
-                placeholder="Polar Mohr"
-                value={draft.manufacturer}
-                onChange={(e) => setDraft({ ...draft, manufacturer: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Type *</label>
-              <JlSelect
-                value={draft.equipment_type}
-                onChange={(v) => setDraft({ ...draft, equipment_type: v })}
-                options={typeOptions}
-                placeholder="Select type"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Year Introduced</label>
-              <input
-                className="jl-input"
-                inputMode="numeric"
-                placeholder="2019"
-                value={draft.year_introduced}
-                onChange={(e) => setDraft({ ...draft, year_introduced: e.target.value.replace(/[^\d]/g, "") })}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
-            <input
-              className="jl-input"
-              placeholder="Optional"
-              value={draft.notes}
-              onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-            />
-          </div>
-          <div className="flex items-end gap-2">
-            <button type="button" className="jl-btn jl-btn--ghost flex-1" onClick={closeForm}>
-              Cancel
-            </button>
-            <button type="submit" className="jl-btn jl-btn--primary flex-1" disabled={busy}>
-              {editingId == null ? "Create" : "Update"}
-            </button>
-          </div>
-        </form>
+      {loading ? (
+        <Loading label="Loading models" />
+      ) : (
+        <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} empty="No models yet. Add one to start the catalogue." pageSize={50} />
       )}
 
-      {/* Models table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="text-center py-8 text-gray-500 text-sm">Loading models</div>
-        ) : rows.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">No models yet. Add one to start the catalogue.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Model Name</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Manufacturer</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Year</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Items</th>
-                  {isAdmin && <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {r.manufacturer || <span className="text-gray-400">Not set</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="jl-badge jl-badge--blue">{r.equipment_type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 text-right tabular-nums">
-                      {r.year_introduced ?? <span className="text-gray-400">Not set</span>}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right tabular-nums">{r.item_count}</td>
-                    {isAdmin && (
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          className="p-1 hover:bg-gray-100 rounded mr-1"
-                          title="Edit"
-                          aria-label="Edit"
-                          disabled={busy}
-                          onClick={() => openEdit(r)}
-                        >
-                          <Edit className="w-3.5 h-3.5 text-gray-500" />
-                        </button>
-                        <button
-                          type="button"
-                          className="p-1 hover:bg-red-50 rounded"
-                          title="Delete"
-                          aria-label="Delete"
-                          disabled={busy}
-                          onClick={() => void removeModel(r.id, r.name)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <Muted>CSV columns: name, manufacturer, equipment_type, year_introduced, notes. Header row required.</Muted>
 
-      <p className="text-xs text-gray-400">
-        CSV columns: name, manufacturer, equipment_type, year_introduced, notes. Header row required.
-      </p>
+      <Dialog open={showForm && isAdmin} onOpenChange={(o) => { if (!o) closeForm(); }}>
+        <DialogContent size="form">
+          <DialogHeader>
+            <DialogTitle>{editingId == null ? "Add Model" : "Edit Model"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>{error}</AlertTitle>
+              </Alert>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Model Name *" htmlFor="model-name">
+                <Input id="model-name" autoFocus placeholder="Polar Mohr 76 EM" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+              </Field>
+              <Field label="Manufacturer" htmlFor="model-make">
+                <Input id="model-make" placeholder="Polar Mohr" value={draft.manufacturer} onChange={(e) => setDraft({ ...draft, manufacturer: e.target.value })} />
+              </Field>
+              <Field label="Type *" htmlFor="model-type">
+                <Pick id="model-type" value={draft.equipment_type} onChange={(v) => setDraft({ ...draft, equipment_type: v })} options={typeOptions} placeholder="Select type" />
+              </Field>
+              <Field label="Year Introduced" htmlFor="model-year">
+                <Input id="model-year" inputMode="numeric" placeholder="2019" value={draft.year_introduced} onChange={(e) => setDraft({ ...draft, year_introduced: e.target.value.replace(/[^\d]/g, "") })} />
+              </Field>
+            </div>
+            <Field label="Notes" htmlFor="model-notes">
+              <Input id="model-notes" placeholder="Optional" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+            </Field>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeForm}>Cancel</Button>
+              <Button type="submit" disabled={busy}>{editingId == null ? "Create" : "Update"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Confirm
+        open={deleting !== null}
+        onOpenChange={(o) => { if (!o) setDeleting(null); }}
+        title={`Delete model "${deleting?.name ?? ""}"?`}
+        detail="Items using it keep their make/model text."
+        action="Delete"
+        destructive
+        pending={busy}
+        onConfirm={() => { if (deleting) void removeModel(deleting.id); }}
+      />
     </div>
   );
 }

@@ -1,8 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pencil, Search } from "lucide-react";
-import { JlSelect } from "@/components/ui/jl-select";
+import { Search } from "lucide-react";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Field } from "@/components/machines/field";
+import { Loading } from "@/components/machines/loading";
+import { Muted } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
+import { RowActions } from "@/components/machines/row-actions";
 import { useRole } from "@/lib/use-role";
 
 /**
@@ -142,11 +155,6 @@ export function StoresPanel() {
       }));
   }, [rows, query]);
 
-  const totalShown = useMemo(
-    () => grouped.reduce((n, g) => n + g.rows.length, 0),
-    [grouped],
-  );
-
   const activeCount = useMemo(() => rows.filter((r) => r.active).length, [rows]);
 
   const startEdit = useCallback((r: StoreRow) => {
@@ -226,199 +234,109 @@ export function StoresPanel() {
     [editingStore, form, patchStore],
   );
 
-  if (roleLoading || loading) {
-    return (
-      <div className="jl-card jl-card--pad-lg" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span className="jl-spinner jl-spinner--sm" />
-        <span className="jl-sm jl-muted">Loading stores</span>
-      </div>
-    );
-  }
+  if (roleLoading || loading) return <Loading label="Loading stores" />;
 
   const editingRow = editingStore ? rows.find((r) => r.store === editingStore) ?? null : null;
+  const saving = editingRow !== null && savingStore === editingRow.store;
+  // One table, ordered by holding group and then store, as the groups read.
+  const ordered = grouped.flatMap((g) => g.rows.map((r) => ({ ...r, holding: g.holding })));
+  const unassigned = <Muted>Unassigned</Muted>;
+
+  const columns: Column<StoreRow & { holding: string }>[] = [
+    { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <span className="font-medium">{r.store}</span> },
+    { key: "holding", label: "Holding Group", hideBelow: "md", sortValue: (r) => r.holding, cell: (r) => (r.holdingGroup ? r.holding : unassigned) },
+    { key: "storeGroup", label: "Store Group", hideBelow: "sm", sortValue: (r) => r.storeGroup ?? "", cell: (r) => r.storeGroup ?? unassigned },
+    { key: "group", label: "Group", hideBelow: "lg", sortValue: (r) => r.group ?? "", cell: (r) => r.group ?? unassigned },
+    { key: "company", label: "Connection", hideBelow: "md", sortValue: (r) => r.company ?? "", cell: (r) => r.company ?? <Muted>—</Muted> },
+    {
+      key: "active",
+      label: "Active",
+      sortValue: (r) => (r.active ? 1 : 0),
+      // One click: the lever of the group-by-group audit.
+      cell: (r) => (
+        <Switch
+          aria-label={r.active ? `${r.store} is active. Deactivate` : `${r.store} is inactive. Activate`}
+          checked={r.active}
+          disabled={!isAdmin || savingStore === r.store}
+          onCheckedChange={() => toggleActive(r)}
+        />
+      ),
+    },
+    ...(isAdmin ? [{ key: "actions", label: "", align: "right", cell: (r: StoreRow) => <RowActions onEdit={() => startEdit(r)} /> } satisfies Column<StoreRow & { holding: string }>] : []),
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {/* ---- Header ---- */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="jl-badge">{rows.length} stores</span>
-          <span className="jl-badge jl-badge--green">{activeCount} active</span>
-          {!isAdmin && <span className="jl-badge jl-badge--amber">Read only</span>}
+    <div className="flex w-full max-w-6xl flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
+          <Input type="search" placeholder="Search stores, groups or connection" aria-label="Search stores" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{rows.length} stores</Badge>
+          <Badge status="success">{activeCount} active</Badge>
+          {!isAdmin && <Badge status="warning">Read only</Badge>}
         </div>
       </div>
 
-      {/* ---- Error banner ---- */}
-      {error && (
-        <div className="jl-alert jl-alert--red" role="alert">
-          <span className="jl-chip jl-chip--solid">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-            </svg>
-          </span>
-          <div className="jl-alert__body">
-            <div className="jl-alert__title">Something went wrong</div>
-            <div className="jl-alert__text">{error}</div>
-          </div>
-          <button className="jl-btn jl-btn--soft jl-btn--sm" onClick={() => load()}>Retry</button>
-        </div>
+      {error && !editingRow && (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+          <AlertAction>
+            <Button variant="outline" size="sm" onClick={() => load()}>Retry</Button>
+          </AlertAction>
+        </Alert>
       )}
 
-      {/* ---- Search ---- */}
-      <div style={{ maxWidth: 380 }}>
-        <div className="jl-search">
-          <Search size={16} />
-          <input
-            placeholder="Search stores, groups or connection"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={ordered}
+        rowKey={(r) => r.store}
+        empty={query ? "No stores match your search" : "No stores configured yet"}
+      />
 
-      {/* ---- Inline edit form-card ---- */}
-      {editingRow && form && (
-        <form onSubmit={submitEdit} className="jl-card" style={{ display: "flex", flexDirection: "column", gap: 14, padding: 18 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <span className="jl-h3" style={{ color: "var(--ink-900)" }}>{editingRow.store}</span>
-            <span className="jl-sm jl-muted">Edit group, connection & status</span>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-            <div className="jl-field">
-              <label>Holding Group</label>
-              <JlSelect value={form.holdingGroup} onChange={(v) => setForm((f) => (f ? { ...f, holdingGroup: v } : f))} options={holdingOptions} placeholder="Set holding group" disabled={!isAdmin} />
-            </div>
-            <div className="jl-field">
-              <label>Store Group</label>
-              <JlSelect value={form.storeGroup} onChange={(v) => setForm((f) => (f ? { ...f, storeGroup: v } : f))} options={storeGroupOptions} placeholder="Set store group" disabled={!isAdmin} />
-            </div>
-            <div className="jl-field">
-              <label>Group</label>
-              <JlSelect value={form.group} onChange={(v) => setForm((f) => (f ? { ...f, group: v } : f))} options={groupOptions} placeholder="Set group" disabled={!isAdmin} />
-            </div>
-            <div className="jl-field">
-              <label>BMS Connection</label>
-              <JlSelect value={form.company} onChange={(v) => setForm((f) => (f ? { ...f, company: v } : f))} options={companyOptions} placeholder="No connection" disabled={!isAdmin} />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <label className="jl-switch">
-              <input type="checkbox" checked={form.active} disabled={!isAdmin} onChange={(e) => setForm((f) => (f ? { ...f, active: e.target.checked } : f))} />
-              <span className="track" />
-              <span className="thumb" />
-              <span className="label">Active</span>
-            </label>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {savingStore === editingRow.store && <span className="jl-spinner jl-spinner--sm" />}
-              <button type="button" className="jl-btn jl-btn--ghost" onClick={cancelEdit} disabled={savingStore === editingRow.store}>Cancel</button>
-              <button type="submit" className="jl-btn jl-btn--primary" disabled={!isAdmin || savingStore === editingRow.store}>Save changes</button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* ---- Table ---- */}
-      <div className="jl-table-wrap">
-        <div style={{ overflowX: "auto" }}>
-          <table className="jl-table" style={{ minWidth: 980 }}>
-            <thead>
-              <tr>
-                <th style={{ minWidth: 170 }}>Store</th>
-                <th style={{ minWidth: 180 }}>Store Group</th>
-                <th style={{ minWidth: 170 }}>Group</th>
-                <th style={{ minWidth: 170 }}>Connection</th>
-                <th style={{ width: 120 }}>Active</th>
-                <th style={{ width: 56 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {totalShown === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "40px 16px" }}>
-                    <span className="jl-sm jl-muted">{query ? "No stores match your search." : "No stores configured yet."}</span>
-                  </td>
-                </tr>
-              ) : (
-                grouped.map((g) => (
-                  <HoldingGroup
-                    key={g.holding}
-                    holding={g.holding}
-                    rows={g.rows}
-                    canEdit={isAdmin}
-                    editingStore={editingStore}
-                    savingStore={savingStore}
-                    onEdit={startEdit}
-                    onToggle={toggleActive}
-                  />
-                ))
+      <Dialog open={editingRow !== null && form !== null} onOpenChange={(o) => { if (!o) cancelEdit(); }}>
+        <DialogContent size="form">
+          <DialogHeader>
+            <DialogTitle>{editingRow?.store}</DialogTitle>
+          </DialogHeader>
+          {form && (
+            <form onSubmit={submitEdit} className="flex flex-col gap-4">
+              {error && (
+                <Alert variant="destructive" role="alert">
+                  <AlertTitle>{error}</AlertTitle>
+                </Alert>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Holding Group" htmlFor="store-holding">
+                  <Pick id="store-holding" value={form.holdingGroup} onChange={(v) => setForm((f) => (f ? { ...f, holdingGroup: v } : f))} options={holdingOptions} placeholder="Set holding group" disabled={!isAdmin} />
+                </Field>
+                <Field label="Store Group" htmlFor="store-group">
+                  <Pick id="store-group" value={form.storeGroup} onChange={(v) => setForm((f) => (f ? { ...f, storeGroup: v } : f))} options={storeGroupOptions} placeholder="Set store group" disabled={!isAdmin} />
+                </Field>
+                <Field label="Group" htmlFor="store-subgroup">
+                  <Pick id="store-subgroup" value={form.group} onChange={(v) => setForm((f) => (f ? { ...f, group: v } : f))} options={groupOptions} placeholder="Set group" disabled={!isAdmin} />
+                </Field>
+                <Field label="BMS Connection" htmlFor="store-company">
+                  <Pick id="store-company" value={form.company} onChange={(v) => setForm((f) => (f ? { ...f, company: v } : f))} options={companyOptions} placeholder="No connection" disabled={!isAdmin} />
+                </Field>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Switch id="store-active" checked={form.active} disabled={!isAdmin} onCheckedChange={(checked) => setForm((f) => (f ? { ...f, active: checked } : f))} />
+                <Label htmlFor="store-active">Active</Label>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={cancelEdit} disabled={saving}>Cancel</Button>
+                <Button type="submit" disabled={!isAdmin || saving}>
+                  {saving && <Spinner />}
+                  Save changes
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
-  );
-}
-
-function HoldingGroup({
-  holding,
-  rows,
-  canEdit,
-  editingStore,
-  savingStore,
-  onEdit,
-  onToggle,
-}: {
-  holding: string;
-  rows: StoreRow[];
-  canEdit: boolean;
-  editingStore: string | null;
-  savingStore: string | null;
-  onEdit: (row: StoreRow) => void;
-  onToggle: (row: StoreRow) => void;
-}) {
-  const activeInGroup = rows.filter((r) => r.active).length;
-  return (
-    <>
-      <tr>
-        <td colSpan={6} style={{ padding: "10px 20px", background: "var(--surface-sunken)" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-            <span className="jl-h3" style={{ color: "var(--ink-900)" }}>{holding}</span>
-            <span className="jl-badge">{rows.length}</span>
-            <span className="jl-badge jl-badge--green">{activeInGroup} active</span>
-          </span>
-        </td>
-      </tr>
-      {rows.map((r) => {
-        const isEditing = editingStore === r.store;
-        const isSaving = savingStore === r.store;
-        return (
-          <tr key={r.store} style={isEditing ? { background: "var(--red-tint)" } : undefined}>
-            <td className="cell-strong" style={{ paddingLeft: 32 }}>{r.store}</td>
-            <td>{r.storeGroup ?? <span className="jl-muted">Unassigned</span>}</td>
-            <td>{r.group ?? <span className="jl-muted">Unassigned</span>}</td>
-            <td>{r.company ?? <span className="jl-muted">—</span>}</td>
-            <td>
-              {/* Inline one-click active toggle — the audit workflow lever. */}
-              <label className="jl-switch" title={r.active ? "Active — click to deactivate" : "Inactive — click to activate"} style={{ opacity: isSaving ? 0.5 : 1 }}>
-                <input type="checkbox" checked={r.active} disabled={!canEdit || isSaving} onChange={() => onToggle(r)} />
-                <span className="track" />
-                <span className="thumb" />
-              </label>
-            </td>
-            <td>
-              {canEdit && (
-                <button type="button" className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm" aria-label={`Edit ${r.store}`} onClick={() => onEdit(r)}>
-                  <Pencil size={15} />
-                </button>
-              )}
-            </td>
-          </tr>
-        );
-      })}
-    </>
   );
 }

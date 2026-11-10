@@ -1,7 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Download, Upload, FileText, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Download, FileText, Upload, X } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Empty } from "@/components/machines/empty";
+import { FilePicker } from "@/components/machines/file-picker";
+import { Muted, Panel } from "@/components/machines/panel";
+import { TYPE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
 import { useRole } from "@/lib/use-role";
 
 /**
@@ -19,10 +31,10 @@ const COLUMNS = [
   "located_at", "status", "purchase_date", "supplier", "purchase_price",
   "warranty_expiry", "last_serviced", "next_service_due", "service_provider", "notes",
 ] as const;
-type Column = (typeof COLUMNS)[number];
+type Field = (typeof COLUMNS)[number];
 
 // One example row so the format is obvious. Uses placeholder-but-valid shapes.
-const EXAMPLE_ROW: Record<Column, string> = {
+const EXAMPLE_ROW: Record<Field, string> = {
   store: "Alberton",
   machine_type: "Guillotine",
   make_model: "Ideal 4850",
@@ -82,7 +94,6 @@ const VALID_STATUSES = new Set(["active", "inactive", "disposed", "transferred"]
 
 export function ImportPanel() {
   const { isAdmin } = useRole();
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<ParsedRow[]>([]);
@@ -118,7 +129,7 @@ export function ImportPanel() {
         if (grid.length < 1) { setParseError("The file is empty."); return; }
         const header = grid[0].map((h) => h.trim().toLowerCase());
         // Map header positions to known columns; ignore unknown columns.
-        const colIndex = new Map<Column, number>();
+        const colIndex = new Map<Field, number>();
         COLUMNS.forEach((c) => {
           const idx = header.indexOf(c);
           if (idx >= 0) colIndex.set(c, idx);
@@ -173,7 +184,6 @@ export function ImportPanel() {
 
   const reset = useCallback(() => {
     setFileName(null); setRows([]); setParseError(null); setResult(null);
-    if (fileRef.current) fileRef.current.value = "";
   }, []);
 
   // ---- Commit ----
@@ -200,158 +210,110 @@ export function ImportPanel() {
     }
   }, [rows, mode]);
 
-  if (!isAdmin) {
-    return (
-      <div className="jl-card jl-card--pad-lg">
-        <span className="jl-sm jl-muted">Import is available to administrators only.</span>
-      </div>
-    );
-  }
+  if (!isAdmin) return <Empty title="Import is available to administrators only" />;
+
+  const issueColumns: Column<RowIssue>[] = [
+    { key: "row", label: "Row", width: "w-20", cell: (iss) => <span className="font-medium tabular-nums">{iss.row || "—"}</span> },
+    { key: "reason", label: "Issue", cell: (iss) => <span className={iss.reason.includes("required") || result ? "text-destructive" : undefined}>{iss.reason}</span> },
+  ];
+  // The first few rows as a sanity check.
+  const previewColumns: Column<ParsedRow>[] = COLUMNS.slice(0, 8).map((c) => ({
+    key: c,
+    label: c,
+    cell: (r) => <span className="whitespace-nowrap">{r[c] || <Muted>—</Muted>}</span>,
+  }));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {/* Intro + template download */}
-      <div className="jl-card" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ maxWidth: 620 }}>
-            <div className="jl-h3" style={{ color: "var(--ink-900)", marginBottom: 4 }}>Mass-import equipment</div>
-            <p className="jl-sm jl-muted" style={{ lineHeight: 1.5 }}>
-              Download the template, fill in one row per item (every attribute except images),
-              then upload it here. You&apos;ll see a preview before anything is saved.
-            </p>
-          </div>
-          <button type="button" className="jl-btn jl-btn--soft" onClick={downloadTemplate}>
-            <Download size={16} /> Download template
-          </button>
-        </div>
-
-        {/* Upload control */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            style={{ display: "none" }}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
-          />
-          <button type="button" className="jl-btn jl-btn--primary" onClick={() => fileRef.current?.click()}>
-            <Upload size={16} /> Choose CSV file
-          </button>
+    <div className="flex w-full max-w-6xl flex-col gap-4">
+      {/* Download the template, fill in a row per item (every attribute except images), upload it, check the preview. */}
+      <Panel
+        caption="Mass-import equipment"
+        right={
+          <Button variant="outline" size="sm" onClick={downloadTemplate}>
+            <Download /> Download template
+          </Button>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <FilePicker accept=".csv,text/csv" variant="default" size="default" onFiles={(files) => onFile(files[0])}>
+            <Upload /> Choose CSV file
+          </FilePicker>
           {fileName && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-600)" }}>
-              <FileText size={15} /> {fileName}
-              <button type="button" className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm" onClick={reset} aria-label="Clear file">
-                <X size={14} />
-              </button>
+            <span className={cn(TYPE.data, "inline-flex items-center gap-2 text-muted-foreground")}>
+              <FileText className="size-4" /> {fileName}
+              <Button variant="ghost" size="icon-sm" onClick={reset} aria-label="Clear file">
+                <X />
+              </Button>
             </span>
           )}
         </div>
-      </div>
+      </Panel>
 
       {parseError && (
-        <div className="jl-alert jl-alert--red" role="alert">
-          <span className="jl-chip jl-chip--solid"><AlertTriangle size={16} /></span>
-          <div className="jl-alert__body">
-            <div className="jl-alert__title">Couldn&apos;t read that file</div>
-            <div className="jl-alert__text">{parseError}</div>
-          </div>
-        </div>
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>Couldn&apos;t read that file</AlertTitle>
+          <AlertDescription>{parseError}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Preview */}
       {rows.length > 0 && !result && (
-        <div className="jl-card" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span className="jl-h3" style={{ color: "var(--ink-900)" }}>Preview</span>
-            <span className="jl-badge jl-badge--green">{validCount} ready</span>
-            {blockingRows.size > 0 && <span className="jl-badge jl-badge--red">{blockingRows.size} will be skipped</span>}
-            {issues.length - blockingRows.size > 0 && (
-              <span className="jl-badge jl-badge--amber">{issues.length - blockingRows.size} warnings</span>
-            )}
-          </div>
-
+        <Panel
+          caption="Preview"
+          right={
+            <>
+              <Badge status="success">{validCount} ready</Badge>
+              {blockingRows.size > 0 && <Badge status="danger">{blockingRows.size} will be skipped</Badge>}
+              {issues.length - blockingRows.size > 0 && <Badge status="warning">{issues.length - blockingRows.size} warnings</Badge>}
+            </>
+          }
+          bodyClassName="flex flex-col gap-4"
+        >
           {issues.length > 0 && (
-            <div style={{ maxHeight: 160, overflowY: "auto", border: "1px solid var(--ink-100)", borderRadius: "var(--r-md)" }}>
-              <table className="jl-table" style={{ minWidth: 0 }}>
-                <thead><tr><th style={{ width: 70 }}>Row</th><th>Issue</th></tr></thead>
-                <tbody>
-                  {issues.map((iss, k) => (
-                    <tr key={k}>
-                      <td className="cell-strong">{iss.row}</td>
-                      <td style={{ color: iss.reason.includes("required") ? "var(--red-600)" : "var(--amber-700)" }}>{iss.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="max-h-48 overflow-y-auto">
+              <DataTable columns={issueColumns} rows={issues} rowKey={(_, i) => i} card={false} />
             </div>
           )}
 
-          {/* First few rows as a sanity check */}
-          <div style={{ overflowX: "auto" }}>
-            <table className="jl-table" style={{ minWidth: 900 }}>
-              <thead>
-                <tr>{COLUMNS.slice(0, 8).map((c) => <th key={c}>{c}</th>)}</tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, 5).map((r, i) => (
-                  <tr key={i}>
-                    {COLUMNS.slice(0, 8).map((c) => (
-                      <td key={c} style={{ color: "var(--ink-600)", whiteSpace: "nowrap" }}>{r[c] || <span className="jl-muted">—</span>}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {rows.length > 5 && <span className="jl-sm jl-muted">Showing 5 of {rows.length} rows.</span>}
+          <DataTable wide columns={previewColumns} rows={rows.slice(0, 5)} rowKey={(_, i) => i} card={false} />
+          {rows.length > 5 && <Muted>Showing 5 of {rows.length} rows</Muted>}
 
-          {/* Mode + commit */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <label className="jl-switch" title="Update items whose serial already exists (instead of creating duplicates)">
-              <input type="checkbox" checked={mode === "upsert"} onChange={(e) => setMode(e.target.checked ? "upsert" : "create")} />
-              <span className="track" />
-              <span className="thumb" />
-              <span className="label">Update existing items matched by serial</span>
-            </label>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {committing && <span className="jl-spinner jl-spinner--sm" />}
-              <button type="button" className="jl-btn jl-btn--ghost" onClick={reset} disabled={committing}>Cancel</button>
-              <button type="button" className="jl-btn jl-btn--primary" onClick={commit} disabled={committing || validCount === 0}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5" title="Update items whose serial already exists (instead of creating duplicates)">
+              <Switch id="import-upsert" checked={mode === "upsert"} onCheckedChange={(checked) => setMode(checked ? "upsert" : "create")} />
+              <Label htmlFor="import-upsert">Update existing items matched by serial</Label>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Button variant="outline" onClick={reset} disabled={committing}>Cancel</Button>
+              <Button onClick={commit} disabled={committing || validCount === 0}>
+                {committing && <Spinner />}
                 Import {validCount} item{validCount !== 1 ? "s" : ""}
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Panel>
       )}
 
-      {/* Result */}
       {result && (
-        <div className="jl-card" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <CheckCircle2 size={20} style={{ color: "var(--green-600)" }} />
-            <span className="jl-h3" style={{ color: "var(--ink-900)" }}>Import complete</span>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <span className="jl-badge jl-badge--green">{result.imported} created</span>
-            {result.updated > 0 && <span className="jl-badge jl-badge--blue">{result.updated} updated</span>}
-            {result.skipped > 0 && <span className="jl-badge jl-badge--red">{result.skipped} skipped</span>}
-          </div>
+        <Panel
+          caption="Import complete"
+          right={
+            <>
+              <Badge status="success">{result.imported} created</Badge>
+              {result.updated > 0 && <Badge status="info">{result.updated} updated</Badge>}
+              {result.skipped > 0 && <Badge status="danger">{result.skipped} skipped</Badge>}
+            </>
+          }
+          bodyClassName="flex flex-col gap-4"
+        >
           {result.errors.length > 0 && (
-            <div style={{ maxHeight: 160, overflowY: "auto", border: "1px solid var(--ink-100)", borderRadius: "var(--r-md)" }}>
-              <table className="jl-table" style={{ minWidth: 0 }}>
-                <thead><tr><th style={{ width: 70 }}>Row</th><th>Reason</th></tr></thead>
-                <tbody>
-                  {result.errors.map((e, k) => (
-                    <tr key={k}><td className="cell-strong">{e.row || "—"}</td><td style={{ color: "var(--red-600)" }}>{e.reason}</td></tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="max-h-48 overflow-y-auto">
+              <DataTable columns={issueColumns} rows={result.errors} rowKey={(_, i) => i} card={false} />
             </div>
           )}
           <div>
-            <button type="button" className="jl-btn jl-btn--soft" onClick={reset}>Import another file</button>
+            <Button variant="outline" onClick={reset}>Import another file</Button>
           </div>
-        </div>
+        </Panel>
       )}
     </div>
   );

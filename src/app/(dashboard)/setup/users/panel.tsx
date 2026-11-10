@@ -1,9 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { JlSelect } from "@/components/ui/jl-select";
-import { useRole } from "@/lib/use-role";
-import { STORE_GROUPS } from "@/lib/store-groups";
+import { Plus } from "lucide-react";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { Spinner } from "@/components/ui/spinner";
+import { Confirm } from "@/components/machines/confirm";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Field } from "@/components/machines/field";
+import { Loading } from "@/components/machines/loading";
+import { Muted } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
+import { RowActions } from "@/components/machines/row-actions";
 import {
   NAV_CAPS,
   CONFIG_CAPS,
@@ -11,7 +26,8 @@ import {
   EMPTY_PERMISSIONS,
   normalisePermissions,
 } from "@/lib/permissions";
-import { Eye, EyeOff, Pencil, Trash2, Plus, X, Check } from "lucide-react";
+import { STORE_GROUPS } from "@/lib/store-groups";
+import { useRole } from "@/lib/use-role";
 
 type Role = "admin" | "store_staff" | "custom";
 
@@ -35,13 +51,6 @@ const ROLE_OPTIONS = [
 const STORE_OPTIONS = [...new Set(STORE_GROUPS.map((s) => s.store))]
   .sort((a, b) => a.localeCompare(b))
   .map((s) => ({ value: s, label: s }));
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 // Human-readable summary of a custom user's grant for the table (e.g.
 // "Machine Reports · Machine Mapping"). Falls back to "No access" when empty.
@@ -114,124 +123,64 @@ export function UsersPanel() {
   const staff = useMemo(() => rows.filter((r) => r.role === "store_staff").length, [rows]);
   const custom = useMemo(() => rows.filter((r) => r.role === "custom").length, [rows]);
 
-  if (roleLoading || loading) {
-    return (
-      <div className="jl-card jl-card--pad-lg" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span className="jl-spinner jl-spinner--sm" />
-        <span className="jl-sm jl-muted">Loading users</span>
-      </div>
-    );
-  }
+  if (roleLoading || loading) return <Loading label="Loading users" />;
+
+  const columns: Column<UserRow>[] = [
+    {
+      key: "name",
+      label: "Name",
+      sortValue: (u) => u.name,
+      cell: (u) => (
+        <span className="inline-flex items-center gap-2.5 font-medium">
+          <Avatar name={u.name} size="sm" />
+          {u.name}
+        </span>
+      ),
+    },
+    { key: "email", label: "Email", hideBelow: "sm", sortValue: (u) => u.email, cell: (u) => u.email },
+    {
+      key: "role",
+      label: "Role",
+      sortValue: (u) => u.role,
+      cell: (u) => (u.role === "admin" ? <Badge status="danger">Admin</Badge> : u.role === "custom" ? <Badge status="neutral">Custom</Badge> : <Badge status="info">Store staff</Badge>),
+    },
+    {
+      key: "store",
+      label: "Store",
+      hideBelow: "md",
+      sortValue: (u) => u.store ?? "",
+      cell: (u) => (u.role === "custom" ? <Muted>{grantSummary(u.permissions)}</Muted> : u.store ?? <Muted>Global</Muted>),
+    },
+    ...(isAdmin
+      ? [{ key: "actions", label: "", align: "right", cell: (u: UserRow) => <RowActions onEdit={() => setEditing(u)} onDelete={() => setDeleting(u)} /> } satisfies Column<UserRow>]
+      : []),
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* ---- Header ---- */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="jl-badge jl-badge--red">{admins} admin</span>
-          <span className="jl-badge jl-badge--blue">{staff} store staff</span>
-          {custom > 0 && <span className="jl-badge">{custom} custom</span>}
-          {isAdmin && (
-            <button className="jl-btn jl-btn--primary jl-btn--sm" onClick={() => setEditing("new")}>
-              <Plus size={16} /> Add User
-            </button>
-          )}
-        </div>
+    <div className="flex w-full max-w-5xl flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Badge status="danger">{admins} admin</Badge>
+        <Badge status="info">{staff} store staff</Badge>
+        {custom > 0 && <Badge status="neutral">{custom} custom</Badge>}
+        {isAdmin && (
+          <Button size="sm" onClick={() => setEditing("new")}>
+            <Plus /> Add User
+          </Button>
+        )}
       </div>
 
-      {/* ---- Error banner ---- */}
       {error && (
-        <div className="jl-alert jl-alert--red" role="alert">
-          <span className="jl-chip jl-chip--solid">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-            </svg>
-          </span>
-          <div className="jl-alert__body">
-            <div className="jl-alert__title">Something went wrong</div>
-            <div className="jl-alert__text">{error}</div>
-          </div>
-          <button className="jl-btn jl-btn--soft jl-btn--sm" onClick={() => load()}>
-            Retry
-          </button>
-        </div>
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+          <AlertAction>
+            <Button variant="outline" size="sm" onClick={() => load()}>Retry</Button>
+          </AlertAction>
+        </Alert>
       )}
 
-      {/* ---- Users table ---- */}
-      <div className="jl-table-wrap">
-        <div style={{ overflowX: "auto" }}>
-          <table className="jl-table" style={{ minWidth: 720 }}>
-            <thead>
-              <tr>
-                <th style={{ minWidth: 220 }}>Name</th>
-                <th style={{ minWidth: 220 }}>Email</th>
-                <th style={{ width: 140 }}>Role</th>
-                <th style={{ minWidth: 140 }}>Store</th>
-                <th style={{ width: 110, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "40px 16px" }}>
-                    <span className="jl-sm jl-muted">No users yet.</span>
-                  </td>
-                </tr>
-              ) : (
-                rows.map((u) => (
-                  <tr key={u.id}>
-                    <td className="cell-strong">
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                        <span className="jl-avatar jl-avatar--sm">{initials(u.name)}</span>
-                        {u.name}
-                      </span>
-                    </td>
-                    <td>{u.email}</td>
-                    <td>
-                      {u.role === "admin" ? (
-                        <span className="jl-badge jl-badge--red">Admin</span>
-                      ) : u.role === "custom" ? (
-                        <span className="jl-badge">Custom</span>
-                      ) : (
-                        <span className="jl-badge jl-badge--blue">Store staff</span>
-                      )}
-                    </td>
-                    <td>
-                      {u.role === "custom" ? (
-                        <span className="jl-sm jl-muted">{grantSummary(u.permissions)}</span>
-                      ) : (
-                        u.store ?? <span className="jl-muted">Global</span>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        <button
-                          className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                          onClick={() => setEditing(u)}
-                          disabled={!isAdmin}
-                          aria-label={`Edit ${u.name}`}
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                          onClick={() => setDeleting(u)}
-                          disabled={!isAdmin}
-                          aria-label={`Delete ${u.name}`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable columns={columns} rows={rows} rowKey={(u) => u.id} empty="No users yet" />
 
-      {/* ---- Add / Edit modal ---- */}
       {editing !== null && (
         <UserModal
           user={editing === "new" ? null : editing}
@@ -243,7 +192,6 @@ export function UsersPanel() {
         />
       )}
 
-      {/* ---- Delete confirm modal ---- */}
       {deleting !== null && (
         <DeleteModal
           user={deleting}
@@ -282,7 +230,6 @@ function UserModal({
         }
       : EMPTY_FORM,
   );
-  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -359,175 +306,80 @@ function UserModal({
   }
 
   return (
-    <div className="jl-overlay" data-open onMouseDown={onClose}>
-      <div
-        className="jl-modal"
-        style={{ maxWidth: 480 }}
-        onMouseDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={isEdit ? "Edit user" : "Add user"}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-          <div className="jl-modal__title">{isEdit ? "Edit user" : "Add user"}</div>
-          <button
-            className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 20 }}>
-          <div className="jl-field">
-            <label htmlFor="u-email">Email</label>
-            <input
-              id="u-email"
-              className="jl-input"
-              type="email"
-              autoComplete="off"
-              value={form.email}
-              onChange={(e) => set("email", e.target.value)}
-              disabled={isEdit}
-              required={!isEdit}
-            />
-            {isEdit && <span className="hint">Email cannot be changed.</span>}
-          </div>
-
-          <div className="jl-field">
-            <label htmlFor="u-name">Name</label>
-            <input
-              id="u-name"
-              className="jl-input"
-              type="text"
-              autoComplete="off"
-              value={form.name}
-              onChange={(e) => set("name", e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="jl-field">
-            <label>Role</label>
-            <JlSelect
-              value={form.role}
-              onChange={(v) => set("role", v as Role)}
-              options={ROLE_OPTIONS}
-              placeholder="Select role"
-            />
-          </div>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent size="form">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Edit user" : "Add user"}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <Field label="Email" htmlFor="u-email" hint={isEdit ? "Email cannot be changed." : undefined}>
+            <Input id="u-email" type="email" autoComplete="off" value={form.email} onChange={(e) => set("email", e.target.value)} disabled={isEdit} required={!isEdit} />
+          </Field>
+          <Field label="Name" htmlFor="u-name">
+            <Input id="u-name" autoComplete="off" value={form.name} onChange={(e) => set("name", e.target.value)} required />
+          </Field>
+          <Field label="Role" htmlFor="u-role">
+            <Pick id="u-role" value={form.role} onChange={(v) => set("role", v as Role)} options={ROLE_OPTIONS} placeholder="Select role" />
+          </Field>
 
           {form.role === "store_staff" && (
-            <div className="jl-field">
-              <label>Store</label>
-              <JlSelect
-                value={form.store}
-                onChange={(v) => set("store", v)}
-                options={STORE_OPTIONS}
-                placeholder="Select store"
-              />
-            </div>
+            <Field label="Store" htmlFor="u-store">
+              <Pick id="u-store" value={form.store} onChange={(v) => set("store", v)} options={STORE_OPTIONS} placeholder="Select store" />
+            </Field>
           )}
 
           {form.role === "custom" && (
             <>
-              <div className="jl-field">
-                <label>Menu items</label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Field label="Menu items">
+                <div className="flex flex-col gap-2.5">
                   {NAV_CAPS.map((c) => (
-                    <label key={c.key} className="jl-check">
-                      <input
-                        type="checkbox"
-                        checked={form.permissions.nav.includes(c.key)}
-                        onChange={() => toggleCap("nav", c.key)}
-                      />
-                      <span className="box">
-                        <Check />
-                      </span>
-                      <span>{c.label}</span>
-                    </label>
+                    <div key={c.key} className="flex items-center gap-2.5">
+                      <Checkbox id={`u-nav-${c.key}`} checked={form.permissions.nav.includes(c.key)} onCheckedChange={() => toggleCap("nav", c.key)} />
+                      <Label htmlFor={`u-nav-${c.key}`}>{c.label}</Label>
+                    </div>
                   ))}
                 </div>
-              </div>
-
-              <div className="jl-field">
-                <label>Config sections</label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              </Field>
+              <Field label="Config sections" hint="The Config menu appears when at least one section is selected.">
+                <div className="flex flex-col gap-2.5">
                   {CONFIG_CAPS.map((c) => (
-                    <label key={c.key} className="jl-check">
-                      <input
-                        type="checkbox"
-                        checked={form.permissions.config.includes(c.key)}
-                        onChange={() => toggleCap("config", c.key)}
-                      />
-                      <span className="box">
-                        <Check />
-                      </span>
-                      <span>{c.label}</span>
-                    </label>
+                    <div key={c.key} className="flex items-center gap-2.5">
+                      <Checkbox id={`u-config-${c.key}`} checked={form.permissions.config.includes(c.key)} onCheckedChange={() => toggleCap("config", c.key)} />
+                      <Label htmlFor={`u-config-${c.key}`}>{c.label}</Label>
+                    </div>
                   ))}
                 </div>
-                <span className="hint">
-                  The Config menu appears when at least one section is selected.
-                </span>
-              </div>
+              </Field>
             </>
           )}
 
-          <div className="jl-field">
-            <label htmlFor="u-password">{isEdit ? "New password" : "Password"}</label>
-            <div className="jl-input-group">
-              <input
-                id="u-password"
-                className="jl-input"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                value={form.password}
-                onChange={(e) => set("password", e.target.value)}
-                placeholder={isEdit ? "Leave blank to keep current" : ""}
-                required={!isEdit}
-                style={{ paddingRight: 48 }}
-              />
-              <span className="trail">
-                <button
-                  type="button"
-                  className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  aria-pressed={showPassword}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff /> : <Eye />}
-                </button>
-              </span>
-            </div>
-          </div>
+          <Field label={isEdit ? "New password" : "Password"} htmlFor="u-password">
+            <PasswordInput
+              id="u-password"
+              autoComplete="new-password"
+              value={form.password}
+              onChange={(e) => set("password", e.target.value)}
+              placeholder={isEdit ? "Leave blank to keep current" : ""}
+              required={!isEdit}
+            />
+          </Field>
 
           {error && (
-            <div className="jl-alert jl-alert--red" role="alert">
-              <div className="jl-alert__body">
-                <div className="jl-alert__text">{error}</div>
-              </div>
-            </div>
+            <Alert variant="destructive" role="alert">
+              <AlertTitle>{error}</AlertTitle>
+            </Alert>
           )}
 
-          <div className="jl-modal__foot">
-            <button type="button" className="jl-btn jl-btn--ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="jl-btn jl-btn--primary"
-              disabled={saving}
-              data-loading={saving || undefined}
-            >
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Spinner />}
               {isEdit ? "Save changes" : "Create user"}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -563,43 +415,15 @@ function DeleteModal({
   }
 
   return (
-    <div className="jl-overlay" data-open onMouseDown={onClose}>
-      <div
-        className="jl-modal"
-        onMouseDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Delete user"
-      >
-        <div className="jl-modal__title">Delete user</div>
-        <div className="jl-modal__text">
-          Delete <strong style={{ color: "var(--ink-900)" }}>{user.name}</strong> ({user.email})?
-          This cannot be undone.
-        </div>
-
-        {error && (
-          <div className="jl-alert jl-alert--red" role="alert" style={{ marginTop: 16 }}>
-            <div className="jl-alert__body">
-              <div className="jl-alert__text">{error}</div>
-            </div>
-          </div>
-        )}
-
-        <div className="jl-modal__foot">
-          <button type="button" className="jl-btn jl-btn--ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="jl-btn jl-btn--primary"
-            onClick={handleDelete}
-            disabled={deleting}
-            data-loading={deleting || undefined}
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
+    <Confirm
+      open
+      onOpenChange={(o) => { if (!o) onClose(); }}
+      title="Delete user"
+      detail={error ?? `Delete ${user.name} (${user.email})? This cannot be undone.`}
+      action="Delete"
+      destructive
+      pending={deleting}
+      onConfirm={handleDelete}
+    />
   );
 }

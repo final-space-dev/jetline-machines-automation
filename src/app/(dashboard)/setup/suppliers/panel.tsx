@@ -1,7 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pencil, Trash2, Plus, Search, Building2 } from "lucide-react";
+import { Plus, Search } from "lucide-react";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { Confirm } from "@/components/machines/confirm";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Field } from "@/components/machines/field";
+import { Loading } from "@/components/machines/loading";
+import { Muted } from "@/components/machines/panel";
+import { RowActions } from "@/components/machines/row-actions";
 import { useRole } from "@/lib/use-role";
 
 /**
@@ -39,6 +52,8 @@ export function SuppliersPanel() {
   // editingId: null = closed, 0 = adding new, >0 = editing that supplier.
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<Form>(EMPTY);
+  // The supplier whose deletion is being confirmed.
+  const [deleting, setDeleting] = useState<Supplier | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,7 +113,6 @@ export function SuppliersPanel() {
   }, [form, editingId]);
 
   const remove = useCallback(async (s: Supplier) => {
-    if (!confirm(`Delete supplier "${s.name}"? Items already referencing it keep their stored value.`)) return;
     setSaving(true);
     try {
       const res = await fetch("/api/setup/suppliers", {
@@ -110,131 +124,104 @@ export function SuppliersPanel() {
       else { const d = await res.json(); setError(d.error || "Failed to delete"); }
     } finally {
       setSaving(false);
+      setDeleting(null);
     }
   }, []);
 
-  if (loading) {
-    return (
-      <div className="jl-card jl-card--pad-lg" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span className="jl-spinner jl-spinner--sm" />
-        <span className="jl-sm jl-muted">Loading suppliers</span>
-      </div>
-    );
-  }
+  if (loading) return <Loading label="Loading suppliers" />;
+
+  const dash = (v: string | null) => v ?? <Muted>—</Muted>;
+  const columns: Column<Supplier>[] = [
+    { key: "name", label: "Name", sortValue: (s) => s.name, cell: (s) => <span className="font-medium">{s.name}</span> },
+    { key: "contact", label: "Contact", hideBelow: "sm", sortValue: (s) => s.contact ?? "", cell: (s) => dash(s.contact) },
+    { key: "phone", label: "Phone", hideBelow: "md", cell: (s) => dash(s.phone) },
+    { key: "email", label: "Email", hideBelow: "md", cell: (s) => dash(s.email) },
+    ...(isAdmin
+      ? [{ key: "actions", label: "", align: "right", cell: (s: Supplier) => <RowActions onEdit={() => openEdit(s)} onDelete={() => setDeleting(s)} disabled={saving} /> } satisfies Column<Supplier>]
+      : []),
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="jl-badge">{rows.length} suppliers</span>
-          {!isAdmin && <span className="jl-badge jl-badge--amber">Read only</span>}
+    <div className="flex w-full max-w-5xl flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{rows.length} suppliers</Badge>
+          {!isAdmin && <Badge status="warning">Read only</Badge>}
         </div>
         {isAdmin && (
-          <button type="button" className="jl-btn jl-btn--primary" onClick={openAdd}>
-            <Plus size={16} /> Add supplier
-          </button>
+          <Button size="sm" onClick={openAdd}>
+            <Plus /> Add supplier
+          </Button>
         )}
       </div>
 
-      {error && (
-        <div className="jl-alert jl-alert--red" role="alert">
-          <div className="jl-alert__body"><div className="jl-alert__text">{error}</div></div>
-        </div>
+      {error && editingId === null && (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>{error}</AlertTitle>
+        </Alert>
       )}
 
-      <div style={{ maxWidth: 380 }}>
-        <div className="jl-search">
-          <Search size={16} />
-          <input placeholder="Search suppliers" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
+      <div className="relative w-full sm:w-80">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
+        <Input type="search" placeholder="Search suppliers" aria-label="Search suppliers" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
       </div>
 
-      {/* Add / edit form */}
-      {editingId !== null && (
-        <form onSubmit={submit} className="jl-card" style={{ display: "flex", flexDirection: "column", gap: 14, padding: 18 }}>
-          <span className="jl-h3" style={{ color: "var(--ink-900)" }}>{editingId === 0 ? "New supplier" : "Edit supplier"}</span>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-            <div className="jl-field">
-              <label>Name *</label>
-              <input className="jl-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Supplier name" autoFocus />
-            </div>
-            <div className="jl-field">
-              <label>Contact person</label>
-              <input className="jl-input" value={form.contact} onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Contact name" />
-            </div>
-            <div className="jl-field">
-              <label>Phone</label>
-              <input className="jl-input" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Contact number" />
-            </div>
-            <div className="jl-field">
-              <label>Email</label>
-              <input className="jl-input" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="name@supplier.co.za" />
-            </div>
-          </div>
-          <div className="jl-field">
-            <label>Notes</label>
-            <textarea className="jl-textarea" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Account number, terms, etc." />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
-            {saving && <span className="jl-spinner jl-spinner--sm" />}
-            <button type="button" className="jl-btn jl-btn--ghost" onClick={close} disabled={saving}>Cancel</button>
-            <button type="submit" className="jl-btn jl-btn--primary" disabled={saving}>{editingId === 0 ? "Create" : "Save changes"}</button>
-          </div>
-        </form>
-      )}
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        rowKey={(s) => s.id}
+        empty={query ? "No suppliers match your search" : "No suppliers yet. Add one, or they'll appear here once equipment records reference them."}
+      />
 
-      {/* Table */}
-      <div className="jl-table-wrap">
-        <div style={{ overflowX: "auto" }}>
-          <table className="jl-table" style={{ minWidth: 760 }}>
-            <thead>
-              <tr>
-                <th style={{ minWidth: 180 }}>Name</th>
-                <th>Contact</th>
-                <th>Phone</th>
-                <th>Email</th>
-                {isAdmin && <th style={{ width: 96 }} />}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={isAdmin ? 5 : 4} style={{ textAlign: "center", padding: "40px 16px" }}>
-                    <span className="jl-sm jl-muted">
-                      {query ? "No suppliers match your search." : "No suppliers yet. Add one, or they'll appear here once equipment records reference them."}
-                    </span>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((s) => (
-                  <tr key={s.id}>
-                    <td className="cell-strong">
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <Building2 size={15} style={{ color: "var(--ink-400)" }} /> {s.name}
-                      </span>
-                    </td>
-                    <td style={{ color: "var(--ink-600)" }}>{s.contact ?? <span className="jl-muted">—</span>}</td>
-                    <td style={{ color: "var(--ink-600)" }}>{s.phone ?? <span className="jl-muted">—</span>}</td>
-                    <td style={{ color: "var(--ink-600)" }}>{s.email ?? <span className="jl-muted">—</span>}</td>
-                    {isAdmin && (
-                      <td>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <button type="button" className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm" aria-label={`Edit ${s.name}`} onClick={() => openEdit(s)}>
-                            <Pencil size={15} />
-                          </button>
-                          <button type="button" className="jl-btn jl-btn--ghost jl-btn--icon jl-btn--sm" aria-label={`Delete ${s.name}`} onClick={() => remove(s)}>
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Dialog open={editingId !== null} onOpenChange={(o) => { if (!o) close(); }}>
+        <DialogContent size="form">
+          <DialogHeader>
+            <DialogTitle>{editingId === 0 ? "New supplier" : "Edit supplier"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            {error && (
+              <Alert variant="destructive" role="alert">
+                <AlertTitle>{error}</AlertTitle>
+              </Alert>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Name *" htmlFor="supplier-name">
+                <Input id="supplier-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Supplier name" autoFocus />
+              </Field>
+              <Field label="Contact person" htmlFor="supplier-contact">
+                <Input id="supplier-contact" value={form.contact} onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Contact name" />
+              </Field>
+              <Field label="Phone" htmlFor="supplier-phone">
+                <Input id="supplier-phone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Contact number" />
+              </Field>
+              <Field label="Email" htmlFor="supplier-email">
+                <Input id="supplier-email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="name@supplier.co.za" />
+              </Field>
+            </div>
+            <Field label="Notes" htmlFor="supplier-notes">
+              <Textarea id="supplier-notes" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Account number, terms, etc." rows={3} />
+            </Field>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={close} disabled={saving}>Cancel</Button>
+              <Button type="submit" disabled={saving}>
+                {saving && <Spinner />}
+                {editingId === 0 ? "Create" : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Confirm
+        open={deleting !== null}
+        onOpenChange={(o) => { if (!o) setDeleting(null); }}
+        title={`Delete supplier "${deleting?.name ?? ""}"?`}
+        detail="Items already referencing it keep their stored value."
+        action="Delete"
+        destructive
+        pending={saving}
+        onConfirm={() => { if (deleting) remove(deleting); }}
+      />
     </div>
   );
 }

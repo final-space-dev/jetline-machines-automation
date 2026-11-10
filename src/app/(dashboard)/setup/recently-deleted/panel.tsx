@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Trash2, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Loading } from "@/components/machines/loading";
+import { Muted } from "@/components/machines/panel";
 import { useRole } from "@/lib/use-role";
 
 /**
@@ -62,65 +66,32 @@ export function RecentlyDeletedPanel() {
     }
   }, []);
 
-  if (loading) {
-    return (
-      <div className="jl-card jl-card--pad-lg" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span className="jl-spinner jl-spinner--sm" />
-        <span className="jl-sm jl-muted">Loading recently deleted</span>
-      </div>
-    );
-  }
+  if (loading) return <Loading label="Loading recently deleted" />;
 
+  const columns: Column<DeletedItem>[] = [
+    { key: "type", label: "Type", sortValue: (it) => it.machine_type ?? "", cell: (it) => <span className="font-medium">{it.machine_type ?? "—"}</span> },
+    { key: "model", label: "Make / Model", hideBelow: "sm", sortValue: (it) => it.make_model ?? "", cell: (it) => it.make_model ?? <Muted>Not set</Muted> },
+    { key: "serial", label: "Serial", hideBelow: "md", cell: (it) => <span className="tabular-nums">{it.serial ?? "—"}</span> },
+    { key: "store", label: "Store", sortValue: (it) => it.store ?? "", cell: (it) => it.store ?? "—" },
+    { key: "deleted", label: "Deleted", hideBelow: "sm", sortValue: (it) => new Date(it.deleted_at).getTime() || 0, cell: (it) => <Muted className="whitespace-nowrap">{fmt(it.deleted_at)}</Muted> },
+    ...(isAdmin
+      ? [{
+          key: "actions",
+          label: "",
+          align: "right",
+          cell: (it: DeletedItem) => (
+            <Button variant="outline" size="sm" disabled={busyId === it.id} onClick={() => restore(it.id)}>
+              <RotateCcw /> Restore
+            </Button>
+          ),
+        } satisfies Column<DeletedItem>]
+      : []),
+  ];
+
+  // Equipment deleted in the last 90 days; restoring brings an item back exactly as it was.
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <p className="jl-sm jl-muted">
-        Equipment deleted in the last 90 days. Deletes are recoverable — restore any item to bring it back exactly as it was.
-      </p>
-
-      {items.length === 0 ? (
-        <div className="jl-card jl-card--pad-lg" style={{ textAlign: "center" }}>
-          <span className="jl-sm jl-muted">Nothing deleted recently.</span>
-        </div>
-      ) : (
-        <div className="jl-table-wrap">
-          <div style={{ overflowX: "auto" }}>
-            <table className="jl-table" style={{ minWidth: 760 }}>
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Make / Model</th>
-                  <th>Serial</th>
-                  <th>Store</th>
-                  <th>Deleted</th>
-                  {isAdmin && <th style={{ width: 110 }} />}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it) => (
-                  <tr key={it.id}>
-                    <td className="cell-strong">
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <Trash2 size={14} style={{ color: "var(--ink-400)" }} /> {it.machine_type ?? "—"}
-                      </span>
-                    </td>
-                    <td style={{ color: "var(--ink-600)" }}>{it.make_model ?? <span className="jl-muted">Not set</span>}</td>
-                    <td><span className="jl-mono" style={{ color: "var(--ink-600)" }}>{it.serial ?? "—"}</span></td>
-                    <td style={{ color: "var(--ink-600)" }}>{it.store ?? "—"}</td>
-                    <td className="jl-faint" style={{ whiteSpace: "nowrap" }}>{fmt(it.deleted_at)}</td>
-                    {isAdmin && (
-                      <td>
-                        <button type="button" className="jl-btn jl-btn--soft jl-btn--sm" disabled={busyId === it.id} onClick={() => restore(it.id)}>
-                          <RotateCcw size={14} /> Restore
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+    <div className="flex w-full max-w-5xl flex-col gap-4">
+      <DataTable columns={columns} rows={items} rowKey={(it) => it.id} empty="Nothing deleted in the last 90 days" />
     </div>
   );
 }

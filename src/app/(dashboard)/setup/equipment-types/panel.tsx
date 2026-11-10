@@ -1,8 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PageLoading } from "@/components/ui/page-loading";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Field } from "@/components/machines/field";
+import { Loading } from "@/components/machines/loading";
+import { RowActions } from "@/components/machines/row-actions";
+import { GRID } from "@/lib/ui/ui-tokens";
 
 interface TypeRow {
   id: number;
@@ -95,95 +103,57 @@ export function EquipmentTypesPanel() {
     await load();
   }
 
-  if (loading) {
-    return <PageLoading variant="table" />;
-  }
+  if (loading) return <Loading />;
+
+  const columns: Column<TypeRow>[] = [
+    { key: "name", label: "Type", sortValue: (r) => r.name, cell: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "count", label: "Items", align: "right", sortValue: (r) => r.count, cell: (r) => <span className={GRID.num}>{r.count}</span> },
+    {
+      key: "actions",
+      label: "",
+      align: "right",
+      // A type in use cannot be deleted.
+      cell: (r) => <RowActions onEdit={() => openEdit(r)} onDelete={r.count === 0 ? () => deleteType(r) : undefined} />,
+    },
+  ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex items-center justify-end">
-        <button type="button" onClick={openCreate} className="jl-btn jl-btn--primary jl-btn--sm">
-          <Plus className="w-4 h-4" />
-          New Type
-        </button>
+    <div className="flex w-full max-w-4xl flex-col gap-4">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={openCreate}>
+          <Plus /> New Type
+        </Button>
       </div>
 
-      {error && (
-        <div className="bg-red-50 rounded-lg p-2 text-sm text-red-700">{error}</div>
+      {error && !isCreating && (
+        <Alert variant="destructive">
+          <AlertTitle>{error}</AlertTitle>
+        </Alert>
       )}
 
-      {isCreating && (
-        <form onSubmit={handleSubmit} className="space-y-3 bg-white rounded-xl shadow-sm p-4">
-          <h2 className="text-sm font-bold text-gray-900">
-            {editingId === null ? "New Equipment Type" : "Edit Equipment Type"}
-          </h2>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
-            <input
-              autoFocus
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="jl-input"
-              required
-              placeholder="e.g. Laminator"
-            />
-          </div>
-          <div className="flex items-end gap-2">
-            <button type="button" onClick={closeForm} className="jl-btn jl-btn--ghost flex-1">Cancel</button>
-            <button type="submit" disabled={saving} className="jl-btn jl-btn--primary flex-1">
-              {editingId === null ? "Create" : "Update"}
-            </button>
-          </div>
-        </form>
-      )}
+      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} empty="No equipment types yet. Create one to get started." />
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        {rows.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">No equipment types yet. Create one to get started.</div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Items</th>
-                <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => {
-                const canDelete = row.count === 0;
-                return (
-                  <tr key={row.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{row.count}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(row)}
-                        className="p-1 hover:bg-gray-100 rounded mr-1"
-                        aria-label="Edit"
-                      >
-                        <Edit className="w-3.5 h-3.5 text-gray-500" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteType(row)}
-                        disabled={!canDelete}
-                        className="p-1 hover:bg-red-50 rounded disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-                        aria-label="Delete"
-                        title={canDelete ? "Delete" : "In use, cannot delete"}
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Dialog open={isCreating} onOpenChange={(o) => { if (!o) closeForm(); }}>
+        <DialogContent size="form">
+          <DialogHeader>
+            <DialogTitle>{editingId === null ? "New Equipment Type" : "Edit Equipment Type"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>{error}</AlertTitle>
+              </Alert>
+            )}
+            <Field label="Name *" htmlFor="type-name">
+              <Input id="type-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Laminator" />
+            </Field>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeForm}>Cancel</Button>
+              <Button type="submit" disabled={saving}>{editingId === null ? "Create" : "Update"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

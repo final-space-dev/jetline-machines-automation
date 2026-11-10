@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell } from "@/components/layout/app-shell";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Page } from "@/components/machines/page";
 import { useRole } from "@/lib/use-role";
 import { canConfig } from "@/lib/permissions";
 import { EquipmentTypesPanel } from "./equipment-types/panel";
@@ -74,45 +75,32 @@ export function SetupShell({ active }: { active?: string }) {
     ? tab
     : visibleTabs[0]?.key ?? tab;
 
-  function switchTab(key: TabKey) {
-    if (key === activeTab) return;
+  function switchTab(key: string) {
+    if (key === activeTab || !isTabKey(key)) return;
     setTab(key);
     // Keep the URL linkable so deep links and refresh land on the right tab.
     router.replace(`/setup?tab=${key}`);
   }
 
-  // Machine Mapping is a wide tool; give its tab panel room while keeping the
-  // narrower max-width for the form-style panels.
-  const wide = activeTab === "machine-mapping";
-
   return (
-    <AppShell>
-      <div className="space-y-4" style={{ maxWidth: wide ? 1720 : 1280, marginInline: "auto", width: "100%" }}>
-        <h1 className="jl-h1">Config</h1>
-        <div className="jl-tabs" role="tablist">
+    <Page title="Config">
+      <Tabs value={activeTab} onValueChange={switchTab}>
+        <TabsList>
           {visibleTabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === t.key}
-              onClick={() => switchTab(t.key)}
-            >
-              {t.label}
-            </button>
+            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
           ))}
-        </div>
+        </TabsList>
+      </Tabs>
 
-        {activeTab === "stores" && <StoresPanel />}
-        {activeTab === "machine-mapping" && <MachineMappingPanel embedded />}
-        {activeTab === "import" && <ImportPanel />}
-        {activeTab === "models" && <ModelsPanel />}
-        {activeTab === "suppliers" && <SuppliersPanel />}
-        {activeTab === "equipment-types" && <EquipmentTypesPanel />}
-        {activeTab === "conditions" && <ConditionsPanel />}
-        {activeTab === "users" && <UsersPanel />}
-        {activeTab === "recently-deleted" && <RecentlyDeletedPanel />}
-      </div>
-    </AppShell>
+      {activeTab === "stores" && <StoresPanel />}
+      {activeTab === "machine-mapping" && <MachineMappingPanel embedded />}
+      {activeTab === "import" && <ImportPanel />}
+      {activeTab === "models" && <ModelsPanel />}
+      {activeTab === "suppliers" && <SuppliersPanel />}
+      {activeTab === "equipment-types" && <EquipmentTypesPanel />}
+      {activeTab === "conditions" && <ConditionsPanel />}
+      {activeTab === "users" && <UsersPanel />}
+      {activeTab === "recently-deleted" && <RecentlyDeletedPanel />}
+    </Page>
   );
 }

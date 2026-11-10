@@ -2,19 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useRole } from "@/lib/use-role";
+import { Download, RefreshCw, Search } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Field } from "@/components/machines/field";
+import { Loading } from "@/components/machines/loading";
+import { Page } from "@/components/machines/page";
+import { Muted } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
 import { canConfig } from "@/lib/permissions";
-import {
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  RefreshCw,
-  Download,
-  Search,
-  X,
-  MapPin,
-  Pencil,
-} from "lucide-react";
+import { useRole } from "@/lib/use-role";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,10 +69,6 @@ const PRINTER_TYPES = ["Colour", "Black and White", "Plan"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function cx(...parts: (string | false | null | undefined)[]): string {
-  return parts.filter(Boolean).join(" ");
-}
-
 function daysSince(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -78,28 +77,21 @@ function daysSince(dateStr: string | null): number | null {
 
 function ReadingBadge({ dateStr }: { dateStr: string | null }) {
   const d = daysSince(dateStr);
-  if (d === null) return <span className="jl-badge">Never</span>;
-  if (d <= 3)    return <span className="jl-badge jl-badge--green">{d}d ago</span>;
-  if (d <= 14)   return <span className="jl-badge jl-badge--amber">{d}d ago</span>;
-  return           <span className="jl-badge jl-badge--red">{d}d ago</span>;
+  if (d === null) return <Badge status="neutral">Never</Badge>;
+  return <Badge status={d <= 3 ? "success" : d <= 14 ? "warning" : "danger"}>{d}d ago</Badge>;
 }
 
 function XeroxStatusBadge({ m }: { m: XeroxMachine }) {
-  if (m.xerox_status === "Present")
-    return <span className="jl-badge jl-badge--green">Present</span>;
-  return <span className="jl-badge jl-badge--red">Missing</span>;
+  return m.xerox_status === "Present" ? <Badge status="success">Present</Badge> : <Badge status="danger">Missing</Badge>;
 }
 
 function BmsBadge({ m }: { m: XeroxMachine }) {
-  if (!m.bms_found) return <span className="jl-badge">Not in BMS</span>;
-  if (m.bms_active) return <span className="jl-badge jl-badge--green">BMS Active</span>;
-  return <span className="jl-badge">BMS Inactive</span>;
+  if (!m.bms_found) return <Badge status="neutral">Not in BMS</Badge>;
+  return m.bms_active ? <Badge status="success">BMS Active</Badge> : <Badge status="neutral">BMS Inactive</Badge>;
 }
 
 function MappingBadge({ m }: { m: XeroxMachine }) {
-  const mapped = m.store || m.company_group;
-  if (!mapped) return <span className="jl-badge jl-badge--amber">Unmapped</span>;
-  return <span className="jl-badge jl-badge--blue">Mapped</span>;
+  return m.store || m.company_group ? <Badge status="info">Mapped</Badge> : <Badge status="warning">Unmapped</Badge>;
 }
 
 // BMS company name contains-match heuristic
@@ -162,41 +154,10 @@ function matchesFilter(m: XeroxMachine, f: QuickFilter): boolean {
   }
 }
 
-// ─── Sort header button ───────────────────────────────────────────────────────
-
-function SortHeader({
-  label, col, sortKey, sortDir, onSort, align = "left",
-}: {
-  label: string;
-  col: SortKey;
-  sortKey: SortKey;
-  sortDir: SortDir;
-  onSort: (k: SortKey) => void;
-  align?: "left" | "right";
-}) {
-  const active = sortKey === col;
-  return (
-    <th className={align === "right" ? "num" : undefined}>
-      <button
-        onClick={() => onSort(col)}
-        className="inline-flex items-center gap-1"
-        style={{ font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: active ? "var(--ink-900)" : "inherit" }}
-      >
-        {label}
-        {active
-          ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)
-          : <ArrowUpDown className="w-3 h-3 opacity-40" />}
-      </button>
-    </th>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-// Inner panel — renders the mapping UI WITHOUT an AppShell/page chrome so it can
-// be embedded inline as a Config tab. `embedded` drops the outer page padding so
-// it sits cleanly below the Config tab bar. The standalone /machine-mapping route
-// wraps this in <AppShell> via the default export below.
+// The mapping tool. `embedded` renders it bare, as the Config tab's content;
+// on its own route (/machine-mapping) it is a page with its own title.
 export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   // Machine mapping lives under Config. Admins can use it, and so can a custom
@@ -276,11 +237,6 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
     });
     return sortMachines(base, sortKey, sortDir);
   }, [machines, activeFilter, search, sortKey, sortDir]);
-
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
-  }
 
   function openPanel(m: XeroxMachine) {
     setSelected(m);
@@ -370,336 +326,194 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
     URL.revokeObjectURL(url);
   }
 
-  return (
+  const none = <Muted>None</Muted>;
+  const sortable = (key: SortKey) => (m: XeroxMachine) => sortValue(m, key);
+  const columns: Column<XeroxMachine>[] = [
+    { key: "serial_number", label: "Serial", sortValue: sortable("serial_number"), cell: (m) => <span className="font-medium whitespace-nowrap tabular-nums">{m.serial_number}</span> },
+    { key: "model", label: "Model", sortValue: sortable("model"), cell: (m) => <Muted className="whitespace-nowrap">{m.model || "None"}</Muted> },
+    { key: "model_name", label: "Model Name", cell: (m) => (m.model_name ? <span className="font-medium whitespace-nowrap">{m.model_name}</span> : none) },
+    { key: "store", label: "Store", sortValue: sortable("store"), cell: (m) => (m.store ? <span className="font-medium whitespace-nowrap">{m.store}</span> : none) },
+    { key: "company_group", label: "Group", sortValue: sortable("company_group"), cell: (m) => <Muted className="whitespace-nowrap">{m.company_group || "None"}</Muted> },
+    { key: "printer_type", label: "Type", cell: (m) => <Muted className="whitespace-nowrap">{m.printer_type || "None"}</Muted> },
+    { key: "xerox", label: "Xerox", cell: (m) => <XeroxStatusBadge m={m} /> },
+    { key: "bms_active", label: "BMS", sortValue: sortable("bms_active"), cell: (m) => <BmsBadge m={m} /> },
+    {
+      key: "bms_company",
+      label: "BMS Store",
+      cell: (m) => (m.bms_company ? <span className={hasBmsMismatch(m) ? "font-semibold whitespace-nowrap text-deficit" : "font-medium whitespace-nowrap"}>{m.bms_company}</span> : none),
+    },
+    { key: "mapping", label: "Mapping", cell: (m) => <MappingBadge m={m} /> },
+    { key: "latest_reading_date", label: "Last Reading", sortValue: sortable("latest_reading_date"), cell: (m) => <ReadingBadge dateStr={m.latest_reading_date} /> },
+    {
+      key: "reporting",
+      label: "On/Off",
+      cell: (m) => <Switch aria-label={`Reporting for ${m.serial_number}`} checked={m.reporting_enabled !== false} onCheckedChange={(checked) => toggleReporting(m, checked)} />,
+    },
+    {
+      key: "action",
+      label: "",
+      align: "right",
+      cell: (m) => (
+        <Button variant="outline" size="sm" onClick={() => openPanel(m)}>
+          {m.store || m.company_group ? "Edit" : "Map"}
+        </Button>
+      ),
+    },
+  ];
+
+  const summary = (
     <>
-      <main
-        className="space-y-4"
-        style={embedded ? { width: "100%" } : { padding: "16px 32px", maxWidth: 1720, marginInline: "auto" }}
-      >
+      <Badge variant="secondary">{machines.length} total</Badge>
+      {actionNeeded > 0 && <Badge status="warning">{actionNeeded} need attention</Badge>}
+    </>
+  );
+  const actions = (
+    <>
+      <Button variant="outline" size="sm" onClick={exportCSV}>
+        <Download /> Export ({filtered.length})
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={isRefreshing}>
+        {isRefreshing ? <Spinner /> : <RefreshCw />} Refresh
+      </Button>
+    </>
+  );
 
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            {/* Embedded under Config the "Config" heading + tab already name this,
-                so hide the redundant page title. */}
-            {!embedded && <h1 className="jl-h1">Machine Mapping</h1>}
-            <span className="jl-badge">{machines.length} total</span>
-            {actionNeeded > 0 && (
-              <span className="jl-badge jl-badge--amber">{actionNeeded} need attention</span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={exportCSV} className="jl-btn jl-btn--secondary jl-btn--sm">
-              <Download />
-              Export ({filtered.length})
-            </button>
-            <button
-              onClick={() => fetchData(true)}
-              disabled={isRefreshing}
-              className="jl-btn jl-btn--secondary jl-btn--sm"
-            >
-              <RefreshCw className={isRefreshing ? "animate-spin" : undefined} />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* ── Filter chips ── */}
-        <div className="flex flex-wrap gap-2">
-          {(Object.keys(FILTER_LABELS) as QuickFilter[]).map((f) => {
-            const count = filterCounts[f];
-            const isActive = activeFilter === f;
-            const isWarning = WARNING_FILTERS.includes(f) && count > 0 && !isActive;
-            return (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                className={cx(
-                  "jl-badge",
-                  isActive ? "jl-badge--solid" : isWarning ? "jl-badge--amber" : undefined,
-                )}
-                style={{ cursor: "pointer", height: 30, paddingInline: 12 }}
-              >
-                {FILTER_LABELS[f]}
-                <span
-                  className="inline-flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
-                  style={{
-                    minWidth: 18, height: 18,
-                    background: isActive ? "rgba(255,255,255,.22)" : "var(--surface)",
-                    color: isActive ? "#fff" : "var(--ink-500)",
-                  }}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── Search ── */}
-        <div className="jl-search" style={{ maxWidth: 420 }}>
-          <Search />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search serial, store, group, model, BMS company"
-          />
-        </div>
-
-        {error && (
-          <div className="bg-red-50 rounded-xl shadow-sm px-4 py-3 text-sm text-red-700">{error}</div>
-        )}
-
-        {/* ── Table ── */}
-        {isLoading ? (
-          <div className="jl-table-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "64px 0" }}>
-            <div className="jl-spinner jl-spinner--lg" />
-          </div>
-        ) : (
-          <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
-              <table className="jl-table">
-                <thead>
-                  <tr>
-                    <SortHeader label="Serial" col="serial_number" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <SortHeader label="Model" col="model" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <th>Model Name</th>
-                    <SortHeader label="Store" col="store" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <SortHeader label="Group" col="company_group" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <th>Type</th>
-                    <th>Xerox</th>
-                    <SortHeader label="BMS" col="bms_active" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <th>BMS Store</th>
-                    <th>Mapping</th>
-                    <SortHeader label="Last Reading" col="latest_reading_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <th style={{ textAlign: "center" }}>On/Off</th>
-                    <th className="num">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={13} style={{ textAlign: "center", padding: "48px 0", color: "var(--ink-500)" }}>
-                        No machines match the current filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    filtered.map((m) => {
-                      const isOff = m.reporting_enabled === false;
-                      const isMismatch = hasBmsMismatch(m);
-                      return (
-                        <tr key={m.serial_number} style={isOff ? { opacity: 0.4 } : undefined}>
-                          <td><span className="jl-mono cell-strong" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{m.serial_number}</span></td>
-                          <td style={{ color: "var(--ink-500)" }}>{m.model || "None"}</td>
-                          <td className="cell-strong">{m.model_name || "None"}</td>
-                          <td>
-                            {m.store
-                              ? <span className="cell-strong">{m.store}</span>
-                              : <span style={{ color: "var(--ink-400)" }}>None</span>}
-                          </td>
-                          <td style={{ color: "var(--ink-500)" }}>{m.company_group || "None"}</td>
-                          <td style={{ color: "var(--ink-500)" }}>{m.printer_type || "None"}</td>
-                          <td><XeroxStatusBadge m={m} /></td>
-                          <td><BmsBadge m={m} /></td>
-                          <td>
-                            {m.bms_company
-                              ? <span style={{ fontWeight: 600, color: isMismatch ? "var(--amber-700)" : "var(--ink-700)" }}>{m.bms_company}</span>
-                              : <span style={{ color: "var(--ink-400)" }}>None</span>}
-                          </td>
-                          <td><MappingBadge m={m} /></td>
-                          <td><ReadingBadge dateStr={m.latest_reading_date} /></td>
-                          <td style={{ textAlign: "center" }}>
-                            <label className="jl-switch" style={{ transform: "scale(.85)" }}>
-                              <input
-                                type="checkbox"
-                                checked={m.reporting_enabled !== false}
-                                onChange={(e) => toggleReporting(m, e.target.checked)}
-                              />
-                              <span className="track" />
-                              <span className="thumb" />
-                            </label>
-                          </td>
-                          <td className="num">
-                            <button
-                              onClick={() => openPanel(m)}
-                              className="jl-btn jl-btn--soft jl-btn--sm"
-                            >
-                              {m.store || m.company_group ? "Edit" : "Map"}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-          </div>
-        )}
-
-        {!isLoading && !error && (
-          <p className="text-xs text-gray-500">Showing {filtered.length} of {machines.length} machines</p>
-        )}
-      </main>
-
-      {/* ── Mapping modal ── */}
-      {selected && (
-        <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-lg w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="jl-chip jl-chip--sm">
-                    {selected.store || selected.company_group ? <Pencil /> : <MapPin />}
-                  </span>
-                  <h2 className="jl-h3">{selected.store || selected.company_group ? "Edit Mapping" : "Map Machine"}</h2>
-                </div>
-                <p className="text-xs font-mono text-gray-500 mt-1">{selected.serial_number}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                className="p-1 hover:bg-gray-100 rounded"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-
-            {/* Status badges */}
-            <div className="flex flex-wrap gap-1.5">
-              <XeroxStatusBadge m={selected} />
-              <BmsBadge m={selected} />
-              <MappingBadge m={selected} />
-              <ReadingBadge dateStr={selected.latest_reading_date} />
-            </div>
-
-            {/* BMS record */}
-            <div
-              className={cx(
-                "rounded-lg px-3 py-2.5 text-xs space-y-1",
-                selected.bms_found ? "bg-gray-50" : "bg-amber-50",
-              )}
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">BMS Record</p>
-              {selected.bms_found ? (
-                <>
-                  <p className="text-gray-700">
-                    Status:{" "}
-                    <span className={selected.bms_active ? "text-green-700 font-medium" : "text-gray-500"}>
-                      {selected.bms_active ? "Active" : "Inactive"}
-                    </span>
-                  </p>
-                  {selected.bms_company && (
-                    <p className="text-gray-700">Company: <span className="font-medium text-gray-900">{selected.bms_company}</span></p>
-                  )}
-                  {hasBmsMismatch(selected) && (
-                    <p className="text-amber-700 font-medium">BMS company does not match store name</p>
-                  )}
-                </>
-              ) : (
-                <p className="text-amber-700">This serial is not in BMS. It may need to be loaded or the serial is different.</p>
-              )}
-            </div>
-
-            {/* Form */}
-            <form onSubmit={saveMapping} className="space-y-3">
-              {/* Store */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Store</label>
-                <div className="jl-select-wrap mb-2">
-                  <select
-                    className="jl-select"
-                    value={companies.some((c) => c.name === form.store) ? form.store : ""}
-                    onChange={(e) => { if (e.target.value) setForm((f) => ({ ...f, store: e.target.value })); }}
-                  >
-                    <option value="">Select store</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <input
-                  className="jl-input"
-                  value={form.store}
-                  onChange={(e) => setForm((f) => ({ ...f, store: e.target.value }))}
-                  placeholder="Or type a custom store name"
-                />
-              </div>
-
-              {/* Group */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Group</label>
-                <div className="jl-select-wrap mb-2">
-                  <select
-                    className="jl-select"
-                    value={groups.includes(form.company_group) ? form.company_group : ""}
-                    onChange={(e) => { if (e.target.value) setForm((f) => ({ ...f, company_group: e.target.value })); }}
-                  >
-                    <option value="">Select group</option>
-                    {groups.map((g) => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                </div>
-                <input
-                  className="jl-input"
-                  value={form.company_group}
-                  onChange={(e) => setForm((f) => ({ ...f, company_group: e.target.value }))}
-                  placeholder="Or type a custom group name"
-                />
-              </div>
-
-              {/* Printer Type */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Printer Type</label>
-                <div className="jl-select-wrap">
-                  <select
-                    className="jl-select"
-                    value={form.printer_type}
-                    onChange={(e) => setForm((f) => ({ ...f, printer_type: e.target.value }))}
-                  >
-                    <option value="">Select type</option>
-                    {PRINTER_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Model Name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Model Name</label>
-                <input
-                  className="jl-input"
-                  value={form.model_name}
-                  onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))}
-                  placeholder="e.g. B9125, Versant 180"
-                />
-                {selected.model && (
-                  <p className="text-[11px] text-gray-400 mt-1">Xerox model: {selected.model}</p>
-                )}
-              </div>
-
-              {saveError && <p className="text-xs text-red-600">{saveError}</p>}
-
-              <div className="flex items-end gap-2 pt-1">
-                <button type="button" onClick={() => setSelected(null)} className="jl-btn jl-btn--ghost flex-1">
-                  Cancel
-                </button>
-                <button type="submit" disabled={saving} className="jl-btn jl-btn--primary flex-1">
-                  {saving ? "Saving" : "Save"}
-                </button>
-              </div>
-            </form>
-          </div>
+  const body = (
+    <>
+      {/* Embedded under Config the heading and the tab already name this, so the bar carries only the counts and actions. */}
+      {embedded && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">{summary}</div>
+          <div className="flex items-center gap-2">{actions}</div>
         </div>
       )}
+
+      <div className="flex flex-wrap gap-2">
+        {(Object.keys(FILTER_LABELS) as QuickFilter[]).map((f) => {
+          const count = filterCounts[f];
+          const isActive = activeFilter === f;
+          const isWarning = WARNING_FILTERS.includes(f) && count > 0 && !isActive;
+          return (
+            <Button key={f} variant={isActive ? "default" : "outline"} size="sm" aria-pressed={isActive} onClick={() => setActiveFilter(f)}>
+              {FILTER_LABELS[f]}
+              <Badge status={isWarning ? "warning" : "neutral"}>{count}</Badge>
+            </Button>
+          );
+        })}
+      </div>
+
+      <div className="relative w-full sm:w-96">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
+        <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search serial, store, group, model, BMS company" aria-label="Search machines" className="pl-9" />
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>{error}</AlertTitle>
+        </Alert>
+      )}
+
+      {isLoading ? (
+        <Loading />
+      ) : (
+        <DataTable
+          wide
+          columns={columns}
+          rows={filtered}
+          rowKey={(m) => m.serial_number}
+          rowClassName={(m) => (m.reporting_enabled === false ? "opacity-40" : undefined)}
+          defaultSort={{ key: "store", dir: 1 }}
+          onSortChange={(key, dir) => {
+            setSortKey(key as SortKey);
+            setSortDir(dir === 1 ? "asc" : "desc");
+          }}
+          pageSize={100}
+          empty="No machines match the current filter"
+        />
+      )}
+
+      {!isLoading && !error && <Muted>Showing {filtered.length} of {machines.length} machines</Muted>}
+
+      <Dialog open={selected !== null} onOpenChange={(o) => { if (!o) setSelected(null); }}>
+        <DialogContent size="form">
+          {selected && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selected.store || selected.company_group ? "Edit Mapping" : "Map Machine"} · {selected.serial_number}</DialogTitle>
+              </DialogHeader>
+
+              <div className="flex flex-wrap gap-1.5">
+                <XeroxStatusBadge m={selected} />
+                <BmsBadge m={selected} />
+                <MappingBadge m={selected} />
+                <ReadingBadge dateStr={selected.latest_reading_date} />
+              </div>
+
+              <Alert variant={selected.bms_found && !hasBmsMismatch(selected) ? "default" : "warning"}>
+                <AlertTitle>BMS record</AlertTitle>
+                <AlertDescription>
+                  {selected.bms_found ? (
+                    <>
+                      Status: {selected.bms_active ? "Active" : "Inactive"}
+                      {selected.bms_company && <span className="block">Company: {selected.bms_company}</span>}
+                      {hasBmsMismatch(selected) && <span className="block font-medium">BMS company does not match store name</span>}
+                    </>
+                  ) : (
+                    "This serial is not in BMS. It may need to be loaded or the serial is different."
+                  )}
+                </AlertDescription>
+              </Alert>
+
+              <form onSubmit={saveMapping} className="flex flex-col gap-4">
+                <Field label="Store" htmlFor="map-store">
+                  <Pick
+                    id="map-store"
+                    value={companies.some((c) => c.name === form.store) ? form.store : ""}
+                    onChange={(v) => { if (v) setForm((f) => ({ ...f, store: v })); }}
+                    placeholder="Select store"
+                    options={companies.map((c) => ({ value: c.name, label: c.name }))}
+                  />
+                  <Input aria-label="Custom store name" value={form.store} onChange={(e) => setForm((f) => ({ ...f, store: e.target.value }))} placeholder="Or type a custom store name" />
+                </Field>
+
+                <Field label="Group" htmlFor="map-group">
+                  <Pick
+                    id="map-group"
+                    value={groups.includes(form.company_group) ? form.company_group : ""}
+                    onChange={(v) => { if (v) setForm((f) => ({ ...f, company_group: v })); }}
+                    placeholder="Select group"
+                    options={groups.map((g) => ({ value: g, label: g }))}
+                  />
+                  <Input aria-label="Custom group name" value={form.company_group} onChange={(e) => setForm((f) => ({ ...f, company_group: e.target.value }))} placeholder="Or type a custom group name" />
+                </Field>
+
+                <Field label="Printer Type" htmlFor="map-type">
+                  <Pick id="map-type" value={form.printer_type} onChange={(v) => setForm((f) => ({ ...f, printer_type: v }))} placeholder="Select type" options={PRINTER_TYPES.map((t) => ({ value: t, label: t }))} />
+                </Field>
+
+                <Field label="Model Name" htmlFor="map-model" hint={selected.model ? `Xerox model: ${selected.model}` : undefined} error={saveError}>
+                  <Input id="map-model" value={form.model_name} onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))} placeholder="e.g. B9125, Versant 180" />
+                </Field>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
+                  <Button type="submit" disabled={saving}>
+                    {saving && <Spinner />}
+                    {saving ? "Saving" : "Save"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
+  );
+
+  if (embedded) return <div className="flex w-full min-w-0 flex-col gap-4">{body}</div>;
+  return (
+    <Page title="Machine Mapping" titleExtra={summary} actions={actions}>
+      {body}
+    </Page>
   );
 }
