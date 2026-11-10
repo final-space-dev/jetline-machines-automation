@@ -111,8 +111,9 @@ test.describe("Signed in as an admin", () => {
   test("the search finds a store and opens it", async ({ page }) => {
     await page.goto("/equipment");
     await page.keyboard.press("Control+k");
-    await page.getByLabel("Search").fill("alberton");
-    await page.getByRole("button", { name: /Alberton/ }).first().click();
+    const palette = page.getByRole("dialog", { name: "Search" });
+    await palette.getByRole("textbox", { name: "Search" }).fill("alberton");
+    await palette.getByRole("button", { name: /Alberton/ }).first().click();
     await expect(page).toHaveURL(/\/equipment\/stores\/Alberton/);
   });
 });
