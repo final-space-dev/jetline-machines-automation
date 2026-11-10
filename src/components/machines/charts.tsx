@@ -100,7 +100,8 @@ export function Bars({
           axisFormat={f.axis}
           showValues={showValues ?? series.length === 1}
           // A zero bar has nothing to say; its label would only clutter the axis.
-          barLabelFormat={(v) => (v === 0 ? "" : format === "percent" ? `${Math.round(v)}%` : compactR(v))}
+          // Under ten thousand the figure itself fits on the bar ("1 788", not "2k").
+          barLabelFormat={(v) => (v === 0 ? "" : format === "percent" ? `${Math.round(v)}%` : Math.abs(v) < 10000 ? whole(v) : compactR(v))}
           onBarClick={onBarClick}
         />
       </div>

@@ -452,7 +452,7 @@ export default function StoreDetailPage() {
       label: "Installed",
       hideBelow: "lg",
       sortValue: (m) => (m.install_date ? new Date(m.install_date).getTime() : 0),
-      cell: (m) => <span title="Latest install (current store)">{m.install_date ? day(m.install_date) : <Muted>Not set</Muted>}</span>,
+      cell: (m) => <span title="Latest install (current store)">{m.install_date ? day(m.install_date) : <Muted>—</Muted>}</span>,
     },
     {
       key: "balance",

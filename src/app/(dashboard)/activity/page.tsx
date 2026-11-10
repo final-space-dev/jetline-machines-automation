@@ -42,7 +42,7 @@ const TYPE_BUTTONS: Array<{ value: TypeFilter; label: string }> = [
 
 // Date grouping
 
-type GroupKey = "Today" | "Yesterday" | "This Week" | "Earlier";
+type GroupKey = "Today" | "Yesterday" | "This week" | "Earlier";
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -56,11 +56,11 @@ function groupFor(iso: string): GroupKey {
   const diffDays = Math.round((today.getTime() - day.getTime()) / 86400000);
   if (diffDays <= 0) return "Today";
   if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return "This Week";
+  if (diffDays < 7) return "This week";
   return "Earlier";
 }
 
-const GROUP_ORDER: GroupKey[] = ["Today", "Yesterday", "This Week", "Earlier"];
+const GROUP_ORDER: GroupKey[] = ["Today", "Yesterday", "This week", "Earlier"];
 
 // A stored value that is a date (an ISO day, or the long form a JavaScript Date
 // prints) is shown as a day; anything else as it is.

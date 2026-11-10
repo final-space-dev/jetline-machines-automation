@@ -63,7 +63,7 @@ type GroupView = "store" | "storeGroup" | "mainGroup";
 
 const VIEW_STORAGE_KEY = "jl.equipment.groupView";
 
-const UNGROUPED_MAIN = "Other Stores";
+const UNGROUPED_MAIN = "Other stores";
 const UNGROUPED_SUB = "Ungrouped";
 
 // ─── Stores list (from ALL_XEROX_STORES) ──────────────────────────────────────
@@ -205,7 +205,7 @@ interface GroupBucket {
 }
 
 const VIEW_OPTIONS: { value: GroupView; label: string }[] = [
-  { value: "storeGroup", label: "By Store group" },
+  { value: "storeGroup", label: "By store group" },
   { value: "mainGroup", label: "By main group" },
 ];
 
