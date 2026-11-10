@@ -154,13 +154,13 @@ function useFiltered<T extends BaseRow>(rows: T[], f: Filters): T[] {
 
 // ── Columns every report starts with ──────────────────────────────────────────
 
-const text = (v: string | null | undefined) => v ?? "—";
+const text = (v: string | null | undefined) => v || "—";
 const figure = (v: React.ReactNode, strong = false) => <span className={cn(GRID.num, strong && "font-semibold")}>{v}</span>;
 
 function baseColumns<T extends BaseRow>(): Column<T>[] {
   return [
     { key: "serial_number", label: "Serial", sortValue: (r) => r.serial_number ?? "", cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.serial_number}</span> },
-    { key: "model_name", label: "Model", sortValue: (r) => r.model_name ?? "", cell: (r) => <span className="whitespace-nowrap">{r.model_name}</span> },
+    { key: "model_name", label: "Model", sortValue: (r) => r.model_name ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.model_name)}</span> },
     { key: "store", label: "Store", sortValue: (r) => r.store ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.store)}</span> },
     { key: "company_group", label: "Group", sortValue: (r) => r.company_group ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.company_group)}</span> },
     { key: "printer_type", label: "Type", sortValue: (r) => r.printer_type ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.printer_type)}</span> },
@@ -267,7 +267,7 @@ function SummaryTab({ rows, filters, setFilters }: {
   return (
     <>
       <FilterBar allRows={rows} filters={filters} setFilters={setFilters} onExport={exportRows} />
-      <DataTable wide columns={SUMMARY_COLUMNS} rows={shown} rowKey={(r) => r.serial_number} defaultSort={DEFAULT_SORT} onSortChange={(key, dir) => setSort({ key, dir })} empty="No data" />
+      <DataTable wide columns={SUMMARY_COLUMNS} rows={shown} rowKey={(r, i) => `${r.serial_number}-${i}`} defaultSort={DEFAULT_SORT} onSortChange={(key, dir) => setSort({ key, dir })} empty="No data" />
       <Muted>{shown.length} of {rows.length} machines</Muted>
     </>
   );
@@ -326,7 +326,7 @@ function PeriodTab<T extends BaseRow & { period_total: number }>({ rows, periods
         wide
         columns={columns}
         rows={visible}
-        rowKey={(r) => r.serial_number}
+        rowKey={(r, i) => `${r.serial_number}-${i}`}
         defaultSort={DEFAULT_SORT}
         onSortChange={(key, dir) => setSort({ key, dir })}
         empty="No data"
@@ -373,7 +373,7 @@ function StatusTab({ rows, filters, setFilters }: {
   return (
     <>
       <FilterBar allRows={rows} filters={filters} setFilters={setFilters} onExport={exportRows} />
-      <DataTable wide columns={STATUS_COLUMNS} rows={visible} rowKey={(r) => r.serial_number} defaultSort={DEFAULT_SORT} onSortChange={(key, dir) => setSort({ key, dir })} empty="No data" />
+      <DataTable wide columns={STATUS_COLUMNS} rows={visible} rowKey={(r, i) => `${r.serial_number}-${i}`} defaultSort={DEFAULT_SORT} onSortChange={(key, dir) => setSort({ key, dir })} empty="No data" />
       <Muted>{visible.length} machines</Muted>
     </>
   );

@@ -27,6 +27,7 @@ import { Tile, TileRow } from "@/components/machines/tile";
 import { EQUIPMENT_STATUSES, classifyCondition, type ConditionBucket, type EquipmentStatus } from "@/lib/equipment-utils";
 import { getStoreGroup, STORE_GROUPS } from "@/lib/store-groups";
 import { count } from "@/lib/numbers";
+import { onePerSerial } from "@/lib/reading-alerts";
 import { toast } from "@/lib/toast";
 import { GRID } from "@/lib/ui/ui-tokens";
 import { useRole } from "@/lib/use-role";
@@ -198,7 +199,8 @@ export default function StoreDetailPage() {
     }
 
     setItems(data?.equipment ?? []);
-    setMachines(data?.machines ?? []);
+    // Xerox keeps two records for some machines; the list shows each machine once.
+    setMachines(onePerSerial(data?.machines ?? []));
 
     // Only seed identity from server the first time so we don't clobber unsaved edits.
     if (!fetchedIdentityRef.current) {
@@ -590,7 +592,7 @@ export default function StoreDetailPage() {
             <DataTable
               columns={printerColumns}
               rows={machines}
-              rowKey={(m) => m.serial_number}
+              rowKey={(m, i) => `${m.serial_number}-${i}`}
               onRowClick={(m) => router.push(`/equipment/printers/${encodeURIComponent(m.serial_number)}`)}
               empty="No Xerox printers mapped to this store"
             />

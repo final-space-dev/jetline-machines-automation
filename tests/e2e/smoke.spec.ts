@@ -1,98 +1,118 @@
-import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { test, expect, type Page } from "@playwright/test";
 
-test.describe("Application Smoke Tests", () => {
-  test("dashboard page loads without crashing", async ({ page }) => {
-    const response = await page.goto("/");
+/**
+ * What a person meets: signed out, then (when a sign-in is supplied) a walk
+ * through the main screens as an admin. See playwright.config.ts for how to
+ * run it. The walk reads; it writes nothing.
+ */
 
-    // Page should load (2xx or 3xx status)
-    expect(response?.status()).toBeLessThan(500);
+const email = process.env.E2E_EMAIL;
+const password = process.env.E2E_PASSWORD_FILE ? readFileSync(process.env.E2E_PASSWORD_FILE, "utf8").trim() : null;
 
-    // Should have basic structure (not a blank page)
-    await expect(page.locator("body")).not.toBeEmpty();
+/** Every request that answered 5xx while a test ran: the test fails on any. */
+function watchForServerErrors(page: Page): string[] {
+  const failures: string[] = [];
+  page.on("response", (r) => {
+    if (r.status() >= 500) failures.push(`${r.status()} ${new URL(r.url()).pathname}`);
   });
+  page.on("pageerror", (e) => failures.push(`page error: ${e.message}`));
+  return failures;
+}
 
-  test("machines page loads without crashing", async ({ page }) => {
-    const response = await page.goto("/machines");
-    expect(response?.status()).toBeLessThan(500);
-
-    // Should have some content
-    await expect(page.locator("body")).not.toBeEmpty();
-  });
-
-  test("contracts page loads without crashing", async ({ page }) => {
-    const response = await page.goto("/contracts");
-    expect(response?.status()).toBeLessThan(500);
-    await expect(page.locator("body")).not.toBeEmpty();
-  });
-
-  test("lift planner page loads without crashing", async ({ page }) => {
-    const response = await page.goto("/lift");
-    expect(response?.status()).toBeLessThan(500);
-    await expect(page.locator("body")).not.toBeEmpty();
-  });
-
-  test("sync page loads without crashing", async ({ page }) => {
-    const response = await page.goto("/sync");
-    expect(response?.status()).toBeLessThan(500);
-    await expect(page.locator("body")).not.toBeEmpty();
-  });
-
-  test("settings page loads without crashing", async ({ page }) => {
-    const response = await page.goto("/settings");
-    expect(response?.status()).toBeLessThan(500);
-    await expect(page.locator("body")).not.toBeEmpty();
-  });
-});
-
-test.describe("API Endpoints", () => {
-  test("health endpoint responds", async ({ request }) => {
-    const response = await request.get("/api/health");
-    // Should respond (even if unhealthy due to DB)
-    expect(response.status()).toBeLessThan(600);
-
-    const data = await response.json();
-    expect(data.status).toBeDefined();
-    expect(data.timestamp).toBeDefined();
-  });
-
-  test("health detailed endpoint responds", async ({ request }) => {
-    const response = await request.get("/api/health/detailed");
-    expect(response.status()).toBeLessThan(600);
-
-    const data = await response.json();
-    expect(data.status).toBeDefined();
-    expect(data.checks).toBeDefined();
-  });
-
-  test("dashboard API responds", async ({ request }) => {
-    const response = await request.get("/api/dashboard");
-    // API should respond (may error if DB down, but shouldn't crash)
-    expect(response.status()).toBeLessThan(600);
-  });
-
-  test("machines API responds", async ({ request }) => {
-    const response = await request.get("/api/machines?page=1&limit=10");
-    expect(response.status()).toBeLessThan(600);
-  });
-
-  test("companies API responds", async ({ request }) => {
-    const response = await request.get("/api/companies");
-    expect(response.status()).toBeLessThan(600);
-  });
-
-  test("categories API responds", async ({ request }) => {
-    const response = await request.get("/api/categories");
-    expect(response.status()).toBeLessThan(600);
-  });
-});
-
-test.describe("Navigation", () => {
-  test("sidebar has navigation links", async ({ page }) => {
+test.describe("Signed out", () => {
+  test("the start page sends a visitor to sign in", async ({ page }) => {
     await page.goto("/");
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.locator("#email")).toBeVisible();
+    await expect(page.locator("#password")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  });
 
-    // Should have key navigation links
-    await expect(page.locator('a[href="/machines"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('a[href="/contracts"]')).toBeVisible();
-    await expect(page.locator('a[href="/lift"]')).toBeVisible();
+  test("a wrong password is refused with a message", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill("#email", "nobody@jetline.local");
+    await page.fill("#password", "not-the-password");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText("Invalid email or password")).toBeVisible();
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("a data route refuses a visitor", async ({ request }) => {
+    const res = await request.get("/api/equipment/all-stores", { maxRedirects: 0 });
+    expect([301, 302, 307, 308, 401, 403]).toContain(res.status());
+  });
+});
+
+test.describe("Signed in as an admin", () => {
+  test.skip(!email || !password, "Set E2E_EMAIL and E2E_PASSWORD_FILE to run the signed-in walk");
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login");
+    await page.fill("#email", email!);
+    await page.fill("#password", password!);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  });
+
+  test("all stores, then a store and its three tabs", async ({ page }) => {
+    const failures = watchForServerErrors(page);
+    await page.goto("/equipment");
+    await expect(page.getByRole("heading", { name: "Equipment" })).toBeVisible();
+    await expect(page.getByText("Total items")).toBeVisible();
+
+    await page.goto("/equipment/stores/Alberton");
+    await expect(page.getByRole("heading", { name: "Alberton" })).toBeVisible();
+    await page.getByRole("tab", { name: /Printers/ }).first().click();
+    await expect(page.getByRole("columnheader", { name: "Serial" })).toBeVisible();
+    await page.getByRole("tab", { name: "Printer performance" }).click();
+    await expect(page.getByText("Print volumes")).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+
+  test("fleet health, operations and activity", async ({ page }) => {
+    const failures = watchForServerErrors(page);
+    await page.goto("/equipment/fleet");
+    await expect(page.getByRole("heading", { name: "Fleet health" })).toBeVisible();
+    await expect(page.getByText("Condition breakdown")).toBeVisible();
+
+    await page.goto("/operations");
+    await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+    await expect(page.getByText("Reading health")).toBeVisible();
+
+    await page.goto("/activity");
+    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+
+  test("machine reports: every tab loads rows", async ({ page }) => {
+    const failures = watchForServerErrors(page);
+    await page.goto("/machine-reports");
+    await expect(page.getByRole("heading", { name: "Machine reports" })).toBeVisible();
+    for (const tab of ["Summary", "Month to date", "Weekly", "Monthly (6m)", "Year to date", "Machine status"]) {
+      await page.getByRole("tab", { name: tab }).click();
+      await expect(page.getByText(/\d+ (of \d+ )?machines/)).toBeVisible({ timeout: 30_000 });
+    }
+    expect(failures).toEqual([]);
+  });
+
+  test("config: every tab opens", async ({ page }) => {
+    const failures = watchForServerErrors(page);
+    await page.goto("/setup");
+    await expect(page.getByRole("heading", { name: "Config" })).toBeVisible();
+    for (const tab of ["Stores", "Machine mapping", "Import", "Models", "Suppliers", "Equipment types", "Conditions", "Users", "Recently deleted"]) {
+      await page.getByRole("tab", { name: tab, exact: true }).click();
+      await expect(page.getByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true");
+      await page.waitForLoadState("networkidle");
+    }
+    expect(failures).toEqual([]);
+  });
+
+  test("the search finds a store and opens it", async ({ page }) => {
+    await page.goto("/equipment");
+    await page.keyboard.press("Control+k");
+    await page.getByLabel("Search").fill("alberton");
+    await page.getByRole("button", { name: /Alberton/ }).first().click();
+    await expect(page).toHaveURL(/\/equipment\/stores\/Alberton/);
   });
 });

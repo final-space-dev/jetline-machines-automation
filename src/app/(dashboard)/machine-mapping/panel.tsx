@@ -356,7 +356,7 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
           wide
           columns={columns}
           rows={filtered}
-          rowKey={(m) => m.serial_number}
+          rowKey={(m, i) => `${m.serial_number}-${i}`}
           rowClassName={(m) => (m.reporting_enabled === false ? "opacity-40" : undefined)}
           defaultSort={{ key: "store", dir: 1 }}
           onSortChange={(key, dir) => {

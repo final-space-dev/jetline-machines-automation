@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { xeroxPool } from "@/lib/xerox-pool";
 import { bmsPool } from "@/lib/bms-pool";
 import { requireCapability, AuthError } from "@/lib/auth";
+import { readingAlerts, type LatestReading } from "@/lib/reading-alerts";
 
 export async function GET() {
   // Fleet-wide operations data is admin-only (store staff are scoped to their store).
@@ -79,40 +80,22 @@ export async function GET() {
     const staleness = stalenessResult.rows[0];
 
     // ── Alert feed ────────────────────────────────────────────────────────────
-    const alertsResult = await xeroxClient.query<{
-      type: string; serial_number: string; store: string | null;
-      model: string; detail: string; days_since: number | null;
-    }>(`
-      WITH latest AS (
-        SELECT
-          pd.serial_number, pd.model, psm.store, psm.company_group,
-          MAX(mr.report_date) AS latest_date
-        FROM xerox.printer_dimensions pd
-        LEFT JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
-        LEFT JOIN xerox.meter_readings_normalised mr ON mr.printer_id = pd.printer_id
-        WHERE pd.manufacturer = 'Xerox'
-          AND pd.serial_number IS NOT NULL
-          AND psm.reporting_enabled = true
-          AND (psm.store IS NOT NULL OR psm.company_group IS NOT NULL)
-        GROUP BY pd.serial_number, pd.model, psm.store, psm.company_group
-      )
+    // One row per Xerox RECORD with its newest reading. A serial can have several
+    // records; lib/reading-alerts judges the machine by the newest of them.
+    const latestResult = await xeroxClient.query<LatestReading>(`
       SELECT
-        CASE
-          WHEN latest_date IS NULL             THEN 'never_reported'
-          WHEN latest_date < CURRENT_DATE - 30 THEN 'critical'
-          WHEN latest_date < CURRENT_DATE - 14 THEN 'stale'
-        END AS type,
-        serial_number, store, model,
-        CASE
-          WHEN latest_date IS NULL THEN 'Never sent a reading'
-          ELSE 'Last reading ' || (CURRENT_DATE - latest_date) || ' days ago'
-        END AS detail,
-        CASE WHEN latest_date IS NOT NULL THEN (CURRENT_DATE - latest_date) END AS days_since
-      FROM latest
-      WHERE latest_date IS NULL OR latest_date < CURRENT_DATE - 14
-      ORDER BY days_since DESC NULLS FIRST
-      LIMIT 50
+        pd.serial_number, pd.model, psm.store,
+        MAX(mr.report_date)::text AS latest_date
+      FROM xerox.printer_dimensions pd
+      LEFT JOIN xerox.printer_store_map psm ON psm.serial_number = pd.serial_number
+      LEFT JOIN xerox.meter_readings_normalised mr ON mr.printer_id = pd.printer_id
+      WHERE pd.manufacturer = 'Xerox'
+        AND pd.serial_number IS NOT NULL
+        AND psm.reporting_enabled = true
+        AND (psm.store IS NOT NULL OR psm.company_group IS NOT NULL)
+      GROUP BY pd.printer_id, pd.serial_number, pd.model, psm.store
     `);
+    const alerts = readingAlerts(latestResult.rows, new Date());
 
     // ── Xerox pipeline status ─────────────────────────────────────────────────
     const pipelineResult = await xeroxClient.query<{ last_ingested: string | null }>(`
@@ -188,7 +171,7 @@ export async function GET() {
         critical: parseInt(staleness.critical),
         never: parseInt(staleness.never),
       },
-      alerts: alertsResult.rows,
+      alerts,
       sync: {
         lastSuccess: lastSuccessResult.rows[0]?.completed_at ?? null,
         lastFailed: lastFailedResult.rows[0]?.started_at ?? null,
