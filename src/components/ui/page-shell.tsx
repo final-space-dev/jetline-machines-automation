@@ -43,7 +43,7 @@ function PageShell({
               {title}
               {titleExtra}
             </h1>
-            {subtitle && <p className="mt-[5px] text-[13px] text-[#6E747E]">{subtitle}</p>}
+            {subtitle && <p className="mt-[5px] text-[13px] text-[#696F79]">{subtitle}</p>}
           </div>
           {actions && <div className="flex flex-none items-center gap-2.5">{actions}</div>}
         </div>

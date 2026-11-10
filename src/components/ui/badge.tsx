@@ -24,8 +24,8 @@ const badgeVariantClasses: Record<BadgeVariant, string> = {
   secondary: STATUS.neutral,
   destructive: STATUS.danger,
   /** Spec outline tag: hairline border, muted text, no fill */
-  outline: "border-[#DEE0E3] bg-transparent text-[#6E747E]",
-  ghost: "text-[#6E747E]",
+  outline: "border-[#DEE0E3] bg-transparent text-[#696F79]",
+  ghost: "text-[#696F79]",
   link: "text-[#2A5BD7] underline-offset-4 hover:underline",
 }
 

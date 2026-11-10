@@ -143,13 +143,13 @@ export function CommandPalette({
               type="button"
               onClick={() => go(item)}
               onMouseEnter={() => setActive(i)}
-              className={`flex w-full items-center gap-3 rounded-[11px] px-[13px] py-[9px] text-left transition-colors duration-[180ms] ease-standard ${
+              className={`flex w-full items-center gap-3 rounded-[11px] px-[13px] py-[9px] pointer-coarse:min-h-11 text-left transition-colors duration-[180ms] ease-standard ${
                 i === active ? "bg-[#F4F4F5]" : ""
               }`}
             >
               <span
                 aria-hidden
-                className="inline-flex size-6 shrink-0 items-center justify-center rounded-[7px] bg-[#F1F2F3] text-[11px] font-semibold text-[#6E747E]"
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded-[7px] bg-[#F1F2F3] text-[11px] font-semibold text-[#696F79]"
               >
                 {kindCode(item)}
               </span>

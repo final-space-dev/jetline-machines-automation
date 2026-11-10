@@ -15,7 +15,8 @@
 export const COLORS = {
   ink: "#1B1D21",
   slate: "#3A3F47",
-  muted: "#6E747E",
+  /** Darkened from #6E747E on 10 Nov 2026: 4.5 to 1 or better on Canvas, Paper, the inset card, the neutral chip and the subtle button. */
+  muted: "#696F79",
   faint: "#9AA0A9",
   hairline: "#E8E9EB",
   canvas: "#F7F7F8",
@@ -31,7 +32,7 @@ export const COLORS = {
   provenHover: "#12634A",
   provenWash: "#E9F4EF",
   provenChipFg: "#136349",
-  pending: "#6E747E",
+  pending: "#696F79",
   pendingHover: "#5B616B",
   pendingWash: "#F1F2F3",
   pendingChipFg: "#5B616B",
@@ -146,7 +147,7 @@ export const TYPE = {
   /** Grid cells, controls, nav - the platform's native size: 13px */
   data: "text-[13px]",
   /** Field labels: 11.5/500 muted, sentence case (never uppercase) */
-  label: "text-[11.5px] font-medium text-[#6E747E]",
+  label: "text-[11.5px] font-medium text-[#696F79]",
   /** Hints, timeline dates, metadata */
   micro: "text-[11px]",
   /** Uppercase micro label (labelled dividers, filter captions) */

@@ -261,7 +261,7 @@ export function ScopePicker({
                 Clear
               </Button>
               <span className="flex items-center gap-2">
-                {picks.length > 0 && <span className="text-[11px] text-[#6E747E] tabular-nums">{picks.length} selected</span>}
+                {picks.length > 0 && <span className="text-[11px] text-[#696F79] tabular-nums">{picks.length} selected</span>}
                 <Button size="xs" onClick={apply}>Apply</Button>
               </span>
             </div>

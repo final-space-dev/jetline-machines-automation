@@ -27,7 +27,7 @@
    figure that is good or bad. bg-proven, text-deficit and so on. */
 @theme inline {
   --color-proven: #17795B;
-  --color-pending: #6E747E;
+  --color-pending: #696F79;
   --color-deficit: #C0453C;
   --color-signal: #2A5BD7;
   --color-track: #ECEDEE;

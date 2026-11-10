@@ -43,7 +43,7 @@ function Breadcrumbs({
                 aria-current="page"
                 className={cn(
                   "font-medium",
-                  variant === "header" ? "text-[#6E747E]" : "text-[#1B1D21]"
+                  variant === "header" ? "text-[#696F79]" : "text-[#1B1D21]"
                 )}
               >
                 {item.label}

@@ -15,7 +15,7 @@ type AlertVariant =
   | "signal"
 
 const toneInfo =
-  "border-[#E8E9EB] bg-[#F7F7F8] text-[#1B1D21] [&_[data-slot=alert-description]]:text-[#6E747E]"
+  "border-[#E8E9EB] bg-[#F7F7F8] text-[#1B1D21] [&_[data-slot=alert-description]]:text-[#696F79]"
 const toneSuccess =
   "border-[#D3E8DC] bg-[#F1F8F4] text-[#124A38] [&_[data-slot=alert-description]]:text-[#3E6E5C]"
 const toneWarning =

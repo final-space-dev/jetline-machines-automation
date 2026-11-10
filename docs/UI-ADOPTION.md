@@ -111,7 +111,10 @@ rm jetline-ui.mjs
 
 Install any dependency the script prints, then run `npm run gate`. The pulled
 version is recorded in `src/lib/ui/.jetline-ui.json` (this adoption pulled
-`95b37ea6e828`). `ARCHON_URL` and `ARCHON_KEY` are in `.env.local`, which is
+`95b37ea6e828`, then `56b6c72c1df9` for the darker muted grey). The script's
+list is general: `class-variance-authority` is on it and no kit file imports
+it, so it is not installed here. If a pull changes a value in the kit's
+`COLORS`, change the same value in the `@theme` block of `globals.css`. `ARCHON_URL` and `ARCHON_KEY` are in `.env.local`, which is
 never committed.
 
 ### Colour

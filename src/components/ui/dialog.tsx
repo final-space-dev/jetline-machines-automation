@@ -161,7 +161,7 @@ function DialogContent({
               type="button"
               data-slot="dialog-close"
               onClick={() => setOpen(false)}
-              className="absolute top-[18px] right-[18px] inline-flex size-7 items-center justify-center rounded-[9px] bg-[#F1F2F3] text-[#6E747E] transition-colors duration-[180ms] ease-standard outline-none hover:bg-[#E4E6E8] hover:text-[#3A3F47] focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB]"
+              className="absolute top-[18px] right-[18px] inline-flex size-7 items-center justify-center rounded-[9px] bg-[#F1F2F3] text-[#696F79] transition-colors duration-[180ms] ease-standard outline-none hover:bg-[#E4E6E8] hover:text-[#3A3F47] focus-visible:ring-[3px] focus-visible:ring-[#E4EAFB]"
             >
               <XIcon className="size-3.5" />
               <span className="sr-only">Close</span>
@@ -239,7 +239,7 @@ function DialogDescription({
   return (
     <HDescription
       data-slot="dialog-description"
-      className={cn("text-[12.5px] leading-[1.6] text-[#6E747E]", className)}
+      className={cn("text-[12.5px] leading-[1.6] text-[#696F79]", className)}
       {...props}
     />
   )

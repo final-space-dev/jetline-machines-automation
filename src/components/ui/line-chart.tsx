@@ -45,7 +45,7 @@ export const SERIES_COLORS = [
   "#D9730D", // orange
   "#1B1D21", // ink
   "#B0308A", // magenta
-  "#6E747E", // grey
+  "#696F79", // grey
   "#8B5E3C", // brown (a tenth line keeps its own hue; earlier assignments unchanged)
 ] as const
 
@@ -398,7 +398,7 @@ export function LineChart({
           style={{ height: legendH }}
         >
           {series.map((s, si) => (
-            <span key={si} className="flex items-center gap-1 whitespace-nowrap text-[10.5px] font-medium text-[#6E747E]">
+            <span key={si} className="flex items-center gap-1 whitespace-nowrap text-[10.5px] font-medium text-[#696F79]">
               <span
                 aria-hidden
                 className="inline-block h-[7px] w-[7px] rounded-[2px]"

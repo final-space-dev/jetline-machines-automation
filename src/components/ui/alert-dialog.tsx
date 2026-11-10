@@ -171,7 +171,7 @@ function AlertDialogMedia({
     <div
       data-slot="alert-dialog-media"
       className={cn(
-        "mb-2 inline-flex size-[34px] items-center justify-center rounded-[11px] bg-[#F1F2F3] text-[#6E747E] *:[svg:not([class*='size-'])]:size-4",
+        "mb-2 inline-flex size-[34px] items-center justify-center rounded-[11px] bg-[#F1F2F3] text-[#696F79] *:[svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -202,7 +202,7 @@ function AlertDialogDescription({
   return (
     <HDescription
       data-slot="alert-dialog-description"
-      className={cn("text-[13px] leading-[1.6] text-[#6E747E]", className)}
+      className={cn("text-[13px] leading-[1.6] text-[#696F79]", className)}
       {...props}
     />
   )

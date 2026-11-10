@@ -59,14 +59,14 @@ function SideSheet({
                 {title}
               </HDialogTitle>
               {subtitle != null && (
-                <p className="mt-1 text-[12.5px] text-[#6E747E]">{subtitle}</p>
+                <p className="mt-1 text-[12.5px] text-[#696F79]">{subtitle}</p>
               )}
             </div>
             <button
               type="button"
               data-slot="side-sheet-close"
               onClick={() => onOpenChange(false)}
-              className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#F1F2F3] text-[#6E747E] transition-colors duration-[180ms] ease-standard hover:bg-[#E4E6E8]"
+              className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#F1F2F3] text-[#696F79] transition-colors duration-[180ms] ease-standard hover:bg-[#E4E6E8]"
             >
               <XIcon className="size-3.5" />
               <span className="sr-only">Close</span>

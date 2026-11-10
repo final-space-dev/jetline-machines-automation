@@ -15,7 +15,7 @@ const toneClasses: Record<AvatarTone, string> = {
   blue: "bg-[#E4EAFB] text-[#2A5BD7]",
   green: "bg-[#E9F4EF] text-[#17795B]",
   violet: "bg-[#F1EDFB] text-[#553BAE]",
-  neutral: "bg-[#F4F4F5] text-[#6E747E]",
+  neutral: "bg-[#F4F4F5] text-[#696F79]",
   dark: "bg-[#1B1D21] text-white",
 }
 
@@ -115,7 +115,7 @@ function AvatarStack({
       {overflow > 0 && (
         <span
           data-slot="avatar-overflow"
-          className="-ml-2 flex size-7 shrink-0 select-none items-center justify-center rounded-full border-2 border-white bg-[#F4F4F5] text-[11px] font-semibold text-[#6E747E]"
+          className="-ml-2 flex size-7 shrink-0 select-none items-center justify-center rounded-full border-2 border-white bg-[#F4F4F5] text-[11px] font-semibold text-[#696F79]"
         >
           +{overflow}
         </span>
