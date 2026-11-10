@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 export VERCEL_ORG_ID="team_rdzvPFmt6vykW9Fg69BxJNi0"
 export VERCEL_PROJECT_ID="prj_v9CCDtNAkX7ACQegeOpg3DuOurxk"
 DEV_PROJECT="jetline-machines-dev"
-DEV_ALIAS="${DEV_ALIAS:-machines-dev-jetline.vercel.app}"
+DEV_ALIAS="${DEV_ALIAS:-jetline-machines-dev.vercel.app}"
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 if [ "$branch" != "dev" ]; then
