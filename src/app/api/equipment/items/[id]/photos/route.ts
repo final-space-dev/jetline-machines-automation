@@ -20,6 +20,17 @@ const EXT_BY_MIME: Record<string, string> = {
 };
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB per file
 
+// A Vercel deployment that is not Production (the dev environment, any preview)
+// reaches the SAME private photo store as production, and its database is a copy
+// holding the same photo addresses. It may show photos; it must never add or
+// delete one, or a click on the dev copy would change what production shows.
+// docs/DEV-ENVIRONMENT.md "What dev may not do".
+function readOnlyPhotos(): NextResponse | null {
+  const env = process.env.VERCEL_ENV;
+  if (!env || env === "production") return null;
+  return NextResponse.json({ error: "Photos are read-only on the dev copy" }, { status: 403 });
+}
+
 // POST — multipart form-data with one or more "files". Uploads to Vercel Blob
 // with PRIVATE access (the store is private), storing each blob's URL in
 // equipment.items.photos (TEXT[]). Private blobs aren't publicly reachable — they
@@ -35,6 +46,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
+
+  const refused = readOnlyPhotos();
+  if (refused) return refused;
 
   const timer = routeTimer(`POST /api/equipment/items/${id}/photos`);
 
@@ -96,6 +110,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
+
+  const refusedDelete = readOnlyPhotos();
+  if (refusedDelete) return refusedDelete;
 
   const timer = routeTimer(`DELETE /api/equipment/items/${id}/photos`);
 
