@@ -1,10 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { AppShell } from "@/components/layout/app-shell";
+import { ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { REQUEST_STATUS, URGENCY_STATUS } from "@/components/equipment/feedback-panel";
+import { Empty } from "@/components/machines/empty";
+import { Loading } from "@/components/machines/loading";
+import { Page } from "@/components/machines/page";
+import { TextLink } from "@/components/machines/text-link";
+import { SURFACE, TYPE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
 import { useAdminGuard } from "@/lib/use-admin-guard";
-import { AlertOctagon, Clock, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 
 /**
  * Replacement Requests report (admin, under Reports). Head office monitors every
@@ -40,15 +50,7 @@ function isOverdue(r: Req): boolean {
   return (r.status === "open" || r.status === "reviewing") && ageDays(r.created_at) > SLA_DAYS;
 }
 
-const STATUS_META: Record<string, { label: string; badge: string; icon: typeof Clock }> = {
-  open: { label: "Open", badge: "jl-badge--amber", icon: AlertOctagon },
-  reviewing: { label: "Reviewing", badge: "jl-badge--blue", icon: Clock },
-  approved: { label: "Approved", badge: "jl-badge--green", icon: CheckCircle2 },
-  declined: { label: "Declined", badge: "", icon: XCircle },
-};
-const URGENCY_BADGE: Record<string, string> = { high: "jl-badge--red", medium: "jl-badge--amber", low: "jl-badge--green" };
 const FILTERS = ["all", "overdue", "open", "reviewing", "approved", "declined"] as const;
-type Filter = (typeof FILTERS)[number];
 
 function machineHref(r: Req): string {
   return r.entity_type === "printer"
@@ -65,7 +67,7 @@ export default function ReplacementRequestsPage() {
   const { allowed, loading: guardLoading } = useAdminGuard("nav:replacements");
   const [rows, setRows] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<Filter>("open");
+  const [filter, setFilter] = useState<string>("open");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [noteDraft, setNoteDraft] = useState<Record<number, string>>({});
 
@@ -113,111 +115,99 @@ export default function ReplacementRequestsPage() {
   }, [rows]);
 
   if (guardLoading || !allowed) {
-    return <AppShell><div style={{ display: "grid", placeItems: "center", height: 160 }}><div className="jl-spinner jl-spinner--lg" /></div></AppShell>;
+    return (
+      <Page title="Replacement Requests">
+        <Loading />
+      </Page>
+    );
   }
 
   return (
-    <AppShell>
-      <div className="space-y-4" style={{ maxWidth: 1280, marginInline: "auto", width: "100%", padding: "16px 32px 60px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertOctagon size={22} style={{ color: "var(--red-500)" }} />
-          <h1 className="jl-h1" style={{ margin: 0 }}>Replacement Requests</h1>
-        </div>
-        <p className="jl-sm jl-muted">Requests raised by stores for printers and equipment. Review, then approve or decline with a note back to the store.</p>
-
-        {/* Status filter */}
-        <div className="jl-tabs" role="tablist">
+    <Page title="Replacement Requests">
+      <Tabs value={filter} onValueChange={setFilter}>
+        <TabsList>
           {FILTERS.map((f) => (
-            <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} style={{ textTransform: "capitalize" }}>
+            <TabsTrigger key={f} value={f} className="capitalize">
               {f}{counts[f] ? ` (${counts[f]})` : ""}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
+      </Tabs>
 
-        {loading ? (
-          <p className="jl-sm jl-muted">Loading requests…</p>
-        ) : visible.length === 0 ? (
-          <div className="jl-card jl-card--pad-lg" style={{ textAlign: "center" }}>
-            <span className="jl-sm jl-muted">{filter === "open" ? "No open requests. All caught up." : "No requests in this view."}</span>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {visible.map((r) => {
-              const meta = STATUS_META[r.status] ?? STATUS_META.open;
-              const Icon = meta.icon;
-              const isOpen = r.status === "open" || r.status === "reviewing";
-              return (
-                <div key={r.id} className="jl-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <Icon size={16} style={{ color: "var(--ink-500)" }} />
-                    <span className={`jl-badge ${meta.badge}`}>{meta.label}</span>
-                    <span className={`jl-badge ${URGENCY_BADGE[r.urgency] ?? ""}`} style={{ textTransform: "capitalize" }}>{r.urgency}</span>
-                    <span className="jl-badge">{r.entity_type === "printer" ? "Printer" : "Equipment"}</span>
-                    {isOverdue(r) && <span className="jl-badge jl-badge--red">Overdue · {ageDays(r.created_at)}d</span>}
-                    <Link href={machineHref(r)} className="cell-strong" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                      {r.item_label ?? r.entity_ref} <ExternalLink size={13} />
-                    </Link>
-                    <span style={{ fontSize: 12, color: "var(--ink-500)", marginLeft: "auto" }}>
-                      {r.assigned_to_name && <span style={{ color: "var(--ink-700)", fontWeight: 600 }}>{r.assigned_to_name} · </span>}
-                      {r.store ?? "—"} · {r.requested_by_name ?? "user"} · {fmt(r.created_at)}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: 13, color: "var(--ink-800)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{r.motivation}</div>
-
-                  {r.response_note && (
-                    <div style={{ fontSize: 12, color: "var(--ink-600)", borderTop: "1px solid var(--ink-100)", paddingTop: 8 }}>
-                      <strong>Response:</strong> {r.response_note}
-                      {r.responded_by && <span style={{ color: "var(--ink-400)" }}> — {r.responded_by}{r.responded_at ? ` · ${fmt(r.responded_at)}` : ""}</span>}
-                    </div>
-                  )}
-
-                  {/* Triage controls (open/reviewing only) */}
-                  {isOpen && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--ink-100)", paddingTop: 12 }}>
-                      <textarea
-                        className="jl-textarea"
-                        placeholder="Response to the store (optional but recommended)…"
-                        value={noteDraft[r.id] ?? r.response_note ?? ""}
-                        onChange={(e) => setNoteDraft((d) => ({ ...d, [r.id]: e.target.value }))}
-                        style={{ minHeight: 56 }}
-                      />
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                        {r.assigned_to_name ? (
-                          <button type="button" className="jl-btn jl-btn--ghost jl-btn--sm" disabled={busyId === r.id}
-                            onClick={() => patch(r.id, { assign: "" })} title="Release this request">
-                            Unassign
-                          </button>
-                        ) : (
-                          <button type="button" className="jl-btn jl-btn--soft jl-btn--sm" disabled={busyId === r.id}
-                            onClick={() => patch(r.id, { assign: "me" })}>
-                            Assign to me
-                          </button>
-                        )}
-                        {r.status === "open" && (
-                          <button type="button" className="jl-btn jl-btn--soft jl-btn--sm" disabled={busyId === r.id}
-                            onClick={() => patch(r.id, { status: "reviewing", response_note: noteDraft[r.id] })}>
-                            Mark reviewing
-                          </button>
-                        )}
-                        <button type="button" className="jl-btn jl-btn--primary jl-btn--sm" disabled={busyId === r.id}
-                          onClick={() => patch(r.id, { status: "approved", response_note: noteDraft[r.id] })}>
-                          Approve
-                        </button>
-                        <button type="button" className="jl-btn jl-btn--ghost jl-btn--sm" disabled={busyId === r.id}
-                          onClick={() => patch(r.id, { status: "declined", response_note: noteDraft[r.id] })}>
-                          Decline
-                        </button>
-                        {busyId === r.id && <span className="jl-spinner jl-spinner--sm" />}
-                      </div>
-                    </div>
-                  )}
+      {loading ? (
+        <Loading label="Loading requests" />
+      ) : visible.length === 0 ? (
+        <Empty title={filter === "open" ? "No open requests. All caught up." : "No requests in this view"} />
+      ) : (
+        <div className="flex w-full max-w-5xl flex-col gap-3">
+          {visible.map((r) => {
+            const meta = REQUEST_STATUS[r.status] ?? REQUEST_STATUS.open;
+            const isOpen = r.status === "open" || r.status === "reviewing";
+            return (
+              <article key={r.id} className={cn(SURFACE.card, "flex flex-col gap-3 p-4")}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge status={meta.status}>{meta.label}</Badge>
+                  <Badge status={URGENCY_STATUS[r.urgency] ?? "neutral"} className="capitalize">{r.urgency}</Badge>
+                  <Badge variant="secondary">{r.entity_type === "printer" ? "Printer" : "Equipment"}</Badge>
+                  {isOverdue(r) && <Badge status="danger">Overdue · {ageDays(r.created_at)}d</Badge>}
+                  <TextLink href={machineHref(r)} className={cn(TYPE.data, "inline-flex items-center gap-1")}>
+                    {r.item_label ?? r.entity_ref} <ExternalLink className="size-3.5" />
+                  </TextLink>
+                  <span className={cn(TYPE.micro, "text-muted-foreground sm:ml-auto")}>
+                    {r.assigned_to_name && <span className="font-semibold text-foreground">{r.assigned_to_name} · </span>}
+                    {r.store ?? "—"} · {r.requested_by_name ?? "user"} · {fmt(r.created_at)}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </AppShell>
+
+                <p className={cn(TYPE.data, "whitespace-pre-wrap")}>{r.motivation}</p>
+
+                {r.response_note && (
+                  <p className={cn(TYPE.data, "border-t border-border pt-2 text-muted-foreground")}>
+                    <strong className="text-foreground">Response:</strong> {r.response_note}
+                    {r.responded_by && <span> ({r.responded_by}{r.responded_at ? ` · ${fmt(r.responded_at)}` : ""})</span>}
+                  </p>
+                )}
+
+                {/* Triage controls: open and reviewing only. */}
+                {isOpen && (
+                  <div className="flex flex-col gap-2.5 border-t border-border pt-3">
+                    <Textarea
+                      aria-label="Response to the store"
+                      placeholder="Response to the store (optional but recommended)"
+                      value={noteDraft[r.id] ?? r.response_note ?? ""}
+                      onChange={(e) => setNoteDraft((d) => ({ ...d, [r.id]: e.target.value }))}
+                      rows={2}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {r.assigned_to_name ? (
+                        <Button variant="ghost" size="sm" disabled={busyId === r.id} onClick={() => patch(r.id, { assign: "" })} title="Release this request">
+                          Unassign
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" disabled={busyId === r.id} onClick={() => patch(r.id, { assign: "me" })}>
+                          Assign to me
+                        </Button>
+                      )}
+                      {r.status === "open" && (
+                        <Button variant="outline" size="sm" disabled={busyId === r.id} onClick={() => patch(r.id, { status: "reviewing", response_note: noteDraft[r.id] })}>
+                          Mark reviewing
+                        </Button>
+                      )}
+                      <Button size="sm" disabled={busyId === r.id} onClick={() => patch(r.id, { status: "approved", response_note: noteDraft[r.id] })}>
+                        Approve
+                      </Button>
+                      <Button variant="ghost" size="sm" disabled={busyId === r.id} onClick={() => patch(r.id, { status: "declined", response_note: noteDraft[r.id] })}>
+                        Decline
+                      </Button>
+                      {busyId === r.id && <Spinner />}
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </Page>
   );
 }

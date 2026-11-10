@@ -1,14 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AppShell } from "@/components/layout/app-shell";
-import { useRole } from "@/lib/use-role";
-import { useAdminGuard } from "@/lib/use-admin-guard";
+import { RefreshCw } from "lucide-react";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { KeyValueList } from "@/components/ui/key-value-list";
+import { Progress } from "@/components/ui/progress";
 import { RequestsAttention } from "@/components/dashboard/requests-attention";
-import {
-  RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock,
-  Wifi, WifiOff,
-} from "lucide-react";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Loading } from "@/components/machines/loading";
+import { Page } from "@/components/machines/page";
+import { Muted, Panel, SectionHeading } from "@/components/machines/panel";
+import { Tile, TileRow } from "@/components/machines/tile";
+import { GRID, TYPE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
+import { useAdminGuard } from "@/lib/use-admin-guard";
+import { useRole } from "@/lib/use-role";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,91 +72,61 @@ function formatTime(iso: string | null): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatusPill({ ok, okText, warnText, tone = "amber" }: {
-  ok: boolean; okText: string; warnText: string; tone?: "amber" | "red";
-}) {
-  const cls = ok ? "jl-badge jl-badge--green" : `jl-badge jl-badge--${tone}`;
-  return (
-    <span className={cls}>
-      {ok ? <Wifi /> : <WifiOff />}
-      {ok ? okText : warnText}
-    </span>
-  );
-}
+type SyncRun = OpsData["sync"]["recentSyncs"][0];
 
-function DetailRow({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--s-4)" }}>
-      <span className="jl-sm jl-muted">{label}</span>
-      <span className={`jl-sm ${valueClass ?? ""}`} style={{ fontWeight: "var(--fw-semibold)", textAlign: "right" }}>
-        {value}
-      </span>
-    </div>
-  );
+function SyncBadge({ status }: { status: string }) {
+  const ok = status === "success";
+  const failed = status === "failed";
+  return <Badge status={ok ? "success" : failed ? "danger" : "warning"}>{ok ? "Success" : failed ? "Failed" : "Running"}</Badge>;
 }
 
 function AlertRow({ alert }: { alert: OpsData["alerts"][0] }) {
   const critical = alert.type === "critical" || alert.type === "never_reported";
   const label = alert.type === "critical" ? "Critical" : alert.type === "never_reported" ? "Never" : "Stale";
   return (
-    <div
-      style={{
-        display: "flex", alignItems: "center", gap: "var(--s-3)",
-        padding: "var(--s-3) 0",
-        borderBottom: "1px solid var(--ink-100)",
-      }}
-    >
-      <span className={`jl-chip jl-chip--sm ${critical ? "" : "jl-chip--amber"}`}>
-        {critical ? <XCircle /> : <AlertTriangle />}
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)" }}>
-          <span className="jl-mono jl-sm cell-strong" style={{ color: "var(--ink-900)", fontWeight: "var(--fw-bold)" }}>
-            {alert.serial_number}
-          </span>
-          {alert.store && <span className="jl-xs jl-muted">{alert.store}</span>}
-        </div>
-        <p className="jl-xs jl-muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {alert.detail}
-        </p>
+    <div className="flex items-center gap-3 border-b border-border py-2.5 last:border-b-0">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="flex items-baseline gap-2">
+          <span className={cn(TYPE.data, "font-semibold tabular-nums")}>{alert.serial_number}</span>
+          {alert.store && <span className={cn(TYPE.micro, "text-muted-foreground")}>{alert.store}</span>}
+        </span>
+        <span className={cn(TYPE.micro, "truncate text-muted-foreground")}>{alert.detail}</span>
       </div>
-      <span className={`jl-badge ${critical ? "jl-badge--red" : "jl-badge--amber"}`}>{label}</span>
+      <Badge status={critical ? "danger" : "warning"}>{label}</Badge>
     </div>
   );
 }
 
-function SyncRow({ sync }: { sync: OpsData["sync"]["recentSyncs"][0] }) {
+function SyncRow({ sync }: { sync: SyncRun }) {
   const ok = sync.status === "success";
   const failed = sync.status === "failed";
   return (
-    <div
-      style={{
-        display: "flex", alignItems: "center", gap: "var(--s-3)",
-        padding: "var(--s-3) 0",
-        borderBottom: "1px solid var(--ink-100)",
-      }}
-    >
-      <span className={`jl-dot ${ok ? "jl-dot--green" : failed ? "jl-dot--red" : "jl-dot--amber"}`} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="jl-sm" style={{ fontWeight: "var(--fw-semibold)" }}>
+    <div className="flex items-center gap-3 border-b border-border py-2.5 last:border-b-0">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className={cn(TYPE.data, "font-medium")}>
           {sync.company_id ?? "All companies"}
-          {sync.triggered_by && (
-            <span className="jl-muted" style={{ fontWeight: "var(--fw-regular)" }}> ({sync.triggered_by})</span>
-          )}
-        </div>
+          {sync.triggered_by && <span className="font-normal text-muted-foreground"> ({sync.triggered_by})</span>}
+        </span>
         {failed && sync.error_detail && (
-          <p className="jl-xs" style={{ color: "var(--red-600)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sync.error_detail}>
+          <span className={cn(TYPE.micro, "truncate text-destructive")} title={sync.error_detail}>
             {sync.error_detail.slice(0, 80)}{sync.error_detail.length > 80 ? "..." : ""}
-          </p>
+          </span>
         )}
-        {ok && sync.machines_synced != null && (
-          <p className="jl-xs jl-muted">{sync.machines_synced} machines synced</p>
-        )}
+        {ok && sync.machines_synced != null && <span className={cn(TYPE.micro, "text-muted-foreground")}>{sync.machines_synced} machines synced</span>}
       </div>
-      <span className="jl-xs jl-muted" style={{ whiteSpace: "nowrap" }}>{formatTime(sync.started_at)}</span>
+      <span className={cn(TYPE.micro, "whitespace-nowrap text-muted-foreground")}>{formatTime(sync.started_at)}</span>
+      <SyncBadge status={sync.status} />
     </div>
   );
 }
+
+const SYNC_COLUMNS: Column<SyncRun>[] = [
+  { key: "company", label: "Company", cell: (s) => <span className="font-medium">{s.company_id ?? "All companies"}</span> },
+  { key: "status", label: "Status", cell: (s) => <SyncBadge status={s.status} /> },
+  { key: "by", label: "Triggered by", hideBelow: "sm", cell: (s) => s.triggered_by ?? "System" },
+  { key: "machines", label: "Machines", align: "right", hideBelow: "sm", cell: (s) => <span className={GRID.num}>{s.machines_synced ?? "n/a"}</span> },
+  { key: "started", label: "Started", cell: (s) => formatTime(s.started_at) },
+];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -182,40 +160,27 @@ export default function OperationsPage() {
   }, [fetchData]);
 
   // Block non-admins from the render path (they're being redirected to their store).
-  if (guardLoading || !allowed) {
+  if (guardLoading || !allowed || loading) {
     return (
-      <AppShell>
-        <div style={{ display: "grid", placeItems: "center", height: 160 }}>
-          <div className="jl-spinner jl-spinner--lg" />
-        </div>
-      </AppShell>
-    );
-  }
-
-  if (loading) {
-    return (
-      <AppShell>
-        <div style={{ display: "grid", placeItems: "center", height: 160 }}>
-          <div className="jl-spinner jl-spinner--lg" />
-        </div>
-      </AppShell>
+      <Page title="Operations">
+        <Loading />
+      </Page>
     );
   }
 
   if (error || !data) {
     return (
-      <AppShell>
-        <div className="jl-alert jl-alert--red">
-          <span className="jl-chip"><XCircle /></span>
-          <div className="jl-alert__body">
-            <div className="jl-alert__title">Could not load operations data</div>
-            <div className="jl-alert__text">{error ?? "No data returned from the server."}</div>
-          </div>
-          <button className="jl-btn jl-btn--soft jl-btn--sm" onClick={() => fetchData(false)}>
-            <RefreshCw /> Retry
-          </button>
-        </div>
-      </AppShell>
+      <Page title="Operations">
+        <Alert variant="destructive">
+          <AlertTitle>Could not load operations data</AlertTitle>
+          <AlertDescription>{error ?? "No data returned from the server."}</AlertDescription>
+          <AlertAction>
+            <Button variant="outline" size="sm" onClick={() => fetchData(false)}>
+              <RefreshCw /> Retry
+            </Button>
+          </AlertAction>
+        </Alert>
+      </Page>
     );
   }
 
@@ -228,214 +193,86 @@ export default function OperationsPage() {
   const reportingOk = staleness.fresh + staleness.ok;
   const reportingPct = totalMachines > 0 ? Math.round((reportingOk / totalMachines) * 100) : 0;
 
-  const stalenessRows = [
-    { label: "Fresh (3 days or less)", value: staleness.fresh, tone: "var(--green-500)" },
-    { label: "OK (4 to 14 days)", value: staleness.ok, tone: "var(--blue-500)" },
-    { label: "Stale (15 to 30 days)", value: staleness.stale, tone: "var(--amber-500)" },
-    { label: "Critical (over 30 days)", value: staleness.critical, tone: "var(--red-500)" },
-    { label: "Never", value: staleness.never, tone: "var(--ink-300)" },
-  ];
-
-  const kpis: { label: string; value: number | string; color: string }[] = [
-    { label: "Total Fleet", value: totalMachines, color: "var(--ink-900)" },
-    {
-      label: "Reporting OK",
-      value: `${reportingPct}%`,
-      color: reportingPct >= 80 ? "var(--green-700)" : reportingPct >= 60 ? "var(--amber-700)" : "var(--red-600)",
-    },
-    {
-      label: "Unmapped",
-      value: mapping.unmapped,
-      color: mapping.unmapped === 0 ? "var(--green-700)" : mapping.unmapped < 10 ? "var(--amber-700)" : "var(--red-600)",
-    },
-    {
-      label: "Not in BMS",
-      value: crossRef.notInBms,
-      color: crossRef.notInBms === 0 ? "var(--green-700)" : "var(--amber-700)",
-    },
+  const stalenessRows: { label: string; value: number; tone: "success" | "accent" | "warning" | "danger" }[] = [
+    { label: "Fresh (3 days or less)", value: staleness.fresh, tone: "success" },
+    { label: "OK (4 to 14 days)", value: staleness.ok, tone: "accent" },
+    { label: "Stale (15 to 30 days)", value: staleness.stale, tone: "warning" },
+    { label: "Critical (over 30 days)", value: staleness.critical, tone: "danger" },
+    { label: "Never", value: staleness.never, tone: "warning" },
   ];
 
   return (
-    <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-6)" }}>
+    <Page title="Operations">
+      {/* Needs your attention: the response side of the store feedback loop.
+          Renders only when there are open requests, so it never adds noise. */}
+      <RequestsAttention />
 
-        {/* Header */}
-        <h1 className="jl-h1">Operations</h1>
+      <TileRow>
+        <Tile label="Total Fleet" value={totalMachines} />
+        <Tile label="Reporting OK" value={`${reportingPct}%`} tone={reportingPct < 60 ? "danger" : "default"} />
+        <Tile label="Unmapped" value={mapping.unmapped} tone={mapping.unmapped >= 10 ? "danger" : "default"} />
+        <Tile label="Not in BMS" value={crossRef.notInBms} />
+      </TileRow>
 
-        {/* ── Needs your attention: the store feedback loop's response side.
-            Renders only when there are open requests, so it never adds noise. ── */}
-        <RequestsAttention />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel caption="Xerox data pipeline" right={<Badge status={pipelineOk ? "success" : "danger"}>{pipelineOk ? "Live" : "Stale"}</Badge>}>
+          <KeyValueList
+            items={[
+              { label: "Last ingestion", value: formatTime(pipeline.lastIngested) },
+              { label: "Days since last file", value: pipelineDays === null ? "Unknown" : pipelineDays === 0 ? "Today" : `${pipelineDays} days` },
+              { label: "Machines in Xerox DB", value: String(fleet.total) },
+            ]}
+          />
+        </Panel>
 
-        {/* ── Top KPI row ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "var(--s-4)" }}>
-          {kpis.map((k) => (
-            <div key={k.label} className="jl-kpi">
-              <div className="jl-kpi__value" style={{ color: k.color }}>{k.value}</div>
-              <div className="jl-kpi__label">{k.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Data pipeline + Sync health ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "var(--s-6)" }}>
-
-          {/* Xerox Pipeline */}
-          <div className="jl-card">
-            <div className="jl-card__head">
-              <div className="jl-card__title">Xerox Data Pipeline</div>
-              <StatusPill ok={pipelineOk} okText="Live" warnText="Stale" tone="red" />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-3)" }}>
-              <DetailRow label="Last ingestion" value={formatTime(pipeline.lastIngested)} />
-              <DetailRow
-                label="Days since last file"
-                value={pipelineDays === null ? "Unknown" : pipelineDays === 0 ? "Today" : `${pipelineDays} days`}
-              />
-              <DetailRow label="Machines in Xerox DB" value={String(fleet.total)} />
-            </div>
-          </div>
-
-          {/* BMS Sync */}
-          <div className="jl-card">
-            <div className="jl-card__head">
-              <div className="jl-card__title">BMS Sync</div>
-              <StatusPill ok={syncOk} okText="Current" warnText="Check needed" tone="amber" />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-3)", marginBottom: "var(--s-5)" }}>
-              <DetailRow label="Last successful full sync" value={timeAgo(sync.lastSuccess)} />
-              <DetailRow label="Last sync time" value={formatTime(sync.lastSuccess)} />
-            </div>
-            <div className="jl-h3" style={{ marginBottom: "var(--s-3)" }}>Recent runs</div>
-            <div>
-              {sync.recentSyncs.length === 0 ? (
-                <p className="jl-sm jl-muted" style={{ padding: "var(--s-3) 0" }}>No sync runs recorded yet.</p>
-              ) : (
-                sync.recentSyncs.slice(0, 5).map((s) => <SyncRow key={s.id} sync={s} />)
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Reading health + Alert feed ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "var(--s-6)" }}>
-
-          {/* Reading health */}
-          <div className="jl-card">
-            <div className="jl-card__head">
-              <div className="jl-card__title">Reading Health</div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-3)" }}>
-              {stalenessRows.map(({ label, value, tone }) => (
-                <div key={label} style={{ display: "flex", alignItems: "center", gap: "var(--s-3)" }}>
-                  <span className="jl-xs jl-muted" style={{ width: 150, flex: "none" }}>{label}</span>
-                  <div className="jl-progress" style={{ flex: 1 }}>
-                    <div
-                      className="jl-progress__bar"
-                      style={{
-                        width: totalMachines > 0 ? `${(value / totalMachines) * 100}%` : "0%",
-                        background: tone,
-                      }}
-                    />
-                  </div>
-                  <span className="jl-sm" style={{ fontWeight: "var(--fw-bold)", width: 34, textAlign: "right", flex: "none" }}>
-                    {value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Alert feed */}
-          <div className="jl-card">
-            <div className="jl-card__head">
-              <div className="jl-card__title">Alert Feed</div>
-              {alerts.length > 0 && (
-                <span className="jl-badge jl-badge--red">{alerts.length} alerts</span>
-              )}
-            </div>
-            {alerts.length === 0 ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--s-2)", padding: "var(--s-6) 0" }}>
-                <span className="jl-chip jl-chip--sm jl-chip--green"><CheckCircle /></span>
-                <span className="jl-sm" style={{ color: "var(--green-700)", fontWeight: "var(--fw-semibold)" }}>
-                  All machines reporting on time
-                </span>
-              </div>
-            ) : (
-              <div style={{ maxHeight: 320, overflowY: "auto" }}>
-                {alerts.map((a, i) => <AlertRow key={`${a.serial_number}-${i}`} alert={a} />)}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Recent sync runs table (admin only) ── */}
-        {isAdmin && sync.recentSyncs.length > 0 && (
+        <Panel caption="BMS sync" right={<Badge status={syncOk ? "success" : "warning"}>{syncOk ? "Current" : "Check needed"}</Badge>} bodyClassName="flex flex-col gap-3">
+          <KeyValueList
+            items={[
+              { label: "Last successful full sync", value: timeAgo(sync.lastSuccess) },
+              { label: "Last sync time", value: formatTime(sync.lastSuccess) },
+            ]}
+          />
+          <SectionHeading>Recent runs</SectionHeading>
           <div>
-            <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Recent Sync Runs</h2>
-            <div className="jl-table-wrap" style={{ overflowX: "auto" }}>
-              <table className="jl-table">
-                <thead>
-                  <tr>
-                    <th>Company</th>
-                    <th>Status</th>
-                    <th>Triggered by</th>
-                    <th className="num">Machines</th>
-                    <th>Started</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sync.recentSyncs.map((s) => {
-                    const ok = s.status === "success";
-                    const failed = s.status === "failed";
-                    return (
-                      <tr key={s.id}>
-                        <td className="cell-strong">{s.company_id ?? "All companies"}</td>
-                        <td>
-                          <span className={`jl-badge ${ok ? "jl-badge--green" : failed ? "jl-badge--red" : "jl-badge--amber"}`}>
-                            {ok ? <CheckCircle /> : failed ? <XCircle /> : <Clock />}
-                            {ok ? "Success" : failed ? "Failed" : "Running"}
-                          </span>
-                        </td>
-                        <td>{s.triggered_by ?? "System"}</td>
-                        <td className="num">{s.machines_synced ?? "n/a"}</td>
-                        <td>{formatTime(s.started_at)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {sync.recentSyncs.length === 0 ? <Muted>No sync runs recorded yet</Muted> : sync.recentSyncs.slice(0, 5).map((s) => <SyncRow key={s.id} sync={s} />)}
           </div>
-        )}
+        </Panel>
 
-        {/* ── Xerox fleet breakdown — one stat per KPI card ── */}
-        <div>
-          <h2 className="jl-h2" style={{ marginBottom: "var(--s-4)" }}>Xerox Fleet Breakdown</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "var(--s-4)" }}>
-            <div className="jl-kpi">
-              <div className="jl-kpi__value" style={{ color: "var(--green-700)" }}>{fleet.present}</div>
-              <div className="jl-kpi__label">Present on Xerox</div>
-            </div>
-            <div className="jl-kpi">
-              <div className="jl-kpi__value" style={{ color: "var(--red-600)" }}>{fleet.missing}</div>
-              <div className="jl-kpi__label">Missing from Xerox</div>
-            </div>
-            <div className="jl-kpi">
-              <div className="jl-kpi__value" style={{ color: mapping.unmapped > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
-                {mapping.unmapped}
-              </div>
-              <div className="jl-kpi__label">Unmapped machines</div>
-            </div>
-            <div className="jl-kpi">
-              <div className="jl-kpi__value" style={{ color: crossRef.notInBms > 0 ? "var(--amber-700)" : "var(--green-700)" }}>
-                {crossRef.notInBms}
-              </div>
-              <div className="jl-kpi__label">Present, not in BMS</div>
-            </div>
-          </div>
-        </div>
+        <Panel caption="Reading health" bodyClassName="flex flex-col gap-3.5">
+          {stalenessRows.map(({ label, value, tone }) => (
+            <Progress key={label} label={label} value={value} max={Math.max(totalMachines, 1)} tone={tone} valueLabel={value} />
+          ))}
+        </Panel>
 
+        <Panel caption="Alert feed" right={alerts.length > 0 && <Badge status="danger">{alerts.length} alerts</Badge>}>
+          {alerts.length === 0 ? (
+            <div className="flex justify-center py-6">
+              <Badge status="success">All machines reporting on time</Badge>
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto">
+              {alerts.map((a, i) => <AlertRow key={`${a.serial_number}-${i}`} alert={a} />)}
+            </div>
+          )}
+        </Panel>
       </div>
-    </AppShell>
+
+      {/* Recent sync runs: admin only. */}
+      {isAdmin && sync.recentSyncs.length > 0 && (
+        <Panel caption="Recent sync runs">
+          <DataTable columns={SYNC_COLUMNS} rows={sync.recentSyncs} rowKey={(s) => s.id} card={false} />
+        </Panel>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <SectionHeading>Xerox fleet breakdown</SectionHeading>
+        <TileRow>
+          <Tile label="Present on Xerox" value={fleet.present} />
+          <Tile label="Missing from Xerox" value={fleet.missing} tone={fleet.missing > 0 ? "danger" : "default"} />
+          <Tile label="Unmapped machines" value={mapping.unmapped} />
+          <Tile label="Present, not in BMS" value={crossRef.notInBms} />
+        </TileRow>
+      </div>
+    </Page>
   );
 }

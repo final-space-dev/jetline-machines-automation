@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { AppShell } from "@/components/layout/app-shell";
-import { useAdminGuard } from "@/lib/use-admin-guard";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Download } from "lucide-react";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DataTable, type Column } from "@/components/machines/data-table";
+import { Loading } from "@/components/machines/loading";
+import { Page } from "@/components/machines/page";
+import { Muted } from "@/components/machines/panel";
+import { Pick } from "@/components/machines/pick";
+import { GRID } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
+import { useAdminGuard } from "@/lib/use-admin-guard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,7 +59,7 @@ interface MonthlyRow extends BaseRow {
 
 type TabType = "summary" | "mtd" | "weekly" | "monthly" | "ytd" | "status";
 
-interface SortState { col: string; dir: "asc" | "desc" }
+interface SortState { key: string; dir: 1 | -1 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -127,22 +130,17 @@ function bmsAge(iso: string | null): string {
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
 
-function getVal(row: unknown, path: string): unknown {
-  return path.split(".").reduce(
-    (obj, key) => obj != null ? (obj as Record<string, unknown>)[key] : undefined,
-    row
-  );
-}
+const DEFAULT_SORT: SortState = { key: "store", dir: 1 };
 
-function useSorted<T extends BaseRow>(rows: T[], sort: SortState): T[] {
+/** The rows in the order the table shows them, so an export matches the screen. */
+function sortRows<T>(rows: T[], columns: Column<T>[], sort: SortState): T[] {
+  const sv = columns.find((c) => c.key === sort.key)?.sortValue;
+  if (!sv) return rows;
   return [...rows].sort((a, b) => {
-    const av = getVal(a, sort.col);
-    const bv = getVal(b, sort.col);
-    const an = Number(av), bn = Number(bv);
-    const cmp = (!isNaN(an) && !isNaN(bn))
-      ? an - bn
-      : String(av ?? "").localeCompare(String(bv ?? ""));
-    return sort.dir === "asc" ? cmp : -cmp;
+    const x = sv(a);
+    const y = sv(b);
+    const r = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
+    return r * sort.dir;
   });
 }
 
@@ -169,68 +167,53 @@ function useFiltered<T extends BaseRow>(rows: T[], f: Filters): T[] {
   });
 }
 
-// ── SortableTh ────────────────────────────────────────────────────────────────
+// ── Columns every report starts with ──────────────────────────────────────────
 
-function Th({
-  col, sort, onSort, children, className,
-}: {
-  col: string; sort: SortState; onSort: (c: string) => void;
-  children: React.ReactNode; className?: string;
-}) {
-  const active = sort.col === col;
+const text = (v: string | null | undefined) => v ?? "—";
+const figure = (v: React.ReactNode, strong = false) => <span className={cn(GRID.num, strong && "font-semibold")}>{v}</span>;
+
+function baseColumns<T extends BaseRow>(): Column<T>[] {
+  return [
+    { key: "serial_number", label: "Serial", sortValue: (r) => r.serial_number ?? "", cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.serial_number}</span> },
+    { key: "model_name", label: "Model", sortValue: (r) => r.model_name ?? "", cell: (r) => <span className="whitespace-nowrap">{r.model_name}</span> },
+    { key: "store", label: "Store", sortValue: (r) => r.store ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.store)}</span> },
+    { key: "company_group", label: "Group", sortValue: (r) => r.company_group ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.company_group)}</span> },
+    { key: "printer_type", label: "Type", sortValue: (r) => r.printer_type ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.printer_type)}</span> },
+  ];
+}
+
+/** The totals line under a period report. */
+function TotalsRow({ totals, grand }: { totals: number[]; grand: number }) {
   return (
-    <TableHead
-      className={`cursor-pointer select-none whitespace-nowrap ${className ?? ""}`}
-      onClick={() => onSort(col)}
-    >
-      {children}
-      <span className={`ml-1 ${active ? "" : "text-gray-300"}`}>
-        {active ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}
-      </span>
-    </TableHead>
+    <tr className={cn(GRID.band, "border-t border-border font-semibold")}>
+      <td colSpan={5} className={GRID.td}>Totals</td>
+      {totals.map((t, i) => (
+        <td key={i} className={cn(GRID.td, GRID.num)}>{fmt(t)}</td>
+      ))}
+      <td className={cn(GRID.td, GRID.num)}>{fmt(grand)}</td>
+    </tr>
   );
 }
 
 // ── FilterBar ─────────────────────────────────────────────────────────────────
 
-function FilterBar({ allRows, filters, setFilters }: {
-  allRows: BaseRow[]; filters: Filters; setFilters: (f: Filters) => void;
+function FilterBar({ allRows, filters, setFilters, onExport }: {
+  allRows: BaseRow[]; filters: Filters; setFilters: (f: Filters) => void; onExport: () => void;
 }) {
   const uniq = <K extends keyof BaseRow>(key: K) =>
     Array.from(new Set(allRows.map((r) => r[key] ?? ""))).filter(Boolean).sort() as string[];
   const set = (key: keyof Filters) => (val: string) => setFilters({ ...filters, [key]: val });
+  const options = (all: string, values: string[]) => [{ value: "all", label: all }, ...values.map((v) => ({ value: v, label: v }))];
   return (
-    <div className="flex flex-wrap gap-2 items-center">
-      <Input placeholder="Search serial, model, store, group..." value={filters.search}
-        onChange={(e) => set("search")(e.target.value)} className="w-64 h-8 text-sm" />
-      <Select value={filters.store} onValueChange={set("store")}>
-        <SelectTrigger className="h-8 w-36 text-sm"><SelectValue placeholder="Store" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All stores</SelectItem>
-          {uniq("store").map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={filters.group} onValueChange={set("group")}>
-        <SelectTrigger className="h-8 w-36 text-sm"><SelectValue placeholder="Group" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All groups</SelectItem>
-          {uniq("company_group").map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={filters.type} onValueChange={set("type")}>
-        <SelectTrigger className="h-8 w-36 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All types</SelectItem>
-          {uniq("printer_type").map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={filters.model} onValueChange={set("model")}>
-        <SelectTrigger className="h-8 w-44 text-sm"><SelectValue placeholder="Model" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All models</SelectItem>
-          {uniq("model_name").map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-        </SelectContent>
-      </Select>
+    <div className="flex flex-wrap items-center gap-2">
+      <Input placeholder="Search serial, model, store, group" aria-label="Search" value={filters.search} onChange={(e) => set("search")(e.target.value)} className="w-full sm:w-64" />
+      <Pick aria-label="Store" className="w-40" value={filters.store} onChange={set("store")} options={options("All stores", uniq("store"))} />
+      <Pick aria-label="Group" className="w-40" value={filters.group} onChange={set("group")} options={options("All groups", uniq("company_group"))} />
+      <Pick aria-label="Type" className="w-40" value={filters.type} onChange={set("type")} options={options("All types", uniq("printer_type"))} />
+      <Pick aria-label="Model" className="w-48" value={filters.model} onChange={set("model")} options={options("All models", uniq("model_name"))} />
+      <Button variant="outline" size="sm" className="sm:ml-auto" onClick={onExport}>
+        <Download /> Export CSV
+      </Button>
     </div>
   );
 }
@@ -250,345 +233,163 @@ function exportCsv(filename: string, headers: string[], rows: string[][]): void 
 
 // ── Summary tab ───────────────────────────────────────────────────────────────
 
+type SummaryShown = SummaryRow & { bw_total_reading: number };
+
+const SUMMARY_COLUMNS: Column<SummaryShown>[] = [
+  ...baseColumns<SummaryShown>(),
+  { key: "max_daily_vol", label: "Max Daily", align: "right", sortValue: (r) => num(r.max_daily_vol), cell: (r) => figure(fmt(r.max_daily_vol)) },
+  { key: "avg_daily_vol", label: "Avg Daily", align: "right", sortValue: (r) => num(r.avg_daily_vol), cell: (r) => figure(fmt(r.avg_daily_vol)) },
+  { key: "reading_days", label: "Active Days", align: "right", sortValue: (r) => num(r.reading_days), cell: (r) => figure(fmt(r.reading_days)) },
+  { key: "last_reading", label: "Last Read", sortValue: (r) => r.last_reading ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtDate(r.last_reading)}</span> },
+  { key: "black", label: "B&W Reading", align: "right", sortValue: (r) => num(r.latest_balances?.black_impressions), cell: (r) => figure(fmt(r.latest_balances?.black_impressions)) },
+  { key: "colour", label: "Colour Reading", align: "right", sortValue: (r) => num(r.latest_balances?.color_impressions), cell: (r) => figure(fmt(r.latest_balances?.color_impressions)) },
+  {
+    key: "bw_total_reading", label: "Total Reading", align: "right", sortValue: (r) => r.bw_total_reading,
+    cell: (r) => figure(r.latest_balances?.black_impressions != null || r.latest_balances?.color_impressions != null ? fmt(r.bw_total_reading) : "—"),
+  },
+  { key: "bms_installed_date", label: "BMS Install Date", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</span> },
+  { key: "bms_age", label: "BMS Age", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{bmsAge(r.bms_installed_date)}</span> },
+  { key: "age", label: "Age", sortValue: (r) => r.age ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.age)}</span> },
+  { key: "condition_notes", label: "Condition", sortValue: (r) => r.condition_notes ?? "", cell: (r) => <span className="block max-w-72 truncate" title={r.condition_notes ?? ""}>{text(r.condition_notes)}</span> },
+];
+
 function SummaryTab({ rows, filters, setFilters }: {
   rows: SummaryRow[]; filters: Filters; setFilters: (f: Filters) => void;
 }) {
-  const [sort, setSort] = useState<SortState>({ col: "store", dir: "asc" });
-  const toggle = (col: string) =>
-    setSort((s) => ({ col, dir: s.col === col && s.dir === "asc" ? "desc" : "asc" }));
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const filtered = useFiltered(rows, filters);
+  const shown = useMemo<SummaryShown[]>(
+    () => filtered.map((r) => ({ ...r, bw_total_reading: (r.latest_balances?.black_impressions ?? 0) + (r.latest_balances?.color_impressions ?? 0) })),
+    [filtered],
+  );
 
-  const augmented = useFiltered(rows, filters).map((r) => ({
-    ...r,
-    bw_total_reading: (r.latest_balances?.black_impressions ?? 0) + (r.latest_balances?.color_impressions ?? 0),
-  }));
-  const visible = useSorted(augmented, sort);
-
-  const th = (col: string, label: string, cls?: string) =>
-    <Th col={col} sort={sort} onSort={toggle} className={cls}>{label}</Th>;
+  const exportRows = () =>
+    exportCsv("summary.csv",
+      ["Serial","Model","Store","Group","Type","Max Daily","Avg Daily","Active Days","Last Reading","B&W Reading","Colour Reading","Total Reading","BMS Install Date","BMS Age","Age","Condition"],
+      sortRows(shown, SUMMARY_COLUMNS, sort).map((r) => {
+        const bw = r.latest_balances?.black_impressions ?? null;
+        const col = r.latest_balances?.color_impressions ?? null;
+        return [r.serial_number,r.model_name,r.store??"",r.company_group??"",r.printer_type??"",
+          String(r.max_daily_vol),String(r.avg_daily_vol),String(r.reading_days),r.last_reading??"",
+          String(bw??""),String(col??""),
+          bw!=null||col!=null ? String((bw??0)+(col??0)) : "",
+          r.bms_installed_date??"",bmsAge(r.bms_installed_date),
+          r.age??"",r.condition_notes??""];
+      })
+    );
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
-        <Button variant="outline" size="sm" onClick={() =>
-          exportCsv("summary.csv",
-            ["Serial","Model","Store","Group","Type","Max Daily","Avg Daily","Active Days","Last Reading","B&W Reading","Colour Reading","Total Reading","BMS Install Date","BMS Age","Age","Condition"],
-            visible.map((r) => {
-              const bw = r.latest_balances?.black_impressions ?? null;
-              const col = r.latest_balances?.color_impressions ?? null;
-              return [r.serial_number,r.model_name,r.store??"",r.company_group??"",r.printer_type??"",
-                String(r.max_daily_vol),String(r.avg_daily_vol),String(r.reading_days),r.last_reading??"",
-                String(bw??""),String(col??""),
-                bw!=null||col!=null ? String((bw??0)+(col??0)) : "",
-                r.bms_installed_date??"",bmsAge(r.bms_installed_date),
-                r.age??"",r.condition_notes??""];
-            })
-          )
-        }>Export CSV</Button>
-      </div>
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {th("serial_number","Serial")}
-              {th("model_name","Model")}
-              {th("store","Store")}
-              {th("company_group","Group")}
-              {th("printer_type","Type")}
-              {th("max_daily_vol","Max Daily","text-right")}
-              {th("avg_daily_vol","Avg Daily","text-right")}
-              {th("reading_days","Active Days","text-right")}
-              {th("last_reading","Last Read")}
-              {th("latest_balances.black_impressions","B&W Reading","text-right")}
-              {th("latest_balances.color_impressions","Colour Reading","text-right")}
-              {th("bw_total_reading","Total Reading","text-right")}
-              {th("bms_installed_date","BMS Install Date")}
-              {th("bms_installed_date","BMS Age")}
-              {th("age","Age")}
-              {th("condition_notes","Condition")}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.length === 0 ? (
-              <TableRow><TableCell colSpan={16} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
-            ) : visible.map((r) => (
-              <TableRow key={r.serial_number}>
-                <TableCell className="font-mono text-xs">{r.serial_number}</TableCell>
-                <TableCell className="text-xs">{r.model_name}</TableCell>
-                <TableCell className="text-xs">{r.store ?? "—"}</TableCell>
-                <TableCell className="text-xs">{r.company_group ?? "—"}</TableCell>
-                <TableCell className="text-xs">{r.printer_type ?? "—"}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{fmt(r.max_daily_vol)}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{fmt(r.avg_daily_vol)}</TableCell>
-                <TableCell className="text-right text-xs">{fmt(r.reading_days)}</TableCell>
-                <TableCell className="text-xs">{fmtDate(r.last_reading)}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{fmt(r.latest_balances?.black_impressions)}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{fmt(r.latest_balances?.color_impressions)}</TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {(r.latest_balances?.black_impressions != null || r.latest_balances?.color_impressions != null)
-                    ? fmt(r.bw_total_reading) : "—"}
-                </TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{bmsAge(r.bms_installed_date)}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{r.age ?? "—"}</TableCell>
-                <TableCell className="text-xs max-w-[280px] truncate" title={r.condition_notes ?? ""}>{r.condition_notes ?? "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      <p className="text-xs text-muted-foreground">{visible.length} of {rows.length} machines</p>
-    </div>
+    <>
+      <FilterBar allRows={rows} filters={filters} setFilters={setFilters} onExport={exportRows} />
+      <DataTable wide columns={SUMMARY_COLUMNS} rows={shown} rowKey={(r) => r.serial_number} defaultSort={DEFAULT_SORT} onSortChange={(key, dir) => setSort({ key, dir })} empty="No data" />
+      <Muted>{shown.length} of {rows.length} machines</Muted>
+    </>
   );
 }
 
-// ── MTD tab ───────────────────────────────────────────────────────────────────
+// ── Period tabs: a column per day, week or month ──────────────────────────────
 
-function MtdTab({ rows, dates, filters, setFilters }: {
-  rows: MtdRow[]; dates: string[]; filters: Filters; setFilters: (f: Filters) => void;
+function PeriodTab<T extends BaseRow & { period_total: number }>({ rows, periods, volumes, header, exportName, footnote, blankWhenMissing = false, filters, setFilters }: {
+  rows: T[];
+  /** The period keys, in column order. */
+  periods: string[];
+  /** A row's volumes by period key. */
+  volumes: (row: T) => Record<string, number>;
+  /** How to label each period column. */
+  header: (key: string) => string;
+  exportName: string;
+  footnote: (periods: number) => string;
+  /** A day with no reading shows a dash, not 0 (a reading of 0 is a figure). */
+  blankWhenMissing?: boolean;
+  filters: Filters;
+  setFilters: (f: Filters) => void;
 }) {
-  const [sort, setSort] = useState<SortState>({ col: "store", dir: "asc" });
-  const toggle = (col: string) =>
-    setSort((s) => ({ col, dir: s.col === col && s.dir === "asc" ? "desc" : "asc" }));
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const visible = useFiltered(rows, filters);
 
-  // Flatten date volumes onto row so useSorted can reach them via dot-notation key "d_2026-06-01"
-  const augmented = useFiltered(rows, filters).map((r) => {
-    const extra: Record<string, number> = {};
-    dates.forEach((d) => { extra[`d_${d}`] = num(r.daily_volumes[d]); });
-    return { ...r, ...extra };
-  });
-  const visible = useSorted(augmented, sort);
+  const columns = useMemo<Column<T>[]>(
+    () => [
+      ...baseColumns<T>(),
+      ...periods.map((p): Column<T> => ({
+        key: `p_${p}`,
+        label: header(p),
+        align: "right",
+        // num() coercion: volumes are bigint strings from Postgres.
+        sortValue: (r) => num(volumes(r)[p]),
+        cell: (r) => figure(blankWhenMissing && !present(volumes(r)[p]) ? "—" : fmt(num(volumes(r)[p]))),
+      })),
+      { key: "period_total", label: "Total", align: "right", sortValue: (r) => num(r.period_total), cell: (r) => figure(fmt(num(r.period_total)), true) },
+    ],
+    [periods, header, volumes, blankWhenMissing],
+  );
 
-  // num() coercion — daily_volumes/period_total are bigint strings from Postgres.
-  const colTotals = dates.map((d) => visible.reduce((s, r) => s + num(r.daily_volumes[d]), 0));
+  const colTotals = periods.map((p) => visible.reduce((s, r) => s + num(volumes(r)[p]), 0));
   const grandTotal = visible.reduce((s, r) => s + num(r.period_total), 0);
 
-  const th = (col: string, label: string, cls?: string) =>
-    <Th col={col} sort={sort} onSort={toggle} className={cls}>{label}</Th>;
+  const exportRows = () =>
+    exportCsv(`${exportName}.csv`,
+      ["Serial","Model","Store","Group","Type",...periods.map(header),"Total"],
+      sortRows(visible, columns, sort).map((r) => [r.serial_number,r.model_name,r.store??"",r.company_group??"",r.printer_type??"",
+        ...periods.map((p) => String(volumes(r)[p]??0)),String(r.period_total)])
+    );
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
-        <Button variant="outline" size="sm" onClick={() =>
-          exportCsv("mtd.csv",
-            ["Serial","Model","Store","Group","Type",...dates.map(fmtDate),"Total"],
-            visible.map((r) => [r.serial_number,r.model_name,r.store??"",r.company_group??"",r.printer_type??"",
-              ...dates.map((d) => String(r.daily_volumes[d]??0)),String(r.period_total)])
-          )
-        }>Export CSV</Button>
-      </div>
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {th("serial_number","Serial")}
-              {th("model_name","Model")}
-              {th("store","Store")}
-              {th("company_group","Group")}
-              {th("printer_type","Type")}
-              {dates.map((d) => (
-                <Th key={d} col={`d_${d}`} sort={sort} onSort={toggle} className="text-right text-xs">
-                  {fmtDate(d)}
-                </Th>
-              ))}
-              {th("period_total","Total","text-right")}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.length === 0 ? (
-              <TableRow><TableCell colSpan={6+dates.length+1} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
-            ) : (
-              <>
-                {visible.map((r) => (
-                  <TableRow key={r.serial_number}>
-                    <TableCell className="font-mono text-xs">{r.serial_number}</TableCell>
-                    <TableCell className="text-xs">{r.model_name}</TableCell>
-                    <TableCell className="text-xs">{r.store ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{r.company_group ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{r.printer_type ?? "—"}</TableCell>
-                    {dates.map((d) => (
-                      <TableCell key={d} className="text-right font-mono text-xs">
-                        {present(r.daily_volumes[d]) ? fmt(num(r.daily_volumes[d])) : "—"}
-                      </TableCell>
-                    ))}
-                    <TableCell className="text-right font-mono text-xs font-semibold">{fmt(num(r.period_total))}</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-muted/40 font-semibold border-t-2">
-                  <TableCell colSpan={5} className="text-xs">Totals</TableCell>
-                  {colTotals.map((t, i) => (
-                    <TableCell key={i} className="text-right font-mono text-xs">{fmt(t)}</TableCell>
-                  ))}
-                  <TableCell className="text-right font-mono text-xs">{fmt(grandTotal)}</TableCell>
-                </TableRow>
-              </>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <p className="text-xs text-muted-foreground">{visible.length} of {rows.length} machines · {dates.length} days with readings</p>
-    </div>
+    <>
+      <FilterBar allRows={rows} filters={filters} setFilters={setFilters} onExport={exportRows} />
+      <DataTable
+        wide
+        columns={columns}
+        rows={visible}
+        rowKey={(r) => r.serial_number}
+        defaultSort={DEFAULT_SORT}
+        onSortChange={(key, dir) => setSort({ key, dir })}
+        empty="No data"
+        footer={visible.length > 0 ? <TotalsRow totals={colTotals} grand={grandTotal} /> : undefined}
+      />
+      <Muted>{visible.length} of {rows.length} machines · {footnote(periods.length)}</Muted>
+    </>
   );
 }
 
-// ── Monthly / YTD shared tab ──────────────────────────────────────────────────
-
-function MonthColumnsTab({ rows, months, filters, setFilters, exportName, formatHeader = fmtMonth }: {
-  rows: MonthlyRow[]; months: string[]; filters: Filters;
-  setFilters: (f: Filters) => void; exportName: string;
-  // How to label each period column. Monthly/YTD use fmtMonth; Weekly passes fmtWeek.
-  formatHeader?: (key: string) => string;
-}) {
-  const [sort, setSort] = useState<SortState>({ col: "store", dir: "asc" });
-  const toggle = (col: string) =>
-    setSort((s) => ({ col, dir: s.col === col && s.dir === "asc" ? "desc" : "asc" }));
-
-  // Flatten month volumes onto row so useSorted can reach them via "m_2026-01"
-  const augmented = useFiltered(rows, filters).map((r) => {
-    const extra: Record<string, number> = {};
-    months.forEach((m) => { extra[`m_${m}`] = num(r.monthly_volumes[m]); });
-    return { ...r, ...extra };
-  });
-  const visible = useSorted(augmented, sort);
-
-  // num() coercion — bigint strings from Postgres would otherwise concatenate.
-  const colTotals = months.map((m) => visible.reduce((s, r) => s + num(r.monthly_volumes[m]), 0));
-  const grandTotal = visible.reduce((s, r) => s + num(r.period_total), 0);
-
-  const th = (col: string, label: string, cls?: string) =>
-    <Th col={col} sort={sort} onSort={toggle} className={cls}>{label}</Th>;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
-        <Button variant="outline" size="sm" onClick={() =>
-          exportCsv(`${exportName}.csv`,
-            ["Serial","Model","Store","Group","Type",...months.map(formatHeader),"Total"],
-            visible.map((r) => [r.serial_number,r.model_name,r.store??"",r.company_group??"",r.printer_type??"",
-              ...months.map((m) => String(r.monthly_volumes[m]??0)),String(r.period_total)])
-          )
-        }>Export CSV</Button>
-      </div>
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {th("serial_number","Serial")}
-              {th("model_name","Model")}
-              {th("store","Store")}
-              {th("company_group","Group")}
-              {th("printer_type","Type")}
-              {months.map((m) => (
-                <Th key={m} col={`m_${m}`} sort={sort} onSort={toggle} className="text-right text-xs whitespace-nowrap">
-                  {formatHeader(m)}
-                </Th>
-              ))}
-              {th("period_total","Total","text-right")}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.length === 0 ? (
-              <TableRow><TableCell colSpan={6+months.length+1} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
-            ) : (
-              <>
-                {visible.map((r) => (
-                  <TableRow key={r.serial_number}>
-                    <TableCell className="font-mono text-xs">{r.serial_number}</TableCell>
-                    <TableCell className="text-xs">{r.model_name}</TableCell>
-                    <TableCell className="text-xs">{r.store ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{r.company_group ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{r.printer_type ?? "—"}</TableCell>
-                    {months.map((m) => (
-                      <TableCell key={m} className="text-right font-mono text-xs">{fmt(num(r.monthly_volumes[m]))}</TableCell>
-                    ))}
-                    <TableCell className="text-right font-mono text-xs font-semibold">{fmt(num(r.period_total))}</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-muted/40 font-semibold border-t-2">
-                  <TableCell colSpan={5} className="text-xs">Totals</TableCell>
-                  {colTotals.map((t, i) => (
-                    <TableCell key={i} className="text-right font-mono text-xs">{fmt(t)}</TableCell>
-                  ))}
-                  <TableCell className="text-right font-mono text-xs">{fmt(grandTotal)}</TableCell>
-                </TableRow>
-              </>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <p className="text-xs text-muted-foreground">{visible.length} of {rows.length} machines · {months.length} months</p>
-    </div>
-  );
-}
+const dailyVolumes = (r: MtdRow) => r.daily_volumes;
+const monthlyVolumes = (r: MonthlyRow) => r.monthly_volumes;
 
 // ── Status tab ────────────────────────────────────────────────────────────────
+
+const STATUS_COLUMNS: Column<StatusRow>[] = (() => {
+  const [serial, model, store, group, type] = baseColumns<StatusRow>();
+  return [
+    store, model, serial, group, type,
+    { key: "bms_installed_date", label: "BMS Install Date", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</span> },
+    { key: "bms_age", label: "BMS Age", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{bmsAge(r.bms_installed_date)}</span> },
+    { key: "age", label: "Age", sortValue: (r) => r.age ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.age)}</span> },
+    { key: "condition_notes", label: "Condition", sortValue: (r) => r.condition_notes ?? "", cell: (r) => <span className="block max-w-80 truncate" title={r.condition_notes ?? ""}>{text(r.condition_notes)}</span> },
+  ];
+})();
 
 function StatusTab({ rows, filters, setFilters }: {
   rows: StatusRow[]; filters: Filters; setFilters: (f: Filters) => void;
 }) {
-  const [sort, setSort] = useState<SortState>({ col: "store", dir: "asc" });
-  const toggle = (col: string) =>
-    setSort((s) => ({ col, dir: s.col === col && s.dir === "asc" ? "desc" : "asc" }));
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const visible = useFiltered(rows, filters);
 
-  const visible = useSorted(useFiltered(rows, filters), sort);
-
-  const th = (col: string, label: string, cls?: string) =>
-    <Th col={col} sort={sort} onSort={toggle} className={cls}>{label}</Th>;
+  const exportRows = () =>
+    exportCsv("machine-status.csv",
+      ["Store","Model","Serial","Group","Type","BMS Install Date","BMS Age","Age","Condition"],
+      sortRows(visible, STATUS_COLUMNS, sort).map((r) => [
+        r.store ?? "", r.model_name, r.serial_number,
+        r.company_group ?? "", r.printer_type ?? "",
+        r.bms_installed_date ?? "", bmsAge(r.bms_installed_date),
+        r.age ?? "", r.condition_notes ?? "",
+      ])
+    );
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <FilterBar allRows={rows} filters={filters} setFilters={setFilters} />
-        <Button variant="outline" size="sm" onClick={() =>
-          exportCsv("machine-status.csv",
-            ["Store","Model","Serial","Group","Type","BMS Install Date","BMS Age","Age","Condition"],
-            visible.map((r) => [
-              r.store ?? "", r.model_name, r.serial_number,
-              r.company_group ?? "", r.printer_type ?? "",
-              r.bms_installed_date ?? "", bmsAge(r.bms_installed_date),
-              r.age ?? "", r.condition_notes ?? "",
-            ])
-          )
-        }>Export CSV</Button>
-      </div>
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {th("store","Store")}
-              {th("model_name","Model")}
-              {th("serial_number","Serial")}
-              {th("company_group","Group")}
-              {th("printer_type","Type")}
-              {th("bms_installed_date","BMS Install Date")}
-              {th("bms_installed_date","BMS Age")}
-              {th("age","Age")}
-              {th("condition_notes","Condition")}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
-            ) : visible.map((r) => (
-              <TableRow key={r.serial_number}>
-                <TableCell className="text-xs">{r.store ?? "—"}</TableCell>
-                <TableCell className="text-xs">{r.model_name}</TableCell>
-                <TableCell className="font-mono text-xs">{r.serial_number}</TableCell>
-                <TableCell className="text-xs">{r.company_group ?? "—"}</TableCell>
-                <TableCell className="text-xs">{r.printer_type ?? "—"}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{bmsAge(r.bms_installed_date)}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{r.age ?? "—"}</TableCell>
-                <TableCell className="text-xs max-w-[320px] truncate" title={r.condition_notes ?? ""}>{r.condition_notes ?? "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      <p className="text-xs text-muted-foreground">{visible.length} machines</p>
-    </div>
+    <>
+      <FilterBar allRows={rows} filters={filters} setFilters={setFilters} onExport={exportRows} />
+      <DataTable wide columns={STATUS_COLUMNS} rows={visible} rowKey={(r) => r.serial_number} defaultSort={DEFAULT_SORT} onSortChange={(key, dir) => setSort({ key, dir })} empty="No data" />
+      <Muted>{visible.length} machines</Muted>
+    </>
   );
 }
 
@@ -638,8 +439,8 @@ export default function MachineReportsPage() {
     if (!cache[activeTab]) fetchTab(activeTab);
   }, [activeTab, cache, fetchTab]);
 
-  function switchTab(tab: TabType) {
-    setActiveTab(tab);
+  function switchTab(tab: string) {
+    setActiveTab(tab as TabType);
     setFilters(DEFAULT_FILTERS);
   }
 
@@ -648,38 +449,45 @@ export default function MachineReportsPage() {
   // Block non-admins from the render path (they're being redirected to their store).
   if (guardLoading || !allowed) {
     return (
-      <AppShell>
-        <div style={{ display: "grid", placeItems: "center", height: 160 }}>
-          <div className="jl-spinner jl-spinner--lg" />
-        </div>
-      </AppShell>
+      <Page title="Machine Reports">
+        <Loading />
+      </Page>
     );
   }
 
   return (
-    <AppShell>
-      <div className="flex flex-col h-full space-y-4 px-8 py-4" style={{ maxWidth: 1720, marginInline: "auto", width: "100%" }}>
-        <h1 className="jl-h1">Machine Reports</h1>
-        <div className="jl-tabs">
+    <Page title="Machine Reports">
+      <Tabs value={activeTab} onValueChange={switchTab}>
+        <TabsList>
           {TABS.map((t) => (
-            <button key={t.key} onClick={() => switchTab(t.key)} aria-selected={activeTab === t.key}>
-              {t.label}
-            </button>
+            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
           ))}
-        </div>
-        {loading && <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Loading...</div>}
-        {error && <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">Failed to load: {error}</div>}
-        {!loading && !error && current && (
-          <>
-            {activeTab === "summary" && <SummaryTab rows={current.rows as SummaryRow[]} filters={filters} setFilters={setFilters} />}
-            {activeTab === "mtd" && <MtdTab rows={current.rows as MtdRow[]} dates={current.dates??[]} filters={filters} setFilters={setFilters} />}
-            {activeTab === "weekly" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="weekly" formatHeader={fmtWeek} />}
-            {activeTab === "monthly" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="monthly" />}
-            {activeTab === "ytd" && <MonthColumnsTab rows={current.rows as MonthlyRow[]} months={current.months??[]} filters={filters} setFilters={setFilters} exportName="ytd" />}
-            {activeTab === "status" && <StatusTab rows={current.rows as StatusRow[]} filters={filters} setFilters={setFilters} />}
-          </>
-        )}
-      </div>
-    </AppShell>
+        </TabsList>
+      </Tabs>
+      {loading && <Loading />}
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>Failed to load: {error}</AlertTitle>
+        </Alert>
+      )}
+      {!loading && !error && current && (
+        <>
+          {activeTab === "summary" && <SummaryTab rows={current.rows as SummaryRow[]} filters={filters} setFilters={setFilters} />}
+          {activeTab === "mtd" && (
+            <PeriodTab rows={current.rows as MtdRow[]} periods={current.dates ?? []} volumes={dailyVolumes} header={fmtDate} exportName="mtd" footnote={(n) => `${n} days with readings`} blankWhenMissing filters={filters} setFilters={setFilters} />
+          )}
+          {activeTab === "weekly" && (
+            <PeriodTab rows={current.rows as MonthlyRow[]} periods={current.months ?? []} volumes={monthlyVolumes} header={fmtWeek} exportName="weekly" footnote={(n) => `${n} months`} filters={filters} setFilters={setFilters} />
+          )}
+          {activeTab === "monthly" && (
+            <PeriodTab rows={current.rows as MonthlyRow[]} periods={current.months ?? []} volumes={monthlyVolumes} header={fmtMonth} exportName="monthly" footnote={(n) => `${n} months`} filters={filters} setFilters={setFilters} />
+          )}
+          {activeTab === "ytd" && (
+            <PeriodTab rows={current.rows as MonthlyRow[]} periods={current.months ?? []} volumes={monthlyVolumes} header={fmtMonth} exportName="ytd" footnote={(n) => `${n} months`} filters={filters} setFilters={setFilters} />
+          )}
+          {activeTab === "status" && <StatusTab rows={current.rows as StatusRow[]} filters={filters} setFilters={setFilters} />}
+        </>
+      )}
+    </Page>
   );
 }
