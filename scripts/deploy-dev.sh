@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
-# Deploys the `dev` branch to its Vercel Preview deployment and points the
-# stable dev address at it (docs/DEV-ENVIRONMENT.md). It never deploys to
-# Production: there is no --prod here and there must never be.
+# Deploys the `dev` branch as a Preview deployment of the Vercel project
+# `jetline-machines-dev` and points the stable dev address at it
+# (docs/DEV-ENVIRONMENT.md). The dev copy is its own Vercel project; this
+# script names that project by id, so it cannot reach the production project
+# (`jetline-machines`) whatever this checkout is linked to. There is no --prod
+# here and there must never be.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DEV_ALIAS="${DEV_ALIAS:-jetline-machines-dev.vercel.app}"
+
+# The FinalSpace team and the project jetline-machines-dev. Ids, not secrets.
+export VERCEL_ORG_ID="team_rdzvPFmt6vykW9Fg69BxJNi0"
+export VERCEL_PROJECT_ID="prj_v9CCDtNAkX7ACQegeOpg3DuOurxk"
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 if [ "$branch" != "dev" ]; then
@@ -14,10 +21,6 @@ if [ "$branch" != "dev" ]; then
 fi
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "deploy-dev: there are uncommitted changes. Commit them to 'dev' first, so what is deployed is what is in git." >&2
-  exit 1
-fi
-if [ ! -f .vercel/project.json ]; then
-  echo "deploy-dev: this checkout is not linked to the Vercel project. Run 'vercel link' and choose jetline-machines." >&2
   exit 1
 fi
 
