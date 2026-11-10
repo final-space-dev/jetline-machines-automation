@@ -33,8 +33,10 @@ const ROW: Record<number, string> = {
   2: "grid-cols-2",
   3: "grid-cols-1 sm:grid-cols-3",
   4: "grid-cols-2 md:grid-cols-4",
-  // Five: two columns on a phone with the last one across the row, then all five in a line.
-  5: "grid-cols-2 max-md:*:last:col-span-2 md:grid-cols-5",
+  // Five never leave a hole: on a phone two columns with the last across the row; on a tablet
+  // three above two (a six-column grid: the first three take two columns each, the last two
+  // three each); on a wide screen all five in a line.
+  5: "grid-cols-2 max-md:*:last:col-span-2 md:max-xl:grid-cols-6 md:max-xl:*:col-span-2 md:max-xl:*:nth-[n+4]:col-span-3 xl:grid-cols-5",
   6: "grid-cols-2 md:grid-cols-3 xl:grid-cols-6",
 };
 
