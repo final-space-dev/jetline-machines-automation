@@ -16,27 +16,11 @@ import { Loading } from "@/components/machines/loading";
 import { Page } from "@/components/machines/page";
 import { Muted } from "@/components/machines/panel";
 import { Pick } from "@/components/machines/pick";
+import { FILTER_LABELS, WARNING_FILTERS, hasBmsMismatch, matchesFilter, needingAttention, type QuickFilter, type XeroxMachine } from "@/lib/machine-mapping";
 import { canConfig } from "@/lib/permissions";
 import { useRole } from "@/lib/use-role";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface XeroxMachine {
-  printer_id: number;
-  serial_number: string;
-  model: string;
-  model_name: string | null;
-  store: string | null;
-  company_group: string | null;
-  printer_type: string | null;
-  reporting_enabled: boolean | null;
-  latest_reading_date: string | null;
-  last_seen: string | null;
-  bms_found: boolean;
-  bms_active: boolean | null;
-  bms_company: string | null;
-  xerox_status: "Present" | "Missing";
-}
 
 interface Company {
   id: string;
@@ -53,17 +37,6 @@ interface MappingForm {
 
 type SortKey = "serial_number" | "model" | "store" | "company_group" | "latest_reading_date" | "bms_active";
 type SortDir = "asc" | "desc";
-
-type QuickFilter =
-  | "all"
-  | "unmapped"           // no store AND no group
-  | "mapped"             // has store or group
-  | "no_bms"             // not found in BMS at all
-  | "bms_inactive"       // in BMS but inactive
-  | "bms_mismatch"       // mapped to a store but BMS company name doesn't match
-  | "off"                // reporting disabled
-  | "no_readings"        // never sent a reading
-  | "xerox_missing";     // not on latest Xerox file
 
 const PRINTER_TYPES = ["Colour", "Black and White", "Plan"];
 
@@ -87,19 +60,11 @@ function XeroxStatusBadge({ m }: { m: XeroxMachine }) {
 
 function BmsBadge({ m }: { m: XeroxMachine }) {
   if (!m.bms_found) return <Badge status="neutral">Not in BMS</Badge>;
-  return m.bms_active ? <Badge status="success">BMS Active</Badge> : <Badge status="neutral">BMS Inactive</Badge>;
+  return m.bms_active ? <Badge status="success">BMS active</Badge> : <Badge status="neutral">BMS inactive</Badge>;
 }
 
 function MappingBadge({ m }: { m: XeroxMachine }) {
   return m.store || m.company_group ? <Badge status="info">Mapped</Badge> : <Badge status="warning">Unmapped</Badge>;
-}
-
-// BMS company name contains-match heuristic
-function hasBmsMismatch(m: XeroxMachine): boolean {
-  if (!m.bms_found || !m.store || !m.bms_company) return false;
-  const store = m.store.toLowerCase();
-  const bmsCompany = m.bms_company.toLowerCase();
-  return !bmsCompany.includes(store) && !store.includes(bmsCompany.split(" ").pop() ?? "");
 }
 
 // ─── Sort helpers ─────────────────────────────────────────────────────────────
@@ -122,36 +87,6 @@ function sortMachines(machines: XeroxMachine[], key: SortKey, dir: SortDir): Xer
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
     return dir === "asc" ? cmp : -cmp;
   });
-}
-
-// ─── Filter config ────────────────────────────────────────────────────────────
-
-const FILTER_LABELS: Record<QuickFilter, string> = {
-  all:           "All",
-  unmapped:      "Unmapped",
-  mapped:        "Mapped",
-  no_bms:        "Not in BMS",
-  bms_inactive:  "BMS Inactive",
-  bms_mismatch:  "BMS Mismatch",
-  off:           "Switched Off",
-  no_readings:   "No Readings",
-  xerox_missing: "Missing from Xerox",
-};
-
-const WARNING_FILTERS: QuickFilter[] = ["unmapped", "no_bms", "bms_inactive", "bms_mismatch", "xerox_missing"];
-
-function matchesFilter(m: XeroxMachine, f: QuickFilter): boolean {
-  switch (f) {
-    case "all":           return true;
-    case "unmapped":      return !m.store && !m.company_group;
-    case "mapped":        return !!(m.store || m.company_group);
-    case "no_bms":        return !m.bms_found;
-    case "bms_inactive":  return m.bms_found && m.bms_active === false;
-    case "bms_mismatch":  return hasBmsMismatch(m);
-    case "off":           return m.reporting_enabled === false;
-    case "no_readings":   return !m.latest_reading_date;
-    case "xerox_missing": return m.xerox_status === "Missing";
-  }
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -294,11 +229,10 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
     }
   }
 
-  const actionNeeded =
-    filterCounts.unmapped + filterCounts.no_bms + filterCounts.bms_inactive + filterCounts.bms_mismatch + filterCounts.xerox_missing;
+  const actionNeeded = needingAttention(machines);
 
   function exportCSV() {
-    const headers = ["Serial", "Model", "Model Name", "Store", "Group", "Type", "Xerox Status", "BMS Status", "BMS Store", "Mapping", "Last Reading", "Reporting"];
+    const headers = ["Serial", "Model", "Model name", "Store", "Group", "Type", "Xerox Status", "BMS Status", "BMS store", "Mapping", "Last reading", "Reporting"];
     const rows = filtered.map((m) => [
       m.serial_number ?? "",
       m.model ?? "",
@@ -331,7 +265,7 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
   const columns: Column<XeroxMachine>[] = [
     { key: "serial_number", label: "Serial", sortValue: sortable("serial_number"), cell: (m) => <span className="font-medium whitespace-nowrap tabular-nums">{m.serial_number}</span> },
     { key: "model", label: "Model", sortValue: sortable("model"), cell: (m) => <Muted className="whitespace-nowrap">{m.model || "None"}</Muted> },
-    { key: "model_name", label: "Model Name", cell: (m) => (m.model_name ? <span className="font-medium whitespace-nowrap">{m.model_name}</span> : none) },
+    { key: "model_name", label: "Model name", cell: (m) => (m.model_name ? <span className="font-medium whitespace-nowrap">{m.model_name}</span> : none) },
     { key: "store", label: "Store", sortValue: sortable("store"), cell: (m) => (m.store ? <span className="font-medium whitespace-nowrap">{m.store}</span> : none) },
     { key: "company_group", label: "Group", sortValue: sortable("company_group"), cell: (m) => <Muted className="whitespace-nowrap">{m.company_group || "None"}</Muted> },
     { key: "printer_type", label: "Type", cell: (m) => <Muted className="whitespace-nowrap">{m.printer_type || "None"}</Muted> },
@@ -339,11 +273,11 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
     { key: "bms_active", label: "BMS", sortValue: sortable("bms_active"), cell: (m) => <BmsBadge m={m} /> },
     {
       key: "bms_company",
-      label: "BMS Store",
+      label: "BMS store",
       cell: (m) => (m.bms_company ? <span className={hasBmsMismatch(m) ? "font-semibold whitespace-nowrap text-deficit" : "font-medium whitespace-nowrap"}>{m.bms_company}</span> : none),
     },
     { key: "mapping", label: "Mapping", cell: (m) => <MappingBadge m={m} /> },
-    { key: "latest_reading_date", label: "Last Reading", sortValue: sortable("latest_reading_date"), cell: (m) => <ReadingBadge dateStr={m.latest_reading_date} /> },
+    { key: "latest_reading_date", label: "Last reading", sortValue: sortable("latest_reading_date"), cell: (m) => <ReadingBadge dateStr={m.latest_reading_date} /> },
     {
       key: "reporting",
       label: "On/Off",
@@ -439,7 +373,7 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
           {selected && (
             <>
               <DialogHeader>
-                <DialogTitle>{selected.store || selected.company_group ? "Edit Mapping" : "Map Machine"} · {selected.serial_number}</DialogTitle>
+                <DialogTitle>{selected.store || selected.company_group ? "Edit mapping" : "Map machine"} · {selected.serial_number}</DialogTitle>
               </DialogHeader>
 
               <div className="flex flex-wrap gap-1.5">
@@ -487,11 +421,11 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
                   <Input aria-label="Custom group name" value={form.company_group} onChange={(e) => setForm((f) => ({ ...f, company_group: e.target.value }))} placeholder="Or type a custom group name" />
                 </Field>
 
-                <Field label="Printer Type" htmlFor="map-type">
+                <Field label="Printer type" htmlFor="map-type">
                   <Pick id="map-type" value={form.printer_type} onChange={(v) => setForm((f) => ({ ...f, printer_type: v }))} placeholder="Select type" options={PRINTER_TYPES.map((t) => ({ value: t, label: t }))} />
                 </Field>
 
-                <Field label="Model Name" htmlFor="map-model" hint={selected.model ? `Xerox model: ${selected.model}` : undefined} error={saveError}>
+                <Field label="Model name" htmlFor="map-model" hint={selected.model ? `Xerox model: ${selected.model}` : undefined} error={saveError}>
                   <Input id="map-model" value={form.model_name} onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))} placeholder="e.g. B9125, Versant 180" />
                 </Field>
 
@@ -512,7 +446,7 @@ export function MachineMappingPanel({ embedded = false }: { embedded?: boolean }
 
   if (embedded) return <div className="flex w-full min-w-0 flex-col gap-4">{body}</div>;
   return (
-    <Page title="Machine Mapping" titleExtra={summary} actions={actions}>
+    <Page title="Machine mapping" titleExtra={summary} actions={actions}>
       {body}
     </Page>
   );

@@ -26,9 +26,11 @@ import { CompletenessBadge, ConditionBadge, EQUIPMENT_STATUS_LABEL, EquipmentSta
 import { Tile, TileRow } from "@/components/machines/tile";
 import { EQUIPMENT_STATUSES, classifyCondition, type ConditionBucket, type EquipmentStatus } from "@/lib/equipment-utils";
 import { getStoreGroup, STORE_GROUPS } from "@/lib/store-groups";
+import { count } from "@/lib/numbers";
 import { toast } from "@/lib/toast";
 import { GRID } from "@/lib/ui/ui-tokens";
 import { useRole } from "@/lib/use-role";
+import { formatDate } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -104,7 +106,7 @@ const ALL_STORE_NAMES = [...STORE_GROUPS.map((e) => e.store)].sort();
 
 const ALL = "__all__";
 
-const day = (iso: string, year: "numeric" | "2-digit" = "2-digit") => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year });
+const day = (iso: string) => formatDate(iso);
 
 // ─── Relative time ──────────────────────────────────────────────────────────────
 
@@ -344,8 +346,9 @@ export default function StoreDetailPage() {
     return new Date(Math.max(...times)).toISOString();
   }, [items]);
 
+  // A store's three groups are often the same name twice: each name once.
   const groupChips = identity
-    ? [identity.storeGroup, identity.mainGroup, identity.holdingGroup].filter(Boolean)
+    ? [...new Set([identity.storeGroup, identity.mainGroup, identity.holdingGroup].filter(Boolean))]
     : [];
 
   const conditionCounts = useMemo(() => {
@@ -397,7 +400,7 @@ export default function StoreDetailPage() {
     },
     {
       key: "model",
-      label: "Make / Model",
+      label: "Make / model",
       sortValue: (item) => item.make_model ?? "",
       cell: (item) => item.make_model ?? <Muted>Not set</Muted>,
     },
@@ -438,7 +441,7 @@ export default function StoreDetailPage() {
       label: "Age",
       sortValue: (m) => (m.original_install_date ? -new Date(m.original_install_date).getTime() : 0),
       cell: (m) => (
-        <span className="font-medium" title={m.original_install_date ? `Original install ${day(m.original_install_date, "numeric")}` : "No original install date"}>
+        <span className="font-medium" title={m.original_install_date ? `Original install ${day(m.original_install_date)}` : "No original install date"}>
           {ageYears(m.original_install_date)}
         </span>
       ),
@@ -459,15 +462,15 @@ export default function StoreDetailPage() {
       cell: (m) => {
         const balance = m.latest_balance != null ? Number(m.latest_balance) : null;
         return (
-          <span className={GRID.num} title={m.latest_balance_date ? `as at ${day(m.latest_balance_date, "numeric")}` : undefined}>
-            {balance != null ? balance.toLocaleString("en-ZA") : <Muted>—</Muted>}
+          <span className={GRID.num} title={m.latest_balance_date ? `as at ${day(m.latest_balance_date)}` : undefined}>
+            {balance != null ? count(balance) : <Muted>—</Muted>}
           </span>
         );
       },
     },
     {
       key: "seen",
-      label: "Last Seen",
+      label: "Last seen",
       hideBelow: "md",
       sortValue: (m) => (m.last_seen ? new Date(m.last_seen).getTime() : 0),
       cell: (m) => (m.last_seen ? day(m.last_seen) : "Never"),
@@ -504,10 +507,10 @@ export default function StoreDetailPage() {
             <Field label="Phone" htmlFor="store-phone">
               <Input id="store-phone" value={identity.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="Contact number" />
             </Field>
-            <Field label="Manager Name" htmlFor="store-manager">
+            <Field label="Manager name" htmlFor="store-manager">
               <Input id="store-manager" value={identity.managerName} onChange={(e) => setField("managerName", e.target.value)} placeholder="Manager" />
             </Field>
-            <Field label="Manager Email" htmlFor="store-email">
+            <Field label="Manager email" htmlFor="store-email">
               <Input id="store-email" type="email" value={identity.managerEmail} onChange={(e) => setField("managerEmail", e.target.value)} placeholder="name@jetline.co.za" />
             </Field>
           </div>
@@ -516,20 +519,20 @@ export default function StoreDetailPage() {
 
       <TileRow>
         <Tile label="Equipment" value={items.length} />
-        <Tile label="Active Printers" value={activePrinters} />
+        <Tile label="Active printers" value={activePrinters} />
         <Tile
           label="Condition"
           value={items.length > 0 ? `${conditionCounts.good} good` : "—"}
           prior={items.length > 0 ? <ConditionBar {...conditionCounts} className="mt-1" /> : undefined}
         />
-        <Tile label="Last Updated" value={relTime(lastUpdated)} />
+        <Tile label="Last updated" value={relTime(lastUpdated)} />
       </TileRow>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabStrip>
           <TabsTrigger value="equipment">Equipment{items.length > 0 ? ` (${items.length})` : ""}</TabsTrigger>
           <TabsTrigger value="printers">Printers{machines.length > 0 ? ` (${machines.length})` : ""}</TabsTrigger>
-          <TabsTrigger value="performance">Printer Performance</TabsTrigger>
+          <TabsTrigger value="performance">Printer performance</TabsTrigger>
         </TabStrip>
 
         <TabsContent value="equipment" className="flex flex-col gap-3 pt-4">
@@ -543,7 +546,7 @@ export default function StoreDetailPage() {
               className="w-44"
               value={filterType || ALL}
               onChange={(v) => setFilterType(v === ALL ? "" : v)}
-              options={[{ value: ALL, label: "All Types" }, ...types.map((t) => ({ value: t, label: t }))]}
+              options={[{ value: ALL, label: "All types" }, ...types.map((t) => ({ value: t, label: t }))]}
             />
             <Segmented
               value={filterStatus || ALL}
@@ -551,7 +554,7 @@ export default function StoreDetailPage() {
               options={[{ value: ALL, label: "All" }, ...EQUIPMENT_STATUSES.map((s) => ({ value: s, label: EQUIPMENT_STATUS_LABEL[s] }))]}
             />
             <LinkButton href={addHref} className="sm:ml-auto">
-              <Plus /> Add Equipment
+              <Plus /> Add equipment
             </LinkButton>
           </div>
 
@@ -593,7 +596,7 @@ export default function StoreDetailPage() {
           )}
         </TabsContent>
 
-        {/* The Print Volumes chart lives here so the Equipment and Printers lists stay uncluttered. */}
+        {/* The Print volumes chart lives here so the Equipment and Printers lists stay uncluttered. */}
         <TabsContent value="performance" className="pt-4">
           <PrintSection store={storeName} />
         </TabsContent>

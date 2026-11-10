@@ -31,15 +31,15 @@ const NONE: SearchResponse = { stores: [], items: [], printers: [] };
 
 // Quick commands are role-aware: no point offering a store user destinations they would be bounced from.
 const ADMIN_COMMANDS: Row[] = [
-  { kind: "command", primary: "Go to Fleet Health", href: "/equipment/fleet" },
-  { kind: "command", primary: "Replacement Requests", href: "/reports/replacements" },
-  { kind: "command", primary: "Export All CSV", href: "/api/equipment/export", external: true },
+  { kind: "command", primary: "Go to fleet health", href: "/equipment/fleet" },
+  { kind: "command", primary: "Replacement requests", href: "/reports/replacements" },
+  { kind: "command", primary: "Export all as CSV", href: "/api/equipment/export", external: true },
   { kind: "command", primary: "Open Config", href: "/setup" },
 ];
 
 function commandsForRole(role: string | null, store: string | null): Row[] {
   if (role === "store_staff") {
-    return store ? [{ kind: "command", primary: "My Store", href: `/equipment/stores/${encodeURIComponent(store)}` }] : [];
+    return store ? [{ kind: "command", primary: "My store", href: `/equipment/stores/${encodeURIComponent(store)}` }] : [];
   }
   return ADMIN_COMMANDS;
 }

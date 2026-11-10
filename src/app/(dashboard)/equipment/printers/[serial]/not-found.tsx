@@ -6,10 +6,7 @@ import { Page } from "@/components/machines/page";
 export default function PrinterNotFound() {
   return (
     <Page title="Printer not found">
-      <Empty icon={<Printer />} title="This printer may have been removed or its serial changed" />
-      <div className="flex justify-center">
-        <LinkButton href="/equipment">Back to Equipment</LinkButton>
-      </div>
+      <Empty icon={<Printer />} title="This printer may have been removed or its serial changed" action={<LinkButton href="/equipment">Back to equipment</LinkButton>} />
     </Page>
   );
 }

@@ -16,9 +16,10 @@ import { TextLink } from "@/components/machines/text-link";
 import { SURFACE, TYPE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { useAdminGuard } from "@/lib/use-admin-guard";
+import { formatDate } from "@/lib/utils";
 
 /**
- * Replacement Requests report (admin, under Reports). Head office monitors every
+ * Replacement requests report (admin, under Reports). Head office monitors every
  * store's replacement requests here and responds — the response side of the
  * store feedback loop. Reads/triages /api/feedback/replacement-requests.
  */
@@ -61,7 +62,7 @@ function machineHref(r: Req): string {
 
 function fmt(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
+  return Number.isNaN(d.getTime()) ? iso : formatDate(d);
 }
 
 export default function ReplacementRequestsPage() {
@@ -117,14 +118,14 @@ export default function ReplacementRequestsPage() {
 
   if (guardLoading || !allowed) {
     return (
-      <Page title="Replacement Requests">
+      <Page title="Replacement requests">
         <Loading />
       </Page>
     );
   }
 
   return (
-    <Page title="Replacement Requests">
+    <Page title="Replacement requests">
       <Tabs value={filter} onValueChange={setFilter}>
         <TabStrip>
           {FILTERS.map((f) => (

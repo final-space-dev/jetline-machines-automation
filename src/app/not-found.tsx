@@ -8,9 +8,8 @@ import { cn } from "@/lib/ui/utils";
 export default function NotFound() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className={cn(SURFACE.cardRaised, "flex w-full max-w-sm flex-col items-center gap-4 p-7")}>
-        <Empty icon={<Compass />} title="This page does not exist" />
-        <LinkButton href="/">Back to Machines</LinkButton>
+      <div className={cn(SURFACE.cardRaised, "flex w-full max-w-sm flex-col items-center p-4")}>
+        <Empty icon={<Compass />} title="This page does not exist" action={<LinkButton href="/">Back to the start</LinkButton>} />
       </div>
     </main>
   );

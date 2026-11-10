@@ -23,7 +23,7 @@ const CONDITION_OPTIONS = [
   { value: "Poor", label: "Poor" },
 ];
 
-// ─── Add Equipment full-page form ──────────────────────────────────────────────
+// ─── Add equipment full-page form ──────────────────────────────────────────────
 
 export default function AddEquipmentPage() {
   const params = useParams();
@@ -36,11 +36,13 @@ export default function AddEquipmentPage() {
   const [status, setStatus] = useState<EquipmentStatus>("active");
   const [condition, setCondition] = useState("Good");
   const [saving, setSaving] = useState(false);
+  // Shown on the field once a save has been refused for it.
+  const [tried, setTried] = useState(false);
 
   const storeHref = `/equipment/stores/${encodeURIComponent(storeName)}`;
 
   const save = async () => {
-    if (!type) { toast.error("Equipment type is required"); return; }
+    if (!type) { setTried(true); toast.error("Equipment type is required"); return; }
     setSaving(true);
     try {
       const res = await fetch("/api/equipment", {
@@ -66,16 +68,16 @@ export default function AddEquipmentPage() {
 
   return (
     <Page
-      title="Add Equipment"
-      crumbs={[{ label: "Stores", href: "/equipment" }, { label: storeName, href: storeHref }, { label: "Add Equipment" }]}
+      title="Add equipment"
+      crumbs={[{ label: "Stores", href: "/equipment" }, { label: storeName, href: storeHref }, { label: "Add equipment" }]}
     >
       <Panel className="w-full max-w-3xl">
         <div className="flex flex-col gap-4 pt-1">
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Type *" htmlFor="eq-type">
+            <Field label="Type *" htmlFor="eq-type" error={tried && !type ? "Choose a type" : null}>
               <Pick id="eq-type" value={type} onChange={setType} placeholder="Select type" options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: t }))} />
             </Field>
-            <Field label="Make / Model">
+            <Field label="Make / model">
               <ModelSuggest value={makeModel} onChange={setMakeModel} placeholder="Search or add model" />
             </Field>
             <Field label="Serial" htmlFor="eq-serial">
@@ -93,7 +95,7 @@ export default function AddEquipmentPage() {
           <div className="flex flex-wrap justify-end gap-2.5">
             <LinkButton href={storeHref} variant="outline">Cancel</LinkButton>
             <Button onClick={save} disabled={saving}>
-              {saving ? <Spinner /> : <Plus />} Save Equipment
+              {saving ? <Spinner /> : <Plus />} Save equipment
             </Button>
           </div>
         </div>

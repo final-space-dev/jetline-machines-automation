@@ -198,7 +198,7 @@ export function ModelsPanel() {
   if (roleLoading) return <Loading />;
 
   const columns: Column<ModelRow>[] = [
-    { key: "name", label: "Model Name", sortValue: (r) => r.name, cell: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "name", label: "Model name", sortValue: (r) => r.name, cell: (r) => <span className="font-medium">{r.name}</span> },
     { key: "manufacturer", label: "Manufacturer", hideBelow: "sm", sortValue: (r) => r.manufacturer ?? "", cell: (r) => r.manufacturer || <Muted>Not set</Muted> },
     { key: "type", label: "Type", sortValue: (r) => r.equipment_type, cell: (r) => <Badge status="info">{r.equipment_type}</Badge> },
     { key: "year", label: "Year", align: "right", hideBelow: "md", sortValue: (r) => r.year_introduced ?? 0, cell: (r) => <span className={GRID.num}>{r.year_introduced ?? <Muted>Not set</Muted>}</span> },
@@ -221,7 +221,7 @@ export function ModelsPanel() {
               <Upload /> Import CSV
             </FilePicker>
             <Button size="sm" disabled={busy} onClick={openCreate}>
-              <Plus /> Add Model
+              <Plus /> Add model
             </Button>
           </div>
         )}
@@ -259,7 +259,7 @@ export function ModelsPanel() {
       <Dialog open={showForm && isAdmin} onOpenChange={(o) => { if (!o) closeForm(); }}>
         <DialogContent size="form">
           <DialogHeader>
-            <DialogTitle>{editingId == null ? "Add Model" : "Edit Model"}</DialogTitle>
+            <DialogTitle>{editingId == null ? "Add model" : "Edit model"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {error && (
@@ -268,7 +268,7 @@ export function ModelsPanel() {
               </Alert>
             )}
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Model Name *" htmlFor="model-name">
+              <Field label="Model name *" htmlFor="model-name">
                 <Input id="model-name" autoFocus placeholder="Polar Mohr 76 EM" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
               </Field>
               <Field label="Manufacturer" htmlFor="model-make">
@@ -277,7 +277,7 @@ export function ModelsPanel() {
               <Field label="Type *" htmlFor="model-type">
                 <Pick id="model-type" value={draft.equipment_type} onChange={(v) => setDraft({ ...draft, equipment_type: v })} options={typeOptions} placeholder="Select type" />
               </Field>
-              <Field label="Year Introduced" htmlFor="model-year">
+              <Field label="Year introduced" htmlFor="model-year">
                 <Input id="model-year" inputMode="numeric" placeholder="2019" value={draft.year_introduced} onChange={(e) => setDraft({ ...draft, year_introduced: e.target.value.replace(/[^\d]/g, "") })} />
               </Field>
             </div>

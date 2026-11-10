@@ -30,16 +30,16 @@ const NAV: { section: string; items: Item[] }[] = [
   {
     section: "Stores",
     items: [
-      { href: "/stores", label: "All Stores", icon: Store, cap: "all-stores" },
-      { href: "/equipment/fleet", label: "Fleet Health", icon: HeartPulse, cap: "fleet" },
+      { href: "/stores", label: "All stores", icon: Store, cap: "all-stores" },
+      { href: "/equipment/fleet", label: "Fleet health", icon: HeartPulse, cap: "fleet" },
     ],
   },
   { section: "Operations", items: [{ href: "/operations", label: "Dashboard", icon: LayoutDashboard, cap: "operations" }] },
   {
     section: "Reports",
     items: [
-      { href: "/machine-reports", label: "Machine Reports", icon: BarChart3, cap: "machine-reports" },
-      { href: "/reports/replacements", label: "Replacement Requests", icon: AlertOctagon, cap: "replacements" },
+      { href: "/machine-reports", label: "Machine reports", icon: BarChart3, cap: "machine-reports" },
+      { href: "/reports/replacements", label: "Replacement requests", icon: AlertOctagon, cap: "replacements" },
     ],
   },
   {
@@ -98,9 +98,9 @@ export function MachinesShell({ dev, children }: { dev: boolean; children: React
     if (role === "store_staff") {
       return [
         {
-          section: "My Store",
+          section: "My store",
           items: [
-            { href: store ? `/equipment/stores/${encodeURIComponent(store)}` : "/", label: "My Store", icon: Store },
+            { href: store ? `/equipment/stores/${encodeURIComponent(store)}` : "/", label: "My store", icon: Store },
             { href: "/activity", label: today > 0 ? `Activity ${today}` : "Activity", icon: Activity },
           ],
         },
@@ -116,7 +116,7 @@ export function MachinesShell({ dev, children }: { dev: boolean; children: React
   }, [loading, role, store, permissions, today]);
 
   // The item a page belongs to: the longest menu address it starts with. A store's
-  // own screens (equipment, items, printers) belong to All Stores.
+  // own screens (equipment, items, printers) belong to All stores.
   const hrefs = nav.flatMap((g) => g.items.map((i) => i.href));
   const current =
     hrefs.filter((href) => pathname === href || pathname.startsWith(`${href}/`)).sort((a, b) => b.length - a.length)[0] ??

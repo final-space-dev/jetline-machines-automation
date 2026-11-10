@@ -3,6 +3,8 @@
 import * as React from "react";
 import { DataGrid, type DataGridColumn } from "@/components/ui/data-grid";
 import { Pagination } from "@/components/ui/pagination";
+import { SURFACE } from "@/lib/ui/ui-tokens";
+import { cn } from "@/lib/ui/utils";
 import { Empty } from "./empty";
 
 export type Column<Row> = DataGridColumn<Row> & {
@@ -79,27 +81,36 @@ export function DataTable<Row>({
       : c,
   );
 
+  const grid = (
+    <DataGrid
+      columns={gridColumns}
+      rows={visible}
+      rowKey={rowKey}
+      onRowClick={onRowClick}
+      rowClassName={rowClassName}
+      chevron={!!onRowClick}
+      // A wide table brings its own card (below), so the part that scrolls is ours and can take the keyboard.
+      card={wide ? false : card}
+      defaultSort={defaultSort}
+      onSortChange={(key, dir) => {
+        setSort({ key, dir: dir === "desc" ? -1 : 1 });
+        setPage(1);
+        onSortChange?.(key, dir === "desc" ? -1 : 1);
+      }}
+      footer={footer}
+      empty={<Empty title={empty} />}
+    />
+  );
+
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="@container min-w-0 overflow-x-auto">
-        <DataGrid
-          columns={gridColumns}
-          rows={visible}
-          rowKey={rowKey}
-          onRowClick={onRowClick}
-          rowClassName={rowClassName}
-          chevron={!!onRowClick}
-          card={card}
-          defaultSort={defaultSort}
-          onSortChange={(key, dir) => {
-            setSort({ key, dir: dir === "desc" ? -1 : 1 });
-            setPage(1);
-            onSortChange?.(key, dir === "desc" ? -1 : 1);
-          }}
-          footer={footer}
-          empty={<Empty title={empty} />}
-        />
-      </div>
+      {wide ? (
+        <div tabIndex={0} role="region" aria-label="Table, scrolls sideways" className={cn(card && SURFACE.shell, "min-w-0 overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-ring/30")}>
+          {grid}
+        </div>
+      ) : (
+        <div className="@container min-w-0 overflow-x-auto">{grid}</div>
+      )}
       {pageCount > 1 && <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />}
     </div>
   );

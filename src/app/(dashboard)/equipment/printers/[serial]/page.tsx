@@ -22,11 +22,13 @@ import { Panel } from "@/components/machines/panel";
 import { ReadField } from "@/components/machines/read-field";
 import { ConditionBadge } from "@/components/machines/status-badge";
 import { addRecentItem } from "@/lib/recently-viewed";
+import { count, num } from "@/lib/numbers";
 import { toast } from "@/lib/toast";
 import { GRID } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { useHotkeys } from "@/lib/use-hotkey";
 import { useRole } from "@/lib/use-role";
+import { formatDate } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -93,31 +95,29 @@ const COUNTER_TYPES: { key: CounterKey; label: string }[] = [
 
 const CONDITION_OPTIONS = ["Good", "Fair", "Poor"].map((c) => ({ value: c, label: c }));
 
-const longDay = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
+const longDay = (iso: string) => formatDate(iso);
 
-const count = (key: CounterKey, label: string): Column<MeterReading> => ({
+const readingColumn = (key: CounterKey, label: string): Column<MeterReading> => ({
   key,
   label,
   align: "right",
-  cell: (r) => <span className={cn(GRID.num, !r[key] && "text-faint")}>{r[key] != null ? (r[key] as number).toLocaleString("en-ZA") : "0"}</span>,
+  // Readings arrive as strings (bigint); count() groups them.
+  cell: (r) => <span className={cn(GRID.num, !num(r[key]) && "text-faint")}>{count(num(r[key]))}</span>,
 });
 
 const READING_COLUMNS: Column<MeterReading>[] = [
   {
     key: "date",
     label: "Date",
-    cell: (r) => <span className="font-medium">{new Date(r.report_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" })}</span>,
+    cell: (r) => <span className="font-medium whitespace-nowrap">{formatDate(r.report_date)}</span>,
   },
-  count("total", "Total"),
-  count("black", "Black"),
-  count("colour", "Colour"),
-  count("a3", "A3"),
-  count("large", "A3 Colour"),
+  readingColumn("total", "Total"),
+  readingColumn("black", "Black"),
+  readingColumn("colour", "Colour"),
+  readingColumn("a3", "A3"),
+  readingColumn("large", "A3 Colour"),
 ];
 
-function num(v: number | null | undefined): number {
-  return typeof v === "number" && isFinite(v) ? v : 0;
-}
 
 export default function PrinterDetailPage() {
   const { serial } = useParams();
@@ -156,7 +156,7 @@ export default function PrinterDetailPage() {
         setFeedback((f) => ({ ...f, ...data.feedback }));
       }
       setHistory(data.history ?? []);
-      const mn = data.mapping?.model_name ?? data.dimensions?.model ?? "Unknown Model";
+      const mn = data.mapping?.model_name ?? data.dimensions?.model ?? "Unknown model";
       const sn2 = data.mapping?.store ?? "";
       addRecentItem({
         type: "printer",
@@ -216,7 +216,7 @@ export default function PrinterDetailPage() {
       const p = num(prev[counter]);
       const delta = Math.max(0, c - p);
       rows.push({
-        label: new Date(curr.report_date).toLocaleDateString("en-ZA", { month: "short" }),
+        label: new Date(curr.report_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short" }),
         date: curr.report_date,
         value: delta,
       });
@@ -245,7 +245,7 @@ export default function PrinterDetailPage() {
   if (loading) return <Loading />;
 
   const storeName = mapping?.store ?? "";
-  const modelName = mapping?.model_name ?? dimensions?.model ?? "Unknown Model";
+  const modelName = mapping?.model_name ?? dimensions?.model ?? "Unknown model";
   const counterLabel = COUNTER_TYPES.find((c) => c.key === counter)?.label ?? "";
 
   return (
@@ -289,7 +289,7 @@ export default function PrinterDetailPage() {
               <ReadField label="Manufacturer" value={dimensions?.manufacturer ?? null} />
               <ReadField label="Colour" value={dimensions?.color_capable ?? null} />
               <ReadField label="Duplex" value={dimensions?.duplex_capable ?? null} />
-              <ReadField label="Last Seen" value={dimensions?.last_seen ? longDay(dimensions.last_seen) : null} />
+              <ReadField label="Last seen" value={dimensions?.last_seen ? longDay(dimensions.last_seen) : null} />
             </div>
           </Panel>
 
@@ -320,19 +320,19 @@ export default function PrinterDetailPage() {
           {isAdmin && (
             <Panel caption="Contract and lifecycle" bodyClassName="flex flex-col gap-4">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Field label="Original Install Date" htmlFor="printer-original" hint="When the machine first entered service.">
+                <Field label="Original install date" htmlFor="printer-original" hint="When the machine first entered service.">
                   <DayField id="printer-original" value={feedback.original_install_date ?? null} onChange={(v) => setF("original_install_date", v)} placeholder="First ever install" />
                 </Field>
-                <Field label="Latest Install Date" htmlFor="printer-install" hint="Install at its current store (may be recent).">
+                <Field label="Latest install date" htmlFor="printer-install" hint="Install at its current store (may be recent).">
                   <DayField id="printer-install" value={feedback.install_date ?? null} onChange={(v) => setF("install_date", v)} placeholder="Install at current store" />
                 </Field>
                 <Field label="Age" hint="Calculated from the original install date.">
                   <p className="py-1.5 font-medium">{ageFromDate(feedback.original_install_date)}</p>
                 </Field>
-                <Field label="Contract End" htmlFor="printer-contract">
+                <Field label="Contract end" htmlFor="printer-contract">
                   <DayField id="printer-contract" value={feedback.contract_end ?? null} onChange={(v) => setF("contract_end", v)} placeholder="Select date" />
                 </Field>
-                <Field label="Last Visit" htmlFor="printer-visit">
+                <Field label="Last visit" htmlFor="printer-visit">
                   <DayField id="printer-visit" value={feedback.last_visit ?? null} onChange={(v) => setF("last_visit", v)} placeholder="Select date" />
                 </Field>
                 <Field label="Supplier">
@@ -345,7 +345,7 @@ export default function PrinterDetailPage() {
                   <AlertDescription>Ended {longDay(feedback.contract_end as string)}</AlertDescription>
                 </Alert>
               )}
-              <Field label="Technician Notes" htmlFor="printer-tech">
+              <Field label="Technician notes" htmlFor="printer-tech">
                 <Textarea
                   id="printer-tech"
                   value={feedback.technician_notes ?? ""}

@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { firstAllowedPath } from "@/lib/permissions";
 
 /**
- * App landing. Admins land on All Stores (the full fleet). Store staff land
+ * App landing. Admins land on All stores (the full fleet). Store staff land
  * straight on their own store. Custom users land on their first granted page.
  */
 export default async function HomePage() {

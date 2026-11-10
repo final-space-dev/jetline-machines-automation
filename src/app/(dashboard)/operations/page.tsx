@@ -17,6 +17,7 @@ import { GRID, TYPE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { useAdminGuard } from "@/lib/use-admin-guard";
 import { useRole } from "@/lib/use-role";
+import { formatDateTime } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ function timeAgo(iso: string | null): string {
 
 function formatTime(iso: string | null): string {
   if (!iso) return "Not available";
-  return new Date(iso).toLocaleString("en-ZA", { dateStyle: "short", timeStyle: "short" });
+  return formatDateTime(iso);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -208,7 +209,7 @@ export default function OperationsPage() {
       <RequestsAttention />
 
       <TileRow>
-        <Tile label="Total Fleet" value={totalMachines} />
+        <Tile label="Total fleet" value={totalMachines} />
         <Tile label="Reporting OK" value={`${reportingPct}%`} tone={reportingPct < 60 ? "danger" : "default"} />
         <Tile label="Unmapped" value={mapping.unmapped} tone={mapping.unmapped >= 10 ? "danger" : "default"} />
         <Tile label="Not in BMS" value={crossRef.notInBms} />
@@ -250,7 +251,7 @@ export default function OperationsPage() {
               <Badge status="success">All machines reporting on time</Badge>
             </div>
           ) : (
-            <div className="max-h-80 overflow-y-auto">
+            <div tabIndex={0} role="region" aria-label="Alerts" className="max-h-80 overflow-y-auto outline-none">
               {alerts.map((a, i) => <AlertRow key={`${a.serial_number}-${i}`} alert={a} />)}
             </div>
           )}

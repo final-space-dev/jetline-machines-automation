@@ -15,11 +15,16 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
 
   return (
     <Page title="Something went wrong">
-      <Empty icon={<AlertTriangle />} title="This screen could not be shown. Try again, or go back to the start." />
-      <div className="flex justify-center gap-2.5">
-        <Button onClick={() => reset()}>Try again</Button>
-        <LinkButton href="/" variant="outline">Back to the start</LinkButton>
-      </div>
+      <Empty
+        icon={<AlertTriangle />}
+        title="This screen could not be shown. Try again, or go back to the start."
+        action={
+          <>
+            <Button onClick={() => reset()}>Try again</Button>
+            <LinkButton href="/" variant="outline">Back to the start</LinkButton>
+          </>
+        }
+      />
     </Page>
   );
 }

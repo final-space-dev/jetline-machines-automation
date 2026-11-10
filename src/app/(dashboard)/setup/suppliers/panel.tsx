@@ -170,7 +170,7 @@ export function SuppliersPanel() {
         columns={columns}
         rows={filtered}
         rowKey={(s) => s.id}
-        empty={query ? "No suppliers match your search" : "No suppliers yet. Add one, or they'll appear here once equipment records reference them."}
+        empty={query ? "No suppliers match your search" : "No suppliers yet"}
       />
 
       <Dialog open={editingId !== null} onOpenChange={(o) => { if (!o) close(); }}>

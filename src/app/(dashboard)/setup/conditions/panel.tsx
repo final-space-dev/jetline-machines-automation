@@ -136,7 +136,7 @@ export function ConditionsPanel() {
     { key: "color", label: "Colour", cell: (r) => <Badge status={STATUS[r.color] ?? "neutral"}>{COLOR_OPTIONS.find((c) => c.value === r.color)?.label ?? r.color}</Badge> },
     {
       key: "keywords",
-      label: "Keyword Triggers",
+      label: "Keyword triggers",
       hideBelow: "sm",
       cell: (r) =>
         r.keywords.length === 0 ? (
@@ -154,7 +154,7 @@ export function ConditionsPanel() {
     <div className="flex w-full max-w-5xl flex-col gap-4">
       <div className="flex justify-end">
         <Button size="sm" onClick={openCreate}>
-          <Plus /> New Condition
+          <Plus /> New condition
         </Button>
       </div>
 
@@ -169,7 +169,7 @@ export function ConditionsPanel() {
       <Dialog open={isCreating} onOpenChange={(o) => { if (!o) closeForm(); }}>
         <DialogContent size="form">
           <DialogHeader>
-            <DialogTitle>{editingId === null ? "New Condition" : "Edit Condition"}</DialogTitle>
+            <DialogTitle>{editingId === null ? "New condition" : "Edit condition"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {error && (
@@ -185,7 +185,7 @@ export function ConditionsPanel() {
                 <Pick id="condition-colour" value={color} onChange={setColor} options={COLOR_OPTIONS} />
               </Field>
             </div>
-            <Field label="Keyword Triggers" htmlFor="condition-keywords">
+            <Field label="Keyword triggers" htmlFor="condition-keywords">
               <Input id="condition-keywords" value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="Comma separated, e.g. broken, jam, error" />
             </Field>
             <DialogFooter>

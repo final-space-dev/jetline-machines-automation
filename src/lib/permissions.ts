@@ -26,11 +26,11 @@ export const EMPTY_PERMISSIONS: Permissions = { nav: [], config: [] };
 
 /** Top-level menu destinations that a Custom user can be granted. */
 export const NAV_CAPS: { key: string; label: string; href: string }[] = [
-  { key: "all-stores", label: "All Stores", href: "/equipment" },
-  { key: "fleet", label: "Fleet Health", href: "/equipment/fleet" },
+  { key: "all-stores", label: "All stores", href: "/equipment" },
+  { key: "fleet", label: "Fleet health", href: "/equipment/fleet" },
   { key: "operations", label: "Dashboard", href: "/operations" },
-  { key: "machine-reports", label: "Machine Reports", href: "/machine-reports" },
-  { key: "replacements", label: "Replacement Requests", href: "/reports/replacements" },
+  { key: "machine-reports", label: "Machine reports", href: "/machine-reports" },
+  { key: "replacements", label: "Replacement requests", href: "/reports/replacements" },
   { key: "activity", label: "Activity", href: "/activity" },
 ];
 
@@ -40,13 +40,13 @@ export const NAV_CAPS: { key: string; label: string; href: string }[] = [
  */
 export const CONFIG_CAPS: { key: string; label: string }[] = [
   { key: "stores", label: "Stores" },
-  { key: "machine-mapping", label: "Machine Mapping" },
+  { key: "machine-mapping", label: "Machine mapping" },
   { key: "import", label: "Import" },
   { key: "models", label: "Models" },
   { key: "suppliers", label: "Suppliers" },
-  { key: "equipment-types", label: "Equipment Types" },
+  { key: "equipment-types", label: "Equipment types" },
   { key: "conditions", label: "Conditions" },
-  { key: "recently-deleted", label: "Recently Deleted" },
+  { key: "recently-deleted", label: "Recently deleted" },
 ];
 
 const NAV_KEYS = new Set(NAV_CAPS.map((c) => c.key));

@@ -19,7 +19,7 @@ import { Field } from "@/components/machines/field";
 import { FilePicker } from "@/components/machines/file-picker";
 import { Loading } from "@/components/machines/loading";
 import { Page } from "@/components/machines/page";
-import { Panel } from "@/components/machines/panel";
+import { Muted, Panel } from "@/components/machines/panel";
 import { Pick } from "@/components/machines/pick";
 import { ConditionBadge, EQUIPMENT_STATUS_LABEL, EquipmentStatusBadge } from "@/components/machines/status-badge";
 import { ALL_XEROX_STORES, EQUIPMENT_STATUSES, EQUIPMENT_TYPES, type EquipmentStatus } from "@/lib/equipment-utils";
@@ -29,6 +29,7 @@ import { SURFACE, TYPE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { useHotkeys } from "@/lib/use-hotkey";
 import { useRole } from "@/lib/use-role";
+import { formatDate } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -431,7 +432,7 @@ export default function EquipmentItemPage() {
                 <Alert variant="warning">
                   <AlertTitle>Service overdue</AlertTitle>
                   <AlertDescription>
-                    Due {new Date(form.next_service_due).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}
+                    Due {formatDate(form.next_service_due)}
                   </AlertDescription>
                 </Alert>
               )}
@@ -447,6 +448,7 @@ export default function EquipmentItemPage() {
                 </FilePicker>
               }
             >
+              {photos.length === 0 && <Muted>No photos yet</Muted>}
               {photos.length > 0 && (
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-6">
                   {photos.map((url, i) => (

@@ -12,9 +12,11 @@ import { Loading } from "@/components/machines/loading";
 import { Page } from "@/components/machines/page";
 import { Muted } from "@/components/machines/panel";
 import { Pick } from "@/components/machines/pick";
+import { count, num, present } from "@/lib/numbers";
 import { GRID } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { useAdminGuard } from "@/lib/use-admin-guard";
+import { formatDate } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -64,33 +66,20 @@ interface SortState { key: string; dir: 1 | -1 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmt(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return n.toLocaleString();
-}
-
-// Postgres bigint values arrive as STRINGS in JSON. Coerce to number so arithmetic
-// (totals via reduce) sums instead of string-concatenating. Returns 0 for
-// null/undefined/non-numeric.
-function num(v: unknown): number {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-// True when a daily/period value is genuinely present (a reading happened),
-// distinguishing "read, 0 volume" from "no reading" (undefined key).
-function present(v: unknown): boolean {
-  return v !== null && v !== undefined;
-}
-
 function fmtMonth(yyyymm: string): string {
   const [y, m] = yyyymm.split("-");
-  return new Date(Number(y), Number(m) - 1, 1)
-    .toLocaleString("default", { month: "short" }) + " " + y.slice(2);
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-ZA", { month: "short", year: "numeric" });
 }
 
-function fmtDate(iso: string | null): string {
+/** A day column's heading: "9 Nov". */
+function fmtDayHeading(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-ZA", { day: "2-digit", month: "short" });
+  return new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+}
+
+/** A date in a cell: the system's one way of writing a day. */
+function fmtDate(iso: string | null): string {
+  return iso ? formatDate(iso) : "—";
 }
 
 // ISO-8601 week number (weeks Mon–Sun; week 1 contains the year's first Thursday).
@@ -105,17 +94,12 @@ function isoWeekNum(d: Date): number {
 }
 
 // Weekly column header: the key is the week's Sunday end-date (YYYY-MM-DD).
-// Rendered as "Wk 32 · 9 Aug 26".
+// Rendered as "Wk 32 · 9 Aug 2026".
 function fmtWeek(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   if (Number.isNaN(d.getTime())) return iso;
-  const end = d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "2-digit" });
+  const end = formatDate(d);
   return `Wk ${isoWeekNum(d)} · ${end}`;
-}
-
-function fmtInstallDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function bmsAge(iso: string | null): string {
@@ -189,9 +173,9 @@ function TotalsRow({ totals, grand }: { totals: number[]; grand: number }) {
     <tr className={cn(GRID.band, "border-t border-border font-semibold")}>
       <td colSpan={5} className={GRID.td}>Totals</td>
       {totals.map((t, i) => (
-        <td key={i} className={cn(GRID.td, GRID.num)}>{fmt(t)}</td>
+        <td key={i} className={cn(GRID.td, GRID.num)}>{count(t)}</td>
       ))}
-      <td className={cn(GRID.td, GRID.num)}>{fmt(grand)}</td>
+      <td className={cn(GRID.td, GRID.num)}>{count(grand)}</td>
     </tr>
   );
 }
@@ -207,11 +191,11 @@ function FilterBar({ allRows, filters, setFilters, onExport }: {
   const options = (all: string, values: string[]) => [{ value: "all", label: all }, ...values.map((v) => ({ value: v, label: v }))];
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Input placeholder="Search serial, model, store, group" aria-label="Search" value={filters.search} onChange={(e) => set("search")(e.target.value)} className="w-full sm:w-64" />
-      <Pick aria-label="Store" className="w-40" value={filters.store} onChange={set("store")} options={options("All stores", uniq("store"))} />
-      <Pick aria-label="Group" className="w-40" value={filters.group} onChange={set("group")} options={options("All groups", uniq("company_group"))} />
-      <Pick aria-label="Type" className="w-40" value={filters.type} onChange={set("type")} options={options("All types", uniq("printer_type"))} />
-      <Pick aria-label="Model" className="w-48" value={filters.model} onChange={set("model")} options={options("All models", uniq("model_name"))} />
+      <Input placeholder="Search serial, model, store, group" aria-label="Search" value={filters.search} onChange={(e) => set("search")(e.target.value)} className="w-full sm:w-60" />
+      <Pick aria-label="Store" className="w-36" value={filters.store} onChange={set("store")} options={options("All stores", uniq("store"))} />
+      <Pick aria-label="Group" className="w-36" value={filters.group} onChange={set("group")} options={options("All groups", uniq("company_group"))} />
+      <Pick aria-label="Type" className="w-36" value={filters.type} onChange={set("type")} options={options("All types", uniq("printer_type"))} />
+      <Pick aria-label="Model" className="w-40" value={filters.model} onChange={set("model")} options={options("All models", uniq("model_name"))} />
       <Button variant="outline" size="sm" className="sm:ml-auto" onClick={onExport}>
         <Download /> Export CSV
       </Button>
@@ -238,18 +222,18 @@ type SummaryShown = SummaryRow & { bw_total_reading: number };
 
 const SUMMARY_COLUMNS: Column<SummaryShown>[] = [
   ...baseColumns<SummaryShown>(),
-  { key: "max_daily_vol", label: "Max Daily", align: "right", sortValue: (r) => num(r.max_daily_vol), cell: (r) => figure(fmt(r.max_daily_vol)) },
-  { key: "avg_daily_vol", label: "Avg Daily", align: "right", sortValue: (r) => num(r.avg_daily_vol), cell: (r) => figure(fmt(r.avg_daily_vol)) },
-  { key: "reading_days", label: "Active Days", align: "right", sortValue: (r) => num(r.reading_days), cell: (r) => figure(fmt(r.reading_days)) },
-  { key: "last_reading", label: "Last Read", sortValue: (r) => r.last_reading ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtDate(r.last_reading)}</span> },
-  { key: "black", label: "B&W Reading", align: "right", sortValue: (r) => num(r.latest_balances?.black_impressions), cell: (r) => figure(fmt(r.latest_balances?.black_impressions)) },
-  { key: "colour", label: "Colour Reading", align: "right", sortValue: (r) => num(r.latest_balances?.color_impressions), cell: (r) => figure(fmt(r.latest_balances?.color_impressions)) },
+  { key: "max_daily_vol", label: "Max daily", align: "right", sortValue: (r) => num(r.max_daily_vol), cell: (r) => figure(count(r.max_daily_vol)) },
+  { key: "avg_daily_vol", label: "Avg daily", align: "right", sortValue: (r) => num(r.avg_daily_vol), cell: (r) => figure(count(r.avg_daily_vol)) },
+  { key: "reading_days", label: "Active days", align: "right", sortValue: (r) => num(r.reading_days), cell: (r) => figure(count(r.reading_days)) },
+  { key: "last_reading", label: "Last read", sortValue: (r) => r.last_reading ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtDate(r.last_reading)}</span> },
+  { key: "black", label: "B&W reading", align: "right", sortValue: (r) => num(r.latest_balances?.black_impressions), cell: (r) => figure(count(r.latest_balances?.black_impressions)) },
+  { key: "colour", label: "Colour reading", align: "right", sortValue: (r) => num(r.latest_balances?.color_impressions), cell: (r) => figure(count(r.latest_balances?.color_impressions)) },
   {
-    key: "bw_total_reading", label: "Total Reading", align: "right", sortValue: (r) => r.bw_total_reading,
-    cell: (r) => figure(r.latest_balances?.black_impressions != null || r.latest_balances?.color_impressions != null ? fmt(r.bw_total_reading) : "—"),
+    key: "bw_total_reading", label: "Total reading", align: "right", sortValue: (r) => r.bw_total_reading,
+    cell: (r) => figure(r.latest_balances?.black_impressions != null || r.latest_balances?.color_impressions != null ? count(r.bw_total_reading) : "—"),
   },
-  { key: "bms_installed_date", label: "BMS Install Date", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</span> },
-  { key: "bms_age", label: "BMS Age", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{bmsAge(r.bms_installed_date)}</span> },
+  { key: "bms_installed_date", label: "BMS install date", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtDate(r.bms_installed_date)}</span> },
+  { key: "bms_age", label: "BMS age", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{bmsAge(r.bms_installed_date)}</span> },
   { key: "age", label: "Age", sortValue: (r) => r.age ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.age)}</span> },
   { key: "condition_notes", label: "Condition", sortValue: (r) => r.condition_notes ?? "", cell: (r) => <span className="block max-w-72 truncate" title={r.condition_notes ?? ""}>{text(r.condition_notes)}</span> },
 ];
@@ -266,7 +250,7 @@ function SummaryTab({ rows, filters, setFilters }: {
 
   const exportRows = () =>
     exportCsv("summary.csv",
-      ["Serial","Model","Store","Group","Type","Max Daily","Avg Daily","Active Days","Last Reading","B&W Reading","Colour Reading","Total Reading","BMS Install Date","BMS Age","Age","Condition"],
+      ["Serial","Model","Store","Group","Type","Max daily","Avg daily","Active days","Last reading","B&W reading","Colour reading","Total reading","BMS install date","BMS age","Age","Condition"],
       sortRows(shown, SUMMARY_COLUMNS, sort).map((r) => {
         const bw = r.latest_balances?.black_impressions ?? null;
         const col = r.latest_balances?.color_impressions ?? null;
@@ -317,9 +301,9 @@ function PeriodTab<T extends BaseRow & { period_total: number }>({ rows, periods
         align: "right",
         // num() coercion: volumes are bigint strings from Postgres.
         sortValue: (r) => num(volumes(r)[p]),
-        cell: (r) => figure(blankWhenMissing && !present(volumes(r)[p]) ? "—" : fmt(num(volumes(r)[p]))),
+        cell: (r) => figure(blankWhenMissing && !present(volumes(r)[p]) ? "—" : count(num(volumes(r)[p]))),
       })),
-      { key: "period_total", label: "Total", align: "right", sortValue: (r) => num(r.period_total), cell: (r) => figure(fmt(num(r.period_total)), true) },
+      { key: "period_total", label: "Total", align: "right", sortValue: (r) => num(r.period_total), cell: (r) => figure(count(num(r.period_total)), true) },
     ],
     [periods, header, volumes, blankWhenMissing],
   );
@@ -361,8 +345,8 @@ const STATUS_COLUMNS: Column<StatusRow>[] = (() => {
   const [serial, model, store, group, type] = baseColumns<StatusRow>();
   return [
     store, model, serial, group, type,
-    { key: "bms_installed_date", label: "BMS Install Date", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtInstallDate(r.bms_installed_date)}</span> },
-    { key: "bms_age", label: "BMS Age", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{bmsAge(r.bms_installed_date)}</span> },
+    { key: "bms_installed_date", label: "BMS install date", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{fmtDate(r.bms_installed_date)}</span> },
+    { key: "bms_age", label: "BMS age", sortValue: (r) => r.bms_installed_date ?? "", cell: (r) => <span className="whitespace-nowrap">{bmsAge(r.bms_installed_date)}</span> },
     { key: "age", label: "Age", sortValue: (r) => r.age ?? "", cell: (r) => <span className="whitespace-nowrap">{text(r.age)}</span> },
     { key: "condition_notes", label: "Condition", sortValue: (r) => r.condition_notes ?? "", cell: (r) => <span className="block max-w-80 truncate" title={r.condition_notes ?? ""}>{text(r.condition_notes)}</span> },
   ];
@@ -376,7 +360,7 @@ function StatusTab({ rows, filters, setFilters }: {
 
   const exportRows = () =>
     exportCsv("machine-status.csv",
-      ["Store","Model","Serial","Group","Type","BMS Install Date","BMS Age","Age","Condition"],
+      ["Store","Model","Serial","Group","Type","BMS install date","BMS age","Age","Condition"],
       sortRows(visible, STATUS_COLUMNS, sort).map((r) => [
         r.store ?? "", r.model_name, r.serial_number,
         r.company_group ?? "", r.printer_type ?? "",
@@ -398,11 +382,11 @@ function StatusTab({ rows, filters, setFilters }: {
 
 const TABS: { key: TabType; label: string }[] = [
   { key: "summary",  label: "Summary" },
-  { key: "mtd",     label: "Month to Date" },
+  { key: "mtd",     label: "Month to date" },
   { key: "weekly",  label: "Weekly" },
   { key: "monthly", label: "Monthly (6m)" },
-  { key: "ytd",     label: "Year to Date" },
-  { key: "status",  label: "Machine Status" },
+  { key: "ytd",     label: "Year to date" },
+  { key: "status",  label: "Machine status" },
 ];
 
 interface ApiPayload {
@@ -450,14 +434,14 @@ export default function MachineReportsPage() {
   // Block non-admins from the render path (they're being redirected to their store).
   if (guardLoading || !allowed) {
     return (
-      <Page title="Machine Reports">
+      <Page title="Machine reports">
         <Loading />
       </Page>
     );
   }
 
   return (
-    <Page title="Machine Reports">
+    <Page title="Machine reports">
       <Tabs value={activeTab} onValueChange={switchTab}>
         <TabStrip>
           {TABS.map((t) => (
@@ -475,10 +459,10 @@ export default function MachineReportsPage() {
         <>
           {activeTab === "summary" && <SummaryTab rows={current.rows as SummaryRow[]} filters={filters} setFilters={setFilters} />}
           {activeTab === "mtd" && (
-            <PeriodTab rows={current.rows as MtdRow[]} periods={current.dates ?? []} volumes={dailyVolumes} header={fmtDate} exportName="mtd" footnote={(n) => `${n} days with readings`} blankWhenMissing filters={filters} setFilters={setFilters} />
+            <PeriodTab rows={current.rows as MtdRow[]} periods={current.dates ?? []} volumes={dailyVolumes} header={fmtDayHeading} exportName="mtd" footnote={(n) => `${n} days with readings`} blankWhenMissing filters={filters} setFilters={setFilters} />
           )}
           {activeTab === "weekly" && (
-            <PeriodTab rows={current.rows as MonthlyRow[]} periods={current.months ?? []} volumes={monthlyVolumes} header={fmtWeek} exportName="weekly" footnote={(n) => `${n} months`} filters={filters} setFilters={setFilters} />
+            <PeriodTab rows={current.rows as MonthlyRow[]} periods={current.months ?? []} volumes={monthlyVolumes} header={fmtWeek} exportName="weekly" footnote={(n) => `${n} weeks`} filters={filters} setFilters={setFilters} />
           )}
           {activeTab === "monthly" && (
             <PeriodTab rows={current.rows as MonthlyRow[]} periods={current.months ?? []} volumes={monthlyVolumes} header={fmtMonth} exportName="monthly" footnote={(n) => `${n} months`} filters={filters} setFilters={setFilters} />

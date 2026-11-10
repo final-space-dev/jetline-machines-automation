@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Phase 18: Print Volumes section for the store detail page.
+ * Phase 18: Print volumes section for the store detail page.
  * A bar chart of the last 6 months (Black / Colour / A3 / A3 Colour),
  * this month against last month as a percentage, the number of active
  * printers, and a filter to one printer.
@@ -106,7 +106,7 @@ export function PrintSection({ store }: { store: string }) {
 
   return (
     <Panel
-      caption="Print Volumes"
+      caption="Print volumes"
       right={
         serials.length > 0 && (
           <Pick

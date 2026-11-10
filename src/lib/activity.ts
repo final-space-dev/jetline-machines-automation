@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/utils";
+
 export interface ActivityEntry {
   id: number;
   item_type: "equipment" | "printer";
@@ -24,5 +26,5 @@ export function relativeTime(iso: string): string {
   if (day < 7) return `${day}d ago`;
   const wk = Math.round(day / 7);
   if (wk < 5) return `${wk}w ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }

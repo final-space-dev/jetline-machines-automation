@@ -53,7 +53,7 @@ const STORE_OPTIONS = [...new Set(STORE_GROUPS.map((s) => s.store))]
   .map((s) => ({ value: s, label: s }));
 
 // Human-readable summary of a custom user's grant for the table (e.g.
-// "Machine Reports · Machine Mapping"). Falls back to "No access" when empty.
+// "Machine reports · Machine mapping"). Falls back to "No access" when empty.
 function grantSummary(permissions: Permissions | null): string {
   const p = normalisePermissions(permissions);
   const labels = [
@@ -146,7 +146,7 @@ export function UsersPanel() {
     },
     {
       key: "store",
-      label: "Store",
+      label: "Store or access",
       hideBelow: "md",
       sortValue: (u) => u.store ?? "",
       cell: (u) => (u.role === "custom" ? <Muted>{grantSummary(u.permissions)}</Muted> : u.store ?? <Muted>Global</Muted>),
@@ -164,7 +164,7 @@ export function UsersPanel() {
         {custom > 0 && <Badge status="neutral">{custom} custom</Badge>}
         {isAdmin && (
           <Button size="sm" onClick={() => setEditing("new")}>
-            <Plus /> Add User
+            <Plus /> Add user
           </Button>
         )}
       </div>
@@ -233,8 +233,11 @@ function UserModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+  // A change to the form answers the last refusal, so its message goes.
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setError(null);
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   function toggleCap(kind: "nav" | "config", key: string) {
     setForm((prev) => {

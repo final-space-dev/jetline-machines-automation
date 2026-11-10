@@ -2,6 +2,16 @@ import { useEffect } from "react";
 
 type Modifier = "cmd" | "ctrl" | "shift" | "alt";
 
+/**
+ * An open dialog, list or popover owns Escape: it closes itself, and a page's
+ * own Escape shortcut (leave the page) must wait. Without this, Escape on a
+ * confirm or a calendar also threw the person off the page, edits and all.
+ */
+export function overlayOpen(doc: Pick<Document, "querySelector"> | undefined = typeof document === "undefined" ? undefined : document): boolean {
+  if (!doc) return false;
+  return doc.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"], [data-slot="popover-content"]') !== null;
+}
+
 interface HotkeyOptions {
   key: string;
   modifiers?: Modifier[];
@@ -14,6 +24,7 @@ export function useHotkey({ key, modifiers = [], onTrigger, enabled = true }: Ho
     if (!enabled) return;
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
+      if (key === "Escape" && (e.defaultPrevented || overlayOpen())) return;
       // Don't fire when typing in inputs/textareas unless it's an escape
       if (key !== "Escape" && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
 
@@ -46,6 +57,7 @@ export function useHotkeys(bindings: HotkeyOptions[]) {
       const handler = (e: KeyboardEvent) => {
         if (!b.enabled && b.enabled !== undefined) return;
         const target = e.target as HTMLElement;
+        if (b.key === "Escape" && (e.defaultPrevented || overlayOpen())) return;
         if (b.key !== "Escape" && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
 
         const mods = b.modifiers ?? [];

@@ -43,14 +43,15 @@ export function Page({
         <>
           {actions && <div className="flex items-center gap-2.5 max-sm:hidden">{actions}</div>}
           <span className="max-lg:hidden print:hidden">
-            <NotificationBell />
+            <NotificationBell size="default" />
           </span>
         </>
       }
       toolbar={toolbar}
       contextBar={contextBar ?? (crumbs ? <Breadcrumbs variant="header" items={crumbs} className="mt-2" /> : undefined)}
     >
-      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-5 pb-10 *:shrink-0 sm:px-7", className)}>
+      {/* The working area scrolls, so the keyboard must be able to reach it: tabIndex 0. */}
+      <div tabIndex={0} role="region" aria-label="Page content" className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-5 pb-10 outline-none *:shrink-0 sm:px-7", className)}>
         {/* On a phone the header keeps the title; the actions come first in the working area. */}
         {actions && <div className="flex flex-wrap items-center gap-2 sm:hidden print:hidden">{actions}</div>}
         {children}

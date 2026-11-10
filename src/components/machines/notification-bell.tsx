@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { STATUS, TYPE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
+import { formatDate } from "@/lib/utils";
 
 interface DbNotification {
   id: number;
@@ -32,7 +33,7 @@ function relativeTime(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-ZA");
+  return formatDate(iso);
 }
 
 const KIND: Record<string, [LucideIcon, string]> = {
@@ -121,7 +122,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 }
 
 /** The bell: unread count on the button, the latest notices in a list; opening one marks it read and goes to it. */
-export function NotificationBell() {
+export function NotificationBell({ size = "sm" }: { size?: "sm" | "default" }) {
   const router = useRouter();
   const inbox = React.useContext(InboxContext);
   const [open, setOpen] = React.useState(false);
@@ -130,7 +131,7 @@ export function NotificationBell() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button variant="outline" size="sm" aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} />}>
+      <PopoverTrigger render={<Button variant="outline" size={size} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} />}>
         <Bell />
         {unread > 0 && <Badge status="danger">{unread > 99 ? "99+" : unread}</Badge>}
       </PopoverTrigger>

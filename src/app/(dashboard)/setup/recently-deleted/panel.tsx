@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@/components/machines/data-table";
 import { Loading } from "@/components/machines/loading";
 import { Muted } from "@/components/machines/panel";
 import { useRole } from "@/lib/use-role";
+import { formatDateTime } from "@/lib/utils";
 
 /**
  * Recently deleted equipment — admin recovery for soft-deleted items. Lists the
@@ -26,10 +27,7 @@ interface DeletedItem {
 
 function fmt(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) +
-      " · " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(d.getTime()) ? iso : formatDateTime(d);
 }
 
 export function RecentlyDeletedPanel() {
@@ -70,7 +68,7 @@ export function RecentlyDeletedPanel() {
 
   const columns: Column<DeletedItem>[] = [
     { key: "type", label: "Type", sortValue: (it) => it.machine_type ?? "", cell: (it) => <span className="font-medium">{it.machine_type ?? "—"}</span> },
-    { key: "model", label: "Make / Model", hideBelow: "sm", sortValue: (it) => it.make_model ?? "", cell: (it) => it.make_model ?? <Muted>Not set</Muted> },
+    { key: "model", label: "Make / model", hideBelow: "sm", sortValue: (it) => it.make_model ?? "", cell: (it) => it.make_model ?? <Muted>Not set</Muted> },
     { key: "serial", label: "Serial", hideBelow: "md", cell: (it) => <span className="tabular-nums">{it.serial ?? "—"}</span> },
     { key: "store", label: "Store", sortValue: (it) => it.store ?? "", cell: (it) => it.store ?? "—" },
     { key: "deleted", label: "Deleted", hideBelow: "sm", sortValue: (it) => new Date(it.deleted_at).getTime() || 0, cell: (it) => <Muted className="whitespace-nowrap">{fmt(it.deleted_at)}</Muted> },

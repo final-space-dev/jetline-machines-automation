@@ -24,7 +24,7 @@ import { useRole } from "@/lib/use-role";
  *
  * The active toggle drives the group-by-group audit workflow: switch a group's
  * stores off, review only the groups you've captured, then move on. Inactive
- * stores are hidden from the main views (All Stores / reports) but stay editable
+ * stores are hidden from the main views (All stores / reports) but stay editable
  * here.
  *
  * Data:
@@ -244,8 +244,8 @@ export function StoresPanel() {
 
   const columns: Column<StoreRow & { holding: string }>[] = [
     { key: "store", label: "Store", sortValue: (r) => r.store, cell: (r) => <span className="font-medium">{r.store}</span> },
-    { key: "holding", label: "Holding Group", hideBelow: "md", sortValue: (r) => r.holding, cell: (r) => (r.holdingGroup ? r.holding : unassigned) },
-    { key: "storeGroup", label: "Store Group", hideBelow: "sm", sortValue: (r) => r.storeGroup ?? "", cell: (r) => r.storeGroup ?? unassigned },
+    { key: "holding", label: "Holding group", hideBelow: "md", sortValue: (r) => r.holding, cell: (r) => (r.holdingGroup ? r.holding : unassigned) },
+    { key: "storeGroup", label: "Store group", hideBelow: "sm", sortValue: (r) => r.storeGroup ?? "", cell: (r) => r.storeGroup ?? unassigned },
     { key: "group", label: "Group", hideBelow: "lg", sortValue: (r) => r.group ?? "", cell: (r) => r.group ?? unassigned },
     { key: "company", label: "Connection", hideBelow: "md", sortValue: (r) => r.company ?? "", cell: (r) => r.company ?? <Muted>—</Muted> },
     {
@@ -309,16 +309,16 @@ export function StoresPanel() {
                 </Alert>
               )}
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Holding Group" htmlFor="store-holding">
+                <Field label="Holding group" htmlFor="store-holding">
                   <Pick id="store-holding" value={form.holdingGroup} onChange={(v) => setForm((f) => (f ? { ...f, holdingGroup: v } : f))} options={holdingOptions} placeholder="Set holding group" disabled={!isAdmin} />
                 </Field>
-                <Field label="Store Group" htmlFor="store-group">
+                <Field label="Store group" htmlFor="store-group">
                   <Pick id="store-group" value={form.storeGroup} onChange={(v) => setForm((f) => (f ? { ...f, storeGroup: v } : f))} options={storeGroupOptions} placeholder="Set store group" disabled={!isAdmin} />
                 </Field>
                 <Field label="Group" htmlFor="store-subgroup">
                   <Pick id="store-subgroup" value={form.group} onChange={(v) => setForm((f) => (f ? { ...f, group: v } : f))} options={groupOptions} placeholder="Set group" disabled={!isAdmin} />
                 </Field>
-                <Field label="BMS Connection" htmlFor="store-company">
+                <Field label="BMS connection" htmlFor="store-company">
                   <Pick id="store-company" value={form.company} onChange={(v) => setForm((f) => (f ? { ...f, company: v } : f))} options={companyOptions} placeholder="No connection" disabled={!isAdmin} />
                 </Field>
               </div>

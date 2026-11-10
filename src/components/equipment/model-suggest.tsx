@@ -32,7 +32,7 @@ interface ModelSuggestProps {
 export function ModelSuggest({
   value,
   onChange,
-  placeholder = "Make / Model",
+  placeholder = "Make / model",
   className,
   equipmentType,
   source = "models",
@@ -92,7 +92,7 @@ export function ModelSuggest({
       onQueryChange={setQuery}
       placeholder={placeholder}
       searchPlaceholder={`Search or add a ${noun}`}
-      className={className ?? "h-9 w-full"}
+      className={className ?? "h-8 w-full"}
     />
   );
 }

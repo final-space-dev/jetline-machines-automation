@@ -121,7 +121,7 @@ export function EquipmentTypesPanel() {
     <div className="flex w-full max-w-4xl flex-col gap-4">
       <div className="flex justify-end">
         <Button size="sm" onClick={openCreate}>
-          <Plus /> New Type
+          <Plus /> New type
         </Button>
       </div>
 
@@ -136,7 +136,7 @@ export function EquipmentTypesPanel() {
       <Dialog open={isCreating} onOpenChange={(o) => { if (!o) closeForm(); }}>
         <DialogContent size="form">
           <DialogHeader>
-            <DialogTitle>{editingId === null ? "New Equipment Type" : "Edit Equipment Type"}</DialogTitle>
+            <DialogTitle>{editingId === null ? "New equipment type" : "Edit equipment type"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {error && (

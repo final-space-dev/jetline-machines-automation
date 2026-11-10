@@ -28,19 +28,19 @@ type TabKey =
   | "users"
   | "recently-deleted";
 
-// Stores is first — a store is the cornerstone CRM entity. Machine Mapping is an
+// Stores is first — a store is the cornerstone CRM entity. Machine mapping is an
 // admin data-capture exercise that lives here (out of the main menu); its tab links
 // to the full-page tool rather than embedding it.
 const TABS: { key: TabKey; label: string }[] = [
   { key: "stores", label: "Stores" },
-  { key: "machine-mapping", label: "Machine Mapping" },
+  { key: "machine-mapping", label: "Machine mapping" },
   { key: "import", label: "Import" },
   { key: "models", label: "Models" },
   { key: "suppliers", label: "Suppliers" },
-  { key: "equipment-types", label: "Equipment Types" },
+  { key: "equipment-types", label: "Equipment types" },
   { key: "conditions", label: "Conditions" },
   { key: "users", label: "Users" },
-  { key: "recently-deleted", label: "Recently Deleted" },
+  { key: "recently-deleted", label: "Recently deleted" },
 ];
 
 const DEFAULT_TAB: TabKey = "stores";

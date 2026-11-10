@@ -70,7 +70,7 @@ const UNGROUPED_SUB = "Ungrouped";
 
 const STORE_NAMES = ["Alberton","Bedfordview","Benoni","Blackheath","Boksburg","Brooklyn","Bryanston","Centurion","Century City","Constantia","Die Bult","Durban","Fixtrade","Fourways","Fox Street","Foxstreet","Gardens","George","Greenpoint","Hillcrest","Hydepark","Illovo","Klerksdorp","Kyalami","Loftus","Melrose","Menlyn","Midrand","Mmabatho","Modderfontein","Montana","Nelspruit","Parktown","Pietermaritzburg","Polokwane","Potchefstroom","Randburg","Rivonia","Rosebank","Rustenburg","Sandown","Stellenbosch","Sunninghill","Tygervalley","Umhlanga","Waterfront","Wits","Woodmead"];
 
-// ─── Add Equipment dialog ─────────────────────────────────────────────────────
+// ─── Add equipment dialog ─────────────────────────────────────────────────────
 
 function AddEquipmentDialog({
   open,
@@ -93,11 +93,14 @@ function AddEquipmentDialog({
     status: "active",
   });
   const [saving, setSaving] = useState(false);
+  // Shown on the fields once a save has been refused for them.
+  const [tried, setTried] = useState(false);
 
   const set = (k: keyof EquipmentItem, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {
     if (!form.store || !form.machine_type) {
+      setTried(true);
       toast.error("Store and equipment type are required");
       return;
     }
@@ -123,25 +126,25 @@ function AddEquipmentDialog({
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent size="form">
         <DialogHeader>
-          <DialogTitle>Add Equipment</DialogTitle>
+          <DialogTitle>Add equipment</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Store *" htmlFor="add-store">
+            <Field label="Store *" htmlFor="add-store" error={tried && !form.store ? "Choose a store" : null}>
               <Pick id="add-store" value={form.store} onChange={(v) => set("store", v)} placeholder="Select store" options={STORE_NAMES.map((s) => ({ value: s, label: s }))} />
             </Field>
-            <Field label="Type *" htmlFor="add-type">
+            <Field label="Type *" htmlFor="add-type" error={tried && !form.machine_type ? "Choose a type" : null}>
               <Pick id="add-type" value={form.machine_type} onChange={(v) => set("machine_type", v)} placeholder="Select type" options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: t }))} />
             </Field>
           </div>
-          <Field label="Make / Model" htmlFor="add-model">
+          <Field label="Make / model" htmlFor="add-model">
             <Input id="add-model" value={form.make_model} onChange={(e) => set("make_model", e.target.value)} placeholder="e.g. Polar Mohr 76EM" />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Serial Number" htmlFor="add-serial">
+            <Field label="Serial number" htmlFor="add-serial">
               <Input id="add-serial" value={form.serial} onChange={(e) => set("serial", e.target.value)} placeholder="Serial" />
             </Field>
-            <Field label="Located At" htmlFor="add-located">
+            <Field label="Located at" htmlFor="add-located">
               <Input id="add-located" value={form.located_at} onChange={(e) => set("located_at", e.target.value)} placeholder="If different from store" />
             </Field>
           </div>
@@ -160,7 +163,7 @@ function AddEquipmentDialog({
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={save} disabled={saving}>
             {saving ? <Spinner /> : <Plus />}
-            Add Equipment
+            Add equipment
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -202,8 +205,8 @@ interface GroupBucket {
 }
 
 const VIEW_OPTIONS: { value: GroupView; label: string }[] = [
-  { value: "storeGroup", label: "By Store Group" },
-  { value: "mainGroup", label: "By Main Group" },
+  { value: "storeGroup", label: "By Store group" },
+  { value: "mainGroup", label: "By main group" },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -330,9 +333,9 @@ export default function EquipmentCRMPage() {
     };
 
     for (const s of filtered) {
-      // By Store Group buckets on storeGroup ALONE (holding group is irrelevant
+      // By Store group buckets on storeGroup ALONE (holding group is irrelevant
       // here: same-named store groups across holdings merge into one column).
-      // By Main Group buckets on mainGroup.
+      // By main group buckets on mainGroup.
       const key = view === "mainGroup" ? s.mainGroup : s.storeGroup;
       const b = ensure(key, key);
       b.stores.push(s);
@@ -379,16 +382,16 @@ export default function EquipmentCRMPage() {
             <Download /> Export CSV
           </LinkButton>
           <Button onClick={() => { setModalKey((k) => k + 1); setShowModal(true); }}>
-            <Plus /> Add Equipment
+            <Plus /> Add equipment
           </Button>
         </>
       }
     >
       <TileRow>
-        <Tile label="Total Items" value={totalItems} />
-        <Tile label="Stores with Data" value={storesWithData} />
-        <Tile label="Needs Attention" value={needingAttention} tone={needingAttention > 0 ? "danger" : "default"} />
-        <Tile label="Poor Condition" value={totalPoor} tone={totalPoor > 0 ? "danger" : "default"} />
+        <Tile label="Total items" value={totalItems} />
+        <Tile label="Stores with data" value={storesWithData} />
+        <Tile label="Needs attention" value={needingAttention} tone={needingAttention > 0 ? "danger" : "default"} />
+        <Tile label="Poor condition" value={totalPoor} tone={totalPoor > 0 ? "danger" : "default"} />
       </TileRow>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -404,12 +407,13 @@ export default function EquipmentCRMPage() {
       ) : filtered.length === 0 ? (
         <Empty title="No stores match your search" />
       ) : (
-        // Columns of groups; the stores stack under each collapsible heading.
-        <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        // Columns of groups, packed like a page of newsprint so a short group leaves no hole;
+        // the stores stack under each collapsible heading.
+        <div className="columns-1 gap-3 sm:columns-2 xl:columns-3 2xl:columns-4">
           {buckets.map((b) => {
             const isCollapsed = !!collapsed[b.key];
             return (
-              <section key={b.key} className={cn(SURFACE.card, "flex min-w-0 flex-col p-2")}>
+              <section key={b.key} className={cn(SURFACE.card, "mb-3 flex min-w-0 break-inside-avoid flex-col p-2")}>
                 <Button
                   variant="ghost"
                   className="h-auto w-full justify-start gap-2 px-2 py-2"

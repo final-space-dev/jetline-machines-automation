@@ -2,15 +2,12 @@
 
 import { useSession } from "next-auth/react";
 import { Avatar } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { PasswordInput } from "@/components/ui/password-input";
-import { Field } from "@/components/machines/field";
 import { Page } from "@/components/machines/page";
 import { Muted, Panel, SectionHeading } from "@/components/machines/panel";
 
-// Account page. Shows the signed-in user and the change-password form. The
-// submit is wired together with its backend endpoint in a later phase, so the
-// fields stay disabled here rather than pretending to change a password.
+// Account page. Shows the signed-in user. There is no endpoint for changing
+// one's own password yet, so the page says who can set one instead of showing
+// a form that does nothing.
 export default function AccountPage() {
   // useSession() can return undefined during static prerender (no SessionProvider
   // in the tree at build time), so guard the same way lib/use-role.ts does.
@@ -31,23 +28,9 @@ export default function AccountPage() {
             </div>
           </div>
         </Panel>
-        <Panel caption="Change password">
-          <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
-            <Field label="Current password" htmlFor="acc-current">
-              <PasswordInput id="acc-current" autoComplete="current-password" disabled />
-            </Field>
-            <Field label="New password" htmlFor="acc-new">
-              <PasswordInput id="acc-new" autoComplete="new-password" disabled />
-            </Field>
-            <Field label="Confirm new password" htmlFor="acc-confirm" hint="Password changes will be enabled in an upcoming release.">
-              <PasswordInput id="acc-confirm" autoComplete="new-password" disabled />
-            </Field>
-            <div>
-              <Button type="submit" disabled>
-                Update password
-              </Button>
-            </div>
-          </form>
+        <Panel caption="Password">
+          {/* A password is set by an administrator; there is no self-service change yet. */}
+          <Muted>To change your password, ask an administrator to set a new one for you under Config, Users.</Muted>
         </Panel>
       </div>
     </Page>

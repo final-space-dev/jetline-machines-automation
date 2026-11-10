@@ -17,6 +17,7 @@ import { Tile, TileRow } from "@/components/machines/tile";
 import { GRID, TYPE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
 import { useAdminGuard } from "@/lib/use-admin-guard";
+import { formatDate } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ function fmtDate(v: string | null | undefined): string {
   if (!v) return "";
   const d = new Date(v);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
+  return formatDate(d);
 }
 
 const time = (v: string | null | undefined) => (v ? new Date(v).getTime() || 0 : 0);
@@ -152,9 +153,9 @@ const CONTRACT_COLUMNS: Column<PrinterAttention>[] = [
   { key: "serial", label: "Serial", sortValue: (r) => r.serial, cell: (r) => <TextLink href={`/equipment/printers/${encodeURIComponent(r.serial)}`}>{r.serial}</TextLink> },
   { key: "store", label: "Store", sortValue: (r) => r.store ?? "", cell: (r) => (r.store ? <TextLink quiet href={`/equipment/stores/${encodeURIComponent(r.store)}`}>{r.store}</TextLink> : "") },
   { key: "model", label: "Model", hideBelow: "md", sortValue: (r) => r.model ?? "", cell: (r) => r.model ?? "" },
-  { key: "contract_end", label: "Contract End", hideBelow: "sm", sortValue: (r) => time(r.contract_end), cell: (r) => fmtDate(r.contract_end) },
+  { key: "contract_end", label: "Contract end", hideBelow: "sm", sortValue: (r) => time(r.contract_end), cell: (r) => fmtDate(r.contract_end) },
   {
-    key: "days_remaining", label: "Days Left", align: "right",
+    key: "days_remaining", label: "Days left", align: "right",
     sortValue: (r) => r.days_remaining ?? 9999,
     cell: (r) => {
       const d = r.days_remaining ?? 0;
@@ -171,7 +172,7 @@ const STORE_COLUMNS: Column<StoreHealthRow>[] = [
   { key: "printers", label: "Printers", align: "right", hideBelow: "sm", sortValue: (r) => r.printers, cell: (r) => <span className={GRID.num}>{r.printers}</span> },
   { key: "replace", label: "Replace", align: "right", hideBelow: "sm", sortValue: (r) => r.replace, cell: (r) => <span className={cn(GRID.num, r.replace > 0 ? "font-semibold" : "text-faint")}>{r.replace}</span> },
   { key: "score", label: "Score", align: "right", sortValue: (r) => r.score, cell: (r) => <Badge status={scoreStatus(r.score)}>{Math.round(r.score * 100)}%</Badge> },
-  { key: "lastActivity", label: "Last Activity", align: "right", hideBelow: "lg", sortValue: (r) => time(r.lastActivity), cell: (r) => <Muted>{fmtDate(r.lastActivity)}</Muted> },
+  { key: "lastActivity", label: "Last activity", align: "right", hideBelow: "lg", sortValue: (r) => time(r.lastActivity), cell: (r) => <Muted>{fmtDate(r.lastActivity)}</Muted> },
 ];
 
 const NOTHING = "Nothing needs attention here right now";
@@ -247,7 +248,7 @@ export default function FleetHealthPage() {
   // Block non-admins from the fleet render path entirely (they're being redirected).
   if (guardLoading || !allowed || loading) {
     return (
-      <Page title="Fleet Health">
+      <Page title="Fleet health">
         <Loading label={guardLoading || !allowed ? "Loading" : "Loading fleet health"} />
       </Page>
     );
@@ -255,7 +256,7 @@ export default function FleetHealthPage() {
 
   if (!data) {
     return (
-      <Page title="Fleet Health">
+      <Page title="Fleet health">
         <Empty title="Could not load fleet health data" />
       </Page>
     );
@@ -271,13 +272,13 @@ export default function FleetHealthPage() {
   ];
 
   return (
-    <Page title="Fleet Health">
+    <Page title="Fleet health">
       <TileRow>
-        <Tile label="Total Equipment" value={data.kpi.total} />
-        <Tile label="Poor Condition" value={data.kpi.poor} tone={data.kpi.poor > 0 ? "danger" : "default"} />
-        <Tile label="Service Overdue" value={data.kpi.serviceOverdue} tone={data.kpi.serviceOverdue > 0 ? "danger" : "default"} />
-        <Tile label="Replace Flagged" value={data.kpi.replaceFlagged} tone={data.kpi.replaceFlagged > 0 ? "danger" : "default"} />
-        <Tile label="Contracts Expiring" value={data.kpi.contractsExpiring30d} tone={data.kpi.contractsExpiring30d > 0 ? "danger" : "default"} />
+        <Tile label="Total equipment" value={data.kpi.total} />
+        <Tile label="Poor condition" value={data.kpi.poor} tone={data.kpi.poor > 0 ? "danger" : "default"} />
+        <Tile label="Service overdue" value={data.kpi.serviceOverdue} tone={data.kpi.serviceOverdue > 0 ? "danger" : "default"} />
+        <Tile label="Replace flagged" value={data.kpi.replaceFlagged} tone={data.kpi.replaceFlagged > 0 ? "danger" : "default"} />
+        <Tile label="Contracts expiring" value={data.kpi.contractsExpiring30d} tone={data.kpi.contractsExpiring30d > 0 ? "danger" : "default"} />
       </TileRow>
 
       <Panel caption="Condition breakdown" bodyClassName="flex flex-col gap-3">
@@ -298,10 +299,10 @@ export default function FleetHealthPage() {
       <Panel caption="Needs attention">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabStrip>
-            <TabsTrigger value="poorCondition">Poor Condition <Badge variant="secondary">{ai.poorCondition.length}</Badge></TabsTrigger>
-            <TabsTrigger value="serviceOverdue">Service Overdue <Badge variant="secondary">{ai.serviceOverdue.length}</Badge></TabsTrigger>
-            <TabsTrigger value="replaceFlagged">Replace Flagged <Badge variant="secondary">{ai.replaceFlagged.length}</Badge></TabsTrigger>
-            <TabsTrigger value="contractsExpiring">Contracts Expiring <Badge variant="secondary">{ai.contractsExpiring.length}</Badge></TabsTrigger>
+            <TabsTrigger value="poorCondition">Poor condition <Badge variant="secondary">{ai.poorCondition.length}</Badge></TabsTrigger>
+            <TabsTrigger value="serviceOverdue">Service overdue <Badge variant="secondary">{ai.serviceOverdue.length}</Badge></TabsTrigger>
+            <TabsTrigger value="replaceFlagged">Replace flagged <Badge variant="secondary">{ai.replaceFlagged.length}</Badge></TabsTrigger>
+            <TabsTrigger value="contractsExpiring">Contracts expiring <Badge variant="secondary">{ai.contractsExpiring.length}</Badge></TabsTrigger>
           </TabStrip>
           <TabsContent value="poorCondition" className="pt-3">
             <DataTable columns={POOR_COLUMNS} rows={ai.poorCondition} rowKey={(r) => `eq-${r.id}`} empty={NOTHING} pageSize={25} card={false} />

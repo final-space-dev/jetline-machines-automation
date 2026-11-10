@@ -42,6 +42,9 @@ const MACHINE_STATUS: Record<string, "success" | "neutral" | "info" | "danger"> 
   DECOMMISSIONED: "danger",
 };
 
+/** "DECOMMISSIONED" as it is stored, "Decommissioned" as it is read. */
+const statusLabel = (status: string) => status.charAt(0) + status.slice(1).toLowerCase();
+
 const TREND = { up: "rising", down: "falling", stable: "steady" } as const;
 
 const MACHINE_COLUMNS: Column<MachineWithUtil>[] = [
@@ -81,7 +84,7 @@ const MACHINE_COLUMNS: Column<MachineWithUtil>[] = [
     },
   },
   { key: "balance", label: "Balance", align: "right", hideBelow: "sm", sortValue: (m) => m.currentBalance || 0, cell: (m) => <span className={GRID.num}>{formatNumber(m.currentBalance)}</span> },
-  { key: "status", label: "Status", sortValue: (m) => m.status, cell: (m) => <Badge status={MACHINE_STATUS[m.status] ?? "neutral"}>{m.status}</Badge> },
+  { key: "status", label: "Status", sortValue: (m) => m.status, cell: (m) => <Badge status={MACHINE_STATUS[m.status] ?? "neutral"}>{statusLabel(m.status)}</Badge> },
 ];
 
 export default function StoreDetailPage() {
@@ -149,10 +152,7 @@ export default function StoreDetailPage() {
   if (!store) {
     return (
       <Page title="Store not found">
-        <Empty title="This store does not exist or has been removed" />
-        <div className="flex justify-center">
-          <LinkButton href="/stores">Back to Stores</LinkButton>
-        </div>
+        <Empty title="This store does not exist or has been removed" action={<LinkButton href="/stores">Back to stores</LinkButton>} />
       </Page>
     );
   }
@@ -203,10 +203,10 @@ export default function StoreDetailPage() {
         <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
           <Panel caption="Store information">
             <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-3">
-              <ReadField label="Store Name" value={store.name} />
-              <ReadField label="Region" value={store.region || "-"} />
-              <ReadField label="BMS Schema" value={store.bmsSchema} />
-              <ReadField label="BMS Host" value={store.bmsHost || "default"} />
+              <ReadField label="Store name" value={store.name} />
+              <ReadField label="Region" value={store.region} />
+              <ReadField label="BMS schema" value={store.bmsSchema} />
+              <ReadField label="BMS host" value={store.bmsHost || "default"} />
               <ReadField label="Status" value={store.isActive ? "Active" : "Inactive"} />
               <ReadField label="Created" value={formatDate(store.createdAt)} />
             </div>
@@ -229,10 +229,10 @@ export default function StoreDetailPage() {
           <Panel caption="Summary">
             <KeyValueList
               items={[
-                { label: "Total Machines", value: store.machines.length },
+                { label: "Total machines", value: store.machines.length },
                 { label: "Active", value: activeMachines, tone: "good" },
                 { label: "Inactive", value: store.machines.length - activeMachines },
-                { label: "Total Balance", value: formatNumber(totalBalance) },
+                { label: "Total balance", value: formatNumber(totalBalance) },
               ]}
             />
           </Panel>

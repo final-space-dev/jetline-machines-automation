@@ -13,6 +13,7 @@ import { Field } from "@/components/machines/field";
 import { Muted, Panel, SectionHeading } from "@/components/machines/panel";
 import { SURFACE, TYPE } from "@/lib/ui/ui-tokens";
 import { cn } from "@/lib/ui/utils";
+import { formatDateTime } from "@/lib/utils";
 
 /**
  * Shared feedback surface for a single machine (equipment item or printer).
@@ -68,8 +69,7 @@ const URGENCIES = [
 function relDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) +
-    " · " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
+  return formatDateTime(d);
 }
 
 export function FeedbackPanel({ type, refId }: { type: EntityType; refId: string }) {

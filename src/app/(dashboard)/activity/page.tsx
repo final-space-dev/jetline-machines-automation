@@ -14,6 +14,7 @@ import { Panel } from "@/components/machines/panel";
 import { Pick } from "@/components/machines/pick";
 import { relativeTime, type ActivityEntry } from "@/lib/activity";
 import { ALL_XEROX_STORES } from "@/lib/equipment-utils";
+import { formatDate } from "@/lib/utils";
 
 type TypeFilter = "all" | "equipment" | "printer";
 
@@ -60,6 +61,19 @@ function groupFor(iso: string): GroupKey {
 }
 
 const GROUP_ORDER: GroupKey[] = ["Today", "Yesterday", "This Week", "Earlier"];
+
+// A stored value that is a date (an ISO day, or the long form a JavaScript Date
+// prints) is shown as a day; anything else as it is.
+const LONG_DATE = /^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{2} \d{4} \d{2}:\d{2}:\d{2} GMT/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+function showValue(value: string | null): string {
+  if (value === null || value === "") return "empty";
+  if (LONG_DATE.test(value) || ISO_DATE.test(value)) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return formatDate(d);
+  }
+  return value;
+}
 
 function fieldLabel(field: string): string {
   return field.replace(/_/g, " ");
@@ -177,7 +191,7 @@ export default function ActivityPage() {
                     <span className="font-semibold text-foreground">{e.user_name}</span>
                     {" changed "}
                     <span className="font-medium">{fieldLabel(e.field)}</span>
-                    {" on "}
+                    {e.item_type === "printer" ? " on printer " : " on item "}
                     <span className="font-medium">{e.ref}</span>
                     {e.store ? (
                       <>
@@ -187,9 +201,9 @@ export default function ActivityPage() {
                     ) : null}
                     {(e.old_value || e.new_value) && (
                       <span className="block text-muted-foreground">
-                        {e.old_value ?? "empty"}
+                        {showValue(e.old_value)}
                         {"  →  "}
-                        {e.new_value ?? "empty"}
+                        {showValue(e.new_value)}
                       </span>
                     )}
                   </TimelineItem>

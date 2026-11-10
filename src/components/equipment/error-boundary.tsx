@@ -32,11 +32,16 @@ export class EquipmentErrorBoundary extends React.Component<{ children: React.Re
 
     return (
       <Page title="Something went wrong">
-        <Empty icon={<AlertTriangle />} title={this.state.error?.message ?? "An unexpected error occurred in the Equipment section."} />
-        <div className="flex justify-center gap-2.5">
-          <Button onClick={() => this.setState({ hasError: false, error: null })}>Try again</Button>
-          <LinkButton href="/equipment" variant="outline">Back to Equipment</LinkButton>
-        </div>
+        <Empty
+          icon={<AlertTriangle />}
+          title={this.state.error?.message ?? "An unexpected error occurred in the Equipment section."}
+          action={
+            <>
+              <Button onClick={() => this.setState({ hasError: false, error: null })}>Try again</Button>
+              <LinkButton href="/equipment" variant="outline">Back to equipment</LinkButton>
+            </>
+          }
+        />
       </Page>
     );
   }
