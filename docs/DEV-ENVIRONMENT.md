@@ -179,9 +179,15 @@ An agent does step 1 only.
   its Production deployment by Vercel and was built before the variables
   existed, so it does not work. It sits at
   `jetline-machines-dev-finalspace-alwyns-projects.vercel.app`; the dev
-  address does not point at it. A deployment-protection bypass token exists on
-  the dev project (the CLI made it when `vercel curl` was used to test the
-  sign-in). Both can be removed in the dashboard.
+  address does not point at it. It can be removed in the dashboard.
+- **A deployment-protection bypass token exists on the dev project.** The CLI
+  made it the first time `vercel curl` was used. It is how an automated check
+  gets past Vercel's sign-in: `vercel curl /login --deployment <address>`
+  with the dev project named as in "Variables", or a browser script that
+  sends the token in the `x-vercel-protection-bypass` header (read the token
+  from the project with the API into a private file; never print or commit
+  it). Whoever holds it can reach the dev sign-in page without a Vercel
+  account, so remove it in the dashboard if that is not wanted.
 - Vercel's "production branch" setting for `jetline-machines` is `main`, which
   is far behind what production actually runs (`flatten-to-root`, deployed by
   the CLI), and git deployments are switched on. A push to `main` would try to
@@ -210,7 +216,9 @@ An agent does step 1 only.
   creates the table exactly as the schema describes it and was run on the dev
   branch. **Production needs the same file run once**, by Alwyn's say-so; it
   only adds an empty table. The table stays empty until a BMS sync fills it,
-  so store analysis shows machines without utilisation figures either way.
+  and with no readings the route calls every machine 0% utilised, Critical
+  and a lift candidate. Those figures on the store analysis page mean "no
+  readings", not idle machines.
 - The links to `/stores/<store>/completeness` (a page that never existed) and
   fleet health's links to `/stores/<store name>` (the store analysis page
   wants a company id, so they showed "Store not found") now open the store's
