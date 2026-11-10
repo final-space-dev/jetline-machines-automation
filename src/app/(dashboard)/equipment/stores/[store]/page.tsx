@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { Package, Plus, Save, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -331,9 +330,11 @@ export default function StoreDetailPage() {
 
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
+  // "Now" is read once, when the page opens, so a re-render never changes the count.
+  const [openedAt] = useState(() => Date.now());
   const activePrinters = machines.filter((m) => {
     if (!m.last_seen) return false;
-    const days = (Date.now() - new Date(m.last_seen).getTime()) / 86400000;
+    const days = (openedAt - new Date(m.last_seen).getTime()) / 86400000;
     return days <= 45;
   }).length;
 

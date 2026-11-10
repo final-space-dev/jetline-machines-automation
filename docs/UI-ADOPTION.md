@@ -95,6 +95,12 @@ changed how something is done:
   analysis page, which looks a store up by its company id and so showed
   "Store not found" for every one. They now open the store's own page,
   `/equipment/stores/<store>`.
+- **Store analysis with no readings.** A machine that has never sent a
+  reading was shown as "0%, Critical" and counted as a lift candidate, and a
+  store of such machines as "0% average, all critical". It now reads "No
+  readings" in the neutral tone, and those machines are left out of the
+  bands, the lift candidates and the average (`src/lib/utilization-summary.ts`,
+  with a unit test). The route's answer is unchanged.
 - **Two config panels that no tab reached** (`setup/connections/panel.tsx`,
   `setup/store-groups/panel.tsx`) were removed. Their old addresses still open
   Config.

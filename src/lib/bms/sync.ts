@@ -9,7 +9,6 @@
 import { MachineStatus, SyncStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
-  BMSConnectionConfig,
   BMSMachineRow,
   BMSMeterReadingRow,
   BMSMachineRateRow,

@@ -109,7 +109,8 @@ export default function EquipmentItemPage() {
   const router = useRouter();
 
   const [item, setItem] = useState<EquipmentItem | null>(null);
-  const [log, setLog] = useState<ChangeLogEntry[]>([]);
+  // The change log is kept fresh for the activity panel below, which reads it from the server itself.
+  const [, setLog] = useState<ChangeLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);

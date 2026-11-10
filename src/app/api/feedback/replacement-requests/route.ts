@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
 import { bmsPool } from "@/lib/bms-pool";
 import { xeroxPool } from "@/lib/xerox-pool";
-import { withClient, badRequest, notFound, serverError, ensureFeedbackTables, validateBody } from "@/lib/api-utils";
+import { withClient, notFound, serverError, ensureFeedbackTables, validateBody } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
 import { requireUser, requireCapability, AuthError, type SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -40,7 +40,6 @@ const PatchRequestSchema = z.object({
  */
 
 type EntityType = "equipment" | "printer";
-const URGENCIES = new Set(["low", "medium", "high"]);
 const STATUSES = new Set(["open", "reviewing", "approved", "declined"]);
 
 function parseType(v: unknown): EntityType | null {

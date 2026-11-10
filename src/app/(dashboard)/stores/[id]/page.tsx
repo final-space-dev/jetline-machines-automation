@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { Muted, Panel } from "@/components/machines/panel";
 import { ReadField } from "@/components/machines/read-field";
 import { UTILIZATION, UtilizationBadge, type UtilizationStatus } from "@/components/machines/status-badge";
 import { GRID } from "@/lib/ui/ui-tokens";
+import { hasReadings, summariseUtilization, type UtilizationSummary } from "@/lib/utilization-summary";
 import { formatDate, formatNumber } from "@/lib/utils";
 import type { MachineUtilization, MachineWithRelations } from "@/types";
 
@@ -34,17 +35,6 @@ interface StoreDetail {
   machines: MachineWithUtil[];
 }
 
-interface UtilizationSummary {
-  total: number;
-  critical: number;
-  low: number;
-  optimal: number;
-  high: number;
-  overworked: number;
-  liftCandidates: number;
-  avgUtilization: number;
-}
-
 const MACHINE_STATUS: Record<string, "success" | "neutral" | "info" | "danger"> = {
   ACTIVE: "success",
   INACTIVE: "neutral",
@@ -59,11 +49,13 @@ const MACHINE_COLUMNS: Column<MachineWithUtil>[] = [
   { key: "model", label: "Model", hideBelow: "sm", sortValue: (m) => m.modelName ?? "", cell: (m) => m.modelName || "-" },
   {
     key: "utilization",
-    label: "Utilization",
-    sortValue: (m) => m.utilization?.utilizationPercent ?? -1,
+    label: "Utilisation",
+    sortValue: (m) => (hasReadings(m.utilization) ? m.utilization.utilizationPercent : -1),
     cell: (m) => {
       const util = m.utilization;
       if (!util) return <Muted>—</Muted>;
+      // Never read: there is no utilisation to show, and 0% would read as an alarm.
+      if (!hasReadings(util)) return <Badge status="neutral">No readings</Badge>;
       return (
         <span className="inline-flex items-center gap-2" title={`Avg ${formatNumber(util.avgMonthlyVolume)} a month · Duty ${formatNumber(util.dutyCycle)} · ${TREND[util.trendDirection as keyof typeof TREND] ?? ""}`}>
           <UtilizationBadge percent={util.utilizationPercent} status={util.utilizationStatus as UtilizationStatus} />
@@ -75,10 +67,10 @@ const MACHINE_COLUMNS: Column<MachineWithUtil>[] = [
     key: "lift",
     label: "Lift",
     hideBelow: "md",
-    sortValue: (m) => m.utilization?.liftScore ?? -1,
+    sortValue: (m) => (hasReadings(m.utilization) ? m.utilization.liftScore : -1),
     cell: (m) => {
       const util = m.utilization;
-      if (!util || util.liftScore < 60) return <Muted>—</Muted>;
+      if (!hasReadings(util) || util.liftScore < 60) return <Muted>—</Muted>;
       return (
         <Tooltip content={[`Lift score ${util.liftScore} of 100`, ...util.insights.slice(0, 2)].join(". ")}>
           <Badge status={util.liftScore >= 80 ? "danger" : "warning"}>
@@ -100,11 +92,7 @@ export default function StoreDetailPage() {
   const [utilizationSummary, setUtilizationSummary] = useState<UtilizationSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStoreData();
-  }, [storeId]);
-
-  const fetchStoreData = async () => {
+  const fetchStoreData = useCallback(async () => {
     try {
       const [companyRes, machinesRes, utilizationRes] = await Promise.all([
         fetch(`/api/companies/${storeId}`),
@@ -142,37 +130,19 @@ export default function StoreDetailPage() {
           machines: machinesWithUtil,
         });
 
-        // Calculate utilization summary
-        const machinesWithUtilData = machinesWithUtil.filter((m) => m.utilization);
-        if (machinesWithUtilData.length > 0) {
-          const critical = machinesWithUtilData.filter((m) => m.utilization?.utilizationStatus === "critical").length;
-          const low = machinesWithUtilData.filter((m) => m.utilization?.utilizationStatus === "low").length;
-          const optimal = machinesWithUtilData.filter((m) => m.utilization?.utilizationStatus === "optimal").length;
-          const high = machinesWithUtilData.filter((m) => m.utilization?.utilizationStatus === "high").length;
-          const overworked = machinesWithUtilData.filter((m) => m.utilization?.utilizationStatus === "overworked").length;
-          const liftCandidates = machinesWithUtilData.filter((m) => m.utilization && m.utilization.liftScore >= 70).length;
-          const avgUtilization = Math.round(
-            machinesWithUtilData.reduce((sum, m) => sum + (m.utilization?.utilizationPercent || 0), 0) / machinesWithUtilData.length
-          );
-
-          setUtilizationSummary({
-            total: machinesWithUtilData.length,
-            critical,
-            low,
-            optimal,
-            high,
-            overworked,
-            liftCandidates,
-            avgUtilization,
-          });
-        }
+        // Bands, lift candidates and the average: over machines that have readings.
+        setUtilizationSummary(summariseUtilization(machinesWithUtil.map((m) => m.utilization)));
       }
     } catch (error) {
       console.error("Failed to fetch store data:", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [storeId]);
+
+  useEffect(() => {
+    fetchStoreData();
+  }, [fetchStoreData]);
 
   if (isLoading) return <Loading />;
 
@@ -197,6 +167,9 @@ export default function StoreDetailPage() {
     }, {} as Record<string, number>)
   );
   const avg = utilizationSummary?.avgUtilization ?? 0;
+  // Figures exist only for machines that have sent a reading.
+  const measured = utilizationSummary !== null && utilizationSummary.total > 0;
+  const unread = utilizationSummary?.noReadings ?? 0;
 
   return (
     <Page
@@ -204,13 +177,14 @@ export default function StoreDetailPage() {
       titleExtra={
         <>
           <Badge status={store.isActive ? "success" : "neutral"}>{store.isActive ? "Active" : "Inactive"}</Badge>
-          {utilizationSummary && <Badge status={avg < 40 ? "warning" : avg <= 80 ? "success" : "info"}>{avg}% Avg Util</Badge>}
+          {measured && <Badge status={avg < 40 ? "warning" : avg <= 80 ? "success" : "info"}>{avg}% avg utilisation</Badge>}
+          {utilizationSummary && !measured && <Badge status="neutral">No readings</Badge>}
         </>
       }
       subtitle={`${store.machines.length} machines · ${activeMachines} active · ${formatNumber(totalBalance)} total balance`}
       crumbs={[{ label: "Stores", href: "/stores" }, { label: store.name }]}
     >
-      {utilizationSummary && (
+      {measured && utilizationSummary && (
         <div className="flex flex-wrap gap-2">
           {utilizationSummary.critical > 0 && <Badge status="danger">{utilizationSummary.critical} Critical</Badge>}
           {utilizationSummary.low > 0 && <Badge status="warning">{utilizationSummary.low} Low</Badge>}
@@ -218,9 +192,10 @@ export default function StoreDetailPage() {
           {utilizationSummary.overworked > 0 && <Badge status="elim">{utilizationSummary.overworked} Overworked</Badge>}
           {utilizationSummary.liftCandidates > 0 && (
             <Badge status="warning">
-              <Target /> {utilizationSummary.liftCandidates} Lift Candidates
+              <Target /> {utilizationSummary.liftCandidates} Lift candidates
             </Badge>
           )}
+          {unread > 0 && <Badge status="neutral">{unread} No readings</Badge>}
         </div>
       )}
 
@@ -242,7 +217,7 @@ export default function StoreDetailPage() {
               columns={MACHINE_COLUMNS}
               rows={store.machines}
               rowKey={(m) => m.id}
-              rowClassName={(m) => (m.utilization?.utilizationStatus === "critical" || (m.utilization && m.utilization.liftScore >= 80) ? "bg-muted" : undefined)}
+              rowClassName={(m) => (hasReadings(m.utilization) && (m.utilization.utilizationStatus === "critical" || m.utilization.liftScore >= 80) ? "bg-muted" : undefined)}
               empty="No machines in this store"
               pageSize={50}
               card={false}
@@ -263,18 +238,26 @@ export default function StoreDetailPage() {
           </Panel>
 
           {utilizationSummary && (
-            <Panel caption="Utilization overview" bodyClassName="flex flex-col gap-3">
-              <Progress label="Avg Utilization" value={Math.min(avg, 100)} valueLabel={`${avg}%`} tone={avg < 40 ? "warning" : avg <= 80 ? "success" : "accent"} />
-              <KeyValueList
-                items={[
-                  ...(["critical", "low", "optimal", "high", "overworked"] as const).map((band) => ({
-                    label: UTILIZATION[band].label,
-                    value: utilizationSummary[band],
-                    tone: band === "critical" && utilizationSummary.critical > 0 ? ("bad" as const) : undefined,
-                  })),
-                  ...(utilizationSummary.liftCandidates > 0 ? [{ label: "Lift Candidates", value: utilizationSummary.liftCandidates }] : []),
-                ]}
-              />
+            <Panel caption="Utilisation overview" bodyClassName="flex flex-col gap-3">
+              {measured ? (
+                <>
+                  <Progress label="Avg utilisation" value={Math.min(avg, 100)} valueLabel={`${avg}%`} tone={avg < 40 ? "warning" : avg <= 80 ? "success" : "accent"} />
+                  <KeyValueList
+                    items={[
+                      ...(["critical", "low", "optimal", "high", "overworked"] as const).map((band) => ({
+                        label: UTILIZATION[band].label,
+                        value: utilizationSummary[band],
+                        tone: band === "critical" && utilizationSummary.critical > 0 ? ("bad" as const) : undefined,
+                      })),
+                      ...(utilizationSummary.liftCandidates > 0 ? [{ label: "Lift candidates", value: utilizationSummary.liftCandidates }] : []),
+                      ...(unread > 0 ? [{ label: "No readings", value: unread }] : []),
+                    ]}
+                  />
+                </>
+              ) : (
+                // No machine here has ever sent a reading: there is nothing to rate, so nothing is called critical.
+                <Muted>No readings for this store&apos;s machines</Muted>
+              )}
             </Panel>
           )}
 

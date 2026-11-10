@@ -23,9 +23,8 @@ declare module "@imc-trading/react-pivottable" {
   export const getSort: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export const createPlotlyRenderers: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export class PivotData {
-    constructor(props: any);
+    constructor(props: unknown);
   }
 }
 

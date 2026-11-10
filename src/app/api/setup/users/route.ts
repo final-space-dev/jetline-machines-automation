@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma, ensureUserPermissionsColumn } from "@/lib/prisma";
-import { badRequest, serverError, validateBody } from "@/lib/api-utils";
+import { serverError, validateBody } from "@/lib/api-utils";
 import { routeTimer } from "@/lib/logger";
-import { requireAdmin, AuthError, type Role } from "@/lib/auth";
+import { requireAdmin, AuthError } from "@/lib/auth";
 import { normalisePermissions } from "@/lib/permissions";
 import { z } from "zod";
 
@@ -45,11 +45,6 @@ async function adminGate(): Promise<NextResponse | null> {
 }
 
 const BCRYPT_ROUNDS = 10;
-const VALID_ROLES: Role[] = ["admin", "store_staff", "custom"];
-
-function isValidRole(role: unknown): role is Role {
-  return typeof role === "string" && (VALID_ROLES as string[]).includes(role);
-}
 
 /** Public shape — NEVER includes the password hash. */
 const publicSelect = {
